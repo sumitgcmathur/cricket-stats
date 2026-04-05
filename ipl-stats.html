@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IPL All-Time Stats</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --gold: #D4AF37;
+    --gold-light: #F0D060;
+    --bg: #0A0A0F;
+    --surface: #12121A;
+    --surface2: #1C1C28;
+    --border: #2A2A3A;
+    --text: #E8E8F0;
+    --muted: #7A7A9A;
+    --accent: #FF4D4D;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* HERO */
+  .hero {
+    position: relative;
+    text-align: center;
+    padding: 80px 20px 60px;
+    background:
+      radial-gradient(ellipse 80% 60% at 50% 0%, rgba(212,175,55,0.12) 0%, transparent 70%),
+      radial-gradient(ellipse 40% 40% at 20% 80%, rgba(255,77,77,0.06) 0%, transparent 60%),
+      var(--bg);
+    border-bottom: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .hero::before {
+    content: '🏏';
+    position: absolute;
+    font-size: 400px;
+    opacity: 0.03;
+    top: -80px;
+    left: 50%;
+    transform: translateX(-50%) rotate(-20deg);
+    pointer-events: none;
+  }
+
+  .hero-badge {
+    display: inline-block;
+    background: rgba(212,175,55,0.15);
+    border: 1px solid rgba(212,175,55,0.4);
+    color: var(--gold);
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 3px;
+    padding: 6px 16px;
+    border-radius: 2px;
+    text-transform: uppercase;
+    margin-bottom: 24px;
+    animation: fadeUp 0.6s ease both;
+  }
+
+  h1 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(60px, 12vw, 120px);
+    letter-spacing: 4px;
+    line-height: 0.9;
+    background: linear-gradient(135deg, var(--gold-light) 0%, var(--gold) 40%, #A07800 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: fadeUp 0.6s 0.1s ease both;
+  }
+
+  .hero-sub {
+    font-size: 15px;
+    color: var(--muted);
+    margin-top: 16px;
+    letter-spacing: 1px;
+    animation: fadeUp 0.6s 0.2s ease both;
+  }
+
+  #last-updated {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 8px;
+    animation: fadeUp 0.6s 0.3s ease both;
+  }
+
+  /* TABS */
+  .tabs {
+    display: flex;
+    justify-content: center;
+    gap: 4px;
+    padding: 32px 20px 0;
+    flex-wrap: wrap;
+    animation: fadeUp 0.6s 0.3s ease both;
+  }
+
+  .tab {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 1px;
+    padding: 10px 24px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-transform: uppercase;
+    border-radius: 2px;
+  }
+
+  .tab:hover { color: var(--text); border-color: var(--gold); }
+
+  .tab.active {
+    background: var(--gold);
+    border-color: var(--gold);
+    color: #000;
+    font-weight: 600;
+  }
+
+  /* PANELS */
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  /* CONTAINER */
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 40px 20px 80px;
+  }
+
+  /* STAT CARDS ROW */
+  .stat-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    margin-bottom: 40px;
+    animation: fadeUp 0.5s 0.1s ease both;
+  }
+
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 20px;
+    border-radius: 4px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--gold), transparent);
+  }
+
+  .stat-card .label {
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-bottom: 8px;
+  }
+
+  .stat-card .value {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 36px;
+    color: var(--gold);
+    line-height: 1;
+  }
+
+  .stat-card .name {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  /* TABLE */
+  .table-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    animation: fadeUp 0.5s 0.2s ease both;
+  }
+
+  .table-header {
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .table-header h2 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 22px;
+    letter-spacing: 2px;
+    color: var(--text);
+  }
+
+  .table-header .count {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    background: var(--surface2);
+    padding: 3px 10px;
+    border-radius: 20px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  thead th {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 12px 16px;
+    text-align: right;
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+  }
+
+  thead th:first-child { text-align: left; padding-left: 24px; }
+
+  tbody tr {
+    border-bottom: 1px solid rgba(42,42,58,0.6);
+    transition: background 0.15s;
+  }
+
+  tbody tr:hover { background: rgba(212,175,55,0.04); }
+  tbody tr:last-child { border-bottom: none; }
+
+  td {
+    padding: 14px 16px;
+    font-size: 13px;
+    text-align: right;
+    color: var(--muted);
+  }
+
+  td:first-child {
+    text-align: left;
+    padding-left: 24px;
+  }
+
+  .rank {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: rgba(212,175,55,0.4);
+    width: 32px;
+    display: inline-block;
+  }
+
+  .player-name {
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  .highlight {
+    color: var(--gold);
+    font-family: 'DM Mono', monospace;
+    font-weight: 500;
+  }
+
+  /* TEAM TABLE */
+  .win-bar-cell { width: 160px; }
+
+  .win-bar-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .win-bar-bg {
+    flex: 1;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .win-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--gold), var(--gold-light));
+    border-radius: 2px;
+    transition: width 1s ease;
+  }
+
+  .win-pct-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--gold);
+    width: 38px;
+    text-align: right;
+  }
+
+  /* SIXES GRID */
+  .sixes-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+    animation: fadeUp 0.5s 0.2s ease both;
+  }
+
+  .six-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    transition: transform 0.2s, border-color 0.2s;
+  }
+
+  .six-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--gold);
+  }
+
+  .six-rank-circle {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: rgba(212,175,55,0.1);
+    border: 1px solid rgba(212,175,55,0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 18px;
+    color: var(--gold);
+    flex-shrink: 0;
+  }
+
+  .six-info .six-name {
+    font-weight: 500;
+    font-size: 14px;
+    color: var(--text);
+  }
+
+  .six-info .six-count {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 28px;
+    color: var(--gold);
+    line-height: 1;
+  }
+
+  .six-info .six-label {
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  /* SECTION TITLE */
+  .section-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 18px;
+    letter-spacing: 3px;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 16px;
+    margin-top: 40px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* LOADING */
+  .loading {
+    text-align: center;
+    padding: 80px 20px;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+  }
+
+  .loading .spinner {
+    width: 32px;
+    height: 32px;
+    border: 2px solid var(--border);
+    border-top-color: var(--gold);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 16px;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* FOOTER */
+  footer {
+    text-align: center;
+    padding: 32px;
+    border-top: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+  }
+
+  footer a { color: var(--gold); text-decoration: none; }
+
+  @media (max-width: 600px) {
+    .stat-row { grid-template-columns: repeat(2, 1fr); }
+    td:nth-child(n+5) { display: none; }
+    th:nth-child(n+5) { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="hero-badge">Indian Premier League · All-Time Records</div>
+  <h1>IPL<br>STATS</h1>
+  <p class="hero-sub">Ball-by-ball data · Cricsheet · 2008 – present</p>
+  <p id="last-updated">Loading...</p>
+</div>
+
+<div class="tabs">
+  <button class="tab active" onclick="showTab('batting')">🏏 Batting</button>
+  <button class="tab" onclick="showTab('bowling')">🎳 Bowling</button>
+  <button class="tab" onclick="showTab('sixes')">💥 Sixes</button>
+  <button class="tab" onclick="showTab('teams')">🏆 Teams</button>
+</div>
+
+<!-- BATTING -->
+<div id="batting" class="panel active">
+  <div class="container">
+    <div class="stat-row" id="batting-cards"></div>
+    <div class="table-wrap">
+      <div class="table-header">
+        <h2>Most Runs</h2>
+        <span class="count" id="batting-count">—</span>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Player</th>
+            <th>Mat</th>
+            <th>Runs</th>
+            <th>Avg</th>
+            <th>SR</th>
+            <th>4s</th>
+            <th>6s</th>
+            <th>50s</th>
+            <th>100s</th>
+          </tr>
+        </thead>
+        <tbody id="batting-body"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- BOWLING -->
+<div id="bowling" class="panel">
+  <div class="container">
+    <div class="stat-row" id="bowling-cards"></div>
+    <div class="table-wrap">
+      <div class="table-header">
+        <h2>Most Wickets</h2>
+        <span class="count" id="bowling-count">—</span>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Player</th>
+            <th>Mat</th>
+            <th>Wkts</th>
+            <th>Avg</th>
+            <th>Econ</th>
+            <th>Overs</th>
+            <th>Runs</th>
+          </tr>
+        </thead>
+        <tbody id="bowling-body"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- SIXES -->
+<div id="sixes" class="panel">
+  <div class="container">
+    <p class="section-title">Most Sixes — All Time</p>
+    <div class="sixes-grid" id="sixes-grid"></div>
+  </div>
+</div>
+
+<!-- TEAMS -->
+<div id="teams" class="panel">
+  <div class="container">
+    <div class="stat-row" id="teams-cards"></div>
+    <div class="table-wrap">
+      <div class="table-header">
+        <h2>Team Records</h2>
+        <span class="count" id="teams-count">—</span>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Team</th>
+            <th>Matches</th>
+            <th>Wins</th>
+            <th>Win %</th>
+            <th class="win-bar-cell"></th>
+          </tr>
+        </thead>
+        <tbody id="teams-body"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<footer>
+  Data source: <a href="https://cricsheet.org" target="_blank">cricsheet.org</a> &nbsp;·&nbsp;
+  Auto-updated via Python + GitHub Actions &nbsp;·&nbsp;
+  Built with ❤️ for cricket
+</footer>
+
+<script>
+let stats = null;
+
+async function loadStats() {
+  try {
+    const res = await fetch('stats.json');
+    stats = await res.json();
+    document.getElementById('last-updated').textContent = 'Updated: ' + stats.last_updated;
+    renderAll();
+  } catch(e) {
+    document.getElementById('last-updated').textContent = 'Error loading stats.json';
+    console.error(e);
+  }
+}
+
+function showTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById(name).classList.add('active');
+}
+
+function renderAll() {
+  renderBatting();
+  renderBowling();
+  renderSixes();
+  renderTeams();
+}
+
+function renderBatting() {
+  const batters = stats.top_batters;
+  const top = batters[0];
+
+  document.getElementById('batting-cards').innerHTML = `
+    <div class="stat-card">
+      <div class="label">Most Runs</div>
+      <div class="value">${top.runs.toLocaleString()}</div>
+      <div class="name">${top.name}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Best Strike Rate (min 500 balls)</div>
+      <div class="value">${[...batters].filter(b=>b.balls>=500).sort((a,b)=>b.strike_rate-a.strike_rate)[0].strike_rate}</div>
+      <div class="name">${[...batters].filter(b=>b.balls>=500).sort((a,b)=>b.strike_rate-a.strike_rate)[0].name}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Most Hundreds</div>
+      <div class="value">${Math.max(...batters.map(b=>b.hundreds))}</div>
+      <div class="name">${batters.sort((a,b)=>b.hundreds-a.hundreds)[0].name}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Most Fifties</div>
+      <div class="value">${Math.max(...stats.top_batters.map(b=>b.fifties))}</div>
+      <div class="name">${stats.top_batters.sort((a,b)=>b.fifties-a.fifties)[0].name}</div>
+    </div>
+  `;
+  document.getElementById('batting-count').textContent = `Top ${stats.top_batters.length}`;
+
+  document.getElementById('batting-body').innerHTML = stats.top_batters
+    .sort((a,b) => b.runs - a.runs)
+    .map((b, i) => `
+      <tr>
+        <td><span class="rank">${i+1}</span> <span class="player-name">${b.name}</span></td>
+        <td>${b.matches}</td>
+        <td class="highlight">${b.runs.toLocaleString()}</td>
+        <td>${b.avg}</td>
+        <td>${b.strike_rate}</td>
+        <td>${b.fours}</td>
+        <td>${b.sixes}</td>
+        <td>${b.fifties}</td>
+        <td>${b.hundreds}</td>
+      </tr>
+    `).join('');
+}
+
+function renderBowling() {
+  const bowlers = stats.top_bowlers;
+  const top = bowlers[0];
+  const bestEcon = [...bowlers].filter(b=>b.overs>=100).sort((a,b)=>a.economy-b.economy)[0];
+
+  document.getElementById('bowling-cards').innerHTML = `
+    <div class="stat-card">
+      <div class="label">Most Wickets</div>
+      <div class="value">${top.wickets}</div>
+      <div class="name">${top.name}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Best Economy (100+ overs)</div>
+      <div class="value">${bestEcon.economy}</div>
+      <div class="name">${bestEcon.name}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Best Avg (50+ wkts)</div>
+      <div class="value">${[...bowlers].filter(b=>b.wickets>=50).sort((a,b)=>a.avg-b.avg)[0].avg}</div>
+      <div class="name">${[...bowlers].filter(b=>b.wickets>=50).sort((a,b)=>a.avg-b.avg)[0].name}</div>
+    </div>
+  `;
+  document.getElementById('bowling-count').textContent = `Top ${bowlers.length}`;
+
+  document.getElementById('bowling-body').innerHTML = [...bowlers]
+    .sort((a,b) => b.wickets - a.wickets)
+    .map((b, i) => `
+      <tr>
+        <td><span class="rank">${i+1}</span> <span class="player-name">${b.name}</span></td>
+        <td>${b.matches}</td>
+        <td class="highlight">${b.wickets}</td>
+        <td>${b.avg}</td>
+        <td>${b.economy}</td>
+        <td>${b.overs}</td>
+        <td>${b.runs.toLocaleString()}</td>
+      </tr>
+    `).join('');
+}
+
+function renderSixes() {
+  document.getElementById('sixes-grid').innerHTML = stats.top_six_hitters
+    .sort((a,b) => b.sixes - a.sixes)
+    .map((p, i) => `
+      <div class="six-card">
+        <div class="six-rank-circle">${i+1}</div>
+        <div class="six-info">
+          <div class="six-name">${p.name}</div>
+          <div class="six-count">${p.sixes}</div>
+          <div class="six-label">sixes · ${p.matches} matches</div>
+        </div>
+      </div>
+    `).join('');
+}
+
+function renderTeams() {
+  const teams = stats.team_stats;
+  const topTeam = [...teams].sort((a,b) => b.wins - a.wins)[0];
+  const topWinPct = [...teams].sort((a,b) => b.win_pct - a.win_pct)[0];
+
+  document.getElementById('teams-cards').innerHTML = `
+    <div class="stat-card">
+      <div class="label">Most Wins</div>
+      <div class="value">${topTeam.wins}</div>
+      <div class="name">${topTeam.team}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Best Win %</div>
+      <div class="value">${topWinPct.win_pct}%</div>
+      <div class="name">${topWinPct.team}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Most Matches</div>
+      <div class="value">${Math.max(...teams.map(t=>t.matches))}</div>
+      <div class="name">${teams.sort((a,b)=>b.matches-a.matches)[0].team}</div>
+    </div>
+  `;
+  document.getElementById('teams-count').textContent = `${teams.length} teams`;
+
+  document.getElementById('teams-body').innerHTML = stats.team_stats
+    .sort((a,b) => b.wins - a.wins)
+    .map((t, i) => `
+      <tr>
+        <td><span class="rank">${i+1}</span> <span class="player-name">${t.team}</span></td>
+        <td>${t.matches}</td>
+        <td class="highlight">${t.wins}</td>
+        <td>${t.win_pct}%</td>
+        <td class="win-bar-cell">
+          <div class="win-bar-wrap">
+            <div class="win-bar-bg">
+              <div class="win-bar-fill" style="width:${t.win_pct}%"></div>
+            </div>
+          </div>
+        </td>
+      </tr>
+    `).join('');
+}
+
+loadStats();
+</script>
+</body>
+</html>
