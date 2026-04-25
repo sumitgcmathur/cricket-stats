@@ -104,6 +104,11 @@ footer a{color:var(--blue);text-decoration:none;}
   </div>
 </div>
 
+<div style="background:var(--surface);border-bottom:1px solid var(--border);padding:8px 24px;">
+  <div style="max-width:1200px;margin:0 auto">
+    <button onclick="history.back()" style="background:none;border:none;color:var(--muted);font-family:Inter,sans-serif;font-size:13px;cursor:pointer;padding:4px 0;display:inline-flex;align-items:center;gap:6px">← Back</button>
+  </div>
+</div>
 <div class="player-hero">
   <div class="player-hero-inner">
     <div class="player-photo-wrap">
@@ -244,6 +249,10 @@ function showTab(name,btn){
   btn.classList.add('active');
   document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
   document.getElementById('tab-'+name).classList.add('active');
+  killCharts();
+  if(name==='batting') renderBatting();
+  else if(name==='bowling') renderBowling();
+  else if(name==='overview') renderOverview();
 }
 
 // ── BATTING TAB ──────────────────────────────────────────────────────────────

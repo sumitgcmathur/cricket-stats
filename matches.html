@@ -183,14 +183,22 @@ async function loadScorecard(id){
   document.getElementById('list-view').style.display='none';
   document.getElementById('scorecard-view').style.display='';
   document.getElementById('scorecard-wrap').innerHTML='<div class="loading"><div class="spinner"></div>Loading scorecard...</div>';
+  document.getElementById('breadcrumb-text').textContent='Scorecard';
   killCharts();
+  window.scrollTo(0,0);
   try{
     const r=await fetch(`stats/matches/${currentComp}/${id}.json`);
     renderScorecard(await r.json());
   }catch(e){document.getElementById('scorecard-wrap').innerHTML='<div class="empty">Scorecard not available</div>';}
 }
 
-function showList(){killCharts();document.getElementById('scorecard-view').style.display='none';document.getElementById('list-view').style.display='';}
+function showList(){
+  killCharts();
+  document.getElementById('scorecard-view').style.display='none';
+  document.getElementById('list-view').style.display='';
+  document.getElementById('breadcrumb-text').textContent='Match Browser';
+  window.scrollTo(0,0);
+}
 function killCharts(){charts.forEach(c=>{try{c.destroy();}catch(e){}});charts=[];}
 
 function renderScorecard(sc){

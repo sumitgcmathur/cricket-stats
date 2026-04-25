@@ -809,14 +809,22 @@ let yearFrom = null, yearTo = null;
 async function boot() {
   try {
     const res = await fetch('stats/index.json');
+    if (!res.ok) throw new Error('stats/index.json not found (HTTP ' + res.status + ')');
     index = await res.json();
     document.getElementById('header-updated').textContent = 'Updated: ' + index.last_updated;
     document.getElementById('footer-updated').textContent = 'Updated: ' + index.last_updated;
-    await loadComp('ipl');
+    const iplData = await loadComp('ipl');
+    if (iplData) {
+      renderStatTab(iplData);
+    } else {
+      document.getElementById('ipl-content').innerHTML =
+        '<div class="empty">⚠️ Could not load stats/ipl.json<br><small>Run: python fetch_all_cricket.py --comp ipl</small></div>';
+    }
     buildIntGrid();
   } catch(e) {
+    console.error('Boot error:', e);
     document.getElementById('ipl-content').innerHTML =
-      '<div class="empty">Could not load stats/index.json<br><small>Run fetch_all_cricket.py and push the stats/ folder</small></div>';
+      '<div class="empty">⚠️ Could not load data: ' + e.message + '<br><small>Make sure stats/ folder is pushed to GitHub. Run: python fetch_all_cricket.py then git add stats/ && git push</small></div>';
   }
 }
 
@@ -836,7 +844,8 @@ function setView(name, btn) {
   if (name === 'ipl') {
     document.getElementById('hero-strip').querySelector('.hero-title').innerHTML = 'Indian <span style="color:var(--gold-light)">Premier</span> League';
     document.getElementById('hero-strip').querySelector('.hero-sub').textContent = 'Ball-by-ball data · Cricsheet · 2008 – present';
-    refreshIPLView();
+    if (loadedData['ipl']) renderStatTab(loadedData['ipl']);
+    else loadComp('ipl').then(d => { if(d) renderStatTab(d); });
   } else if (name === 'international') {
     document.getElementById('hero-strip').querySelector('.hero-title').innerHTML = 'International <span style="color:var(--gold-light)">Cricket</span>';
     document.getElementById('hero-strip').querySelector('.hero-sub').textContent = 'Tests · ODIs · T20 Internationals · Cricsheet data';
