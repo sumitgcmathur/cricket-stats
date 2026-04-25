@@ -2,18 +2,11 @@
 Cricket Stats Fetcher — All Cricsheet Data
 ==========================================
 Downloads ball-by-ball CSV data for ALL competitions from cricsheet.org
-and generates one JSON file per competition + a master index.json
-
-Output structure:
-  stats/
-    index.json          ← list of all competitions
-    tests.json
-    odis.json
-    t20is.json
-    ipl.json
-    bbl.json
-    psl.json
-    ... (one per competition)
+Generates:
+  stats/index.json              — master competition list
+  stats/{code}.json             — aggregated player/team stats
+  stats/matches/{code}/         — one JSON per match (scorecard)
+  stats/matches/{code}/index.json — match list for competition
 
 Usage:
   python fetch_all_cricket.py              # fetch everything
@@ -30,248 +23,420 @@ import sys
 import datetime
 from collections import defaultdict
 
-# ── All Cricsheet competitions ───────────────────────────────────────────────
 COMPETITIONS = [
-    # International
-    {"code": "tests",   "name": "Test Matches",           "format": "Test",  "type": "international"},
-    {"code": "odis",    "name": "One Day Internationals", "format": "ODI",   "type": "international"},
-    {"code": "t20is",   "name": "T20 Internationals",     "format": "T20",   "type": "international"},
-
-    # T20 Leagues
-    {"code": "ipl",     "name": "Indian Premier League",        "format": "T20", "type": "league"},
-    {"code": "bbl",     "name": "Big Bash League",              "format": "T20", "type": "league"},
-    {"code": "psl",     "name": "Pakistan Super League",        "format": "T20", "type": "league"},
-    {"code": "cpl",     "name": "Caribbean Premier League",     "format": "T20", "type": "league"},
-    {"code": "sa20",    "name": "SA20",                         "format": "T20", "type": "league"},
-    {"code": "lpl",     "name": "Lanka Premier League",         "format": "T20", "type": "league"},
-    {"code": "hundred", "name": "The Hundred",                  "format": "T20", "type": "league"},
-    {"code": "ilt20",   "name": "International League T20",     "format": "T20", "type": "league"},
-    {"code": "mlc",     "name": "Major League Cricket",         "format": "T20", "type": "league"},
-    {"code": "wbbl",    "name": "Women's Big Bash League",      "format": "T20", "type": "league"},
-    {"code": "wcpl",    "name": "Women's CPL",                  "format": "T20", "type": "league"},
-
-    # Domestic
-    {"code": "ntb",     "name": "County Championship",          "format": "Test", "type": "domestic"},
-    {"code": "nto",     "name": "One-Day Cup (England)",        "format": "ODI",  "type": "domestic"},
-    {"code": "ntt",     "name": "T20 Blast",                    "format": "T20",  "type": "domestic"},
-    {"code": "shield",  "name": "Sheffield Shield",             "format": "Test", "type": "domestic"},
-    {"code": "smat",    "name": "Syed Mushtaq Ali Trophy",      "format": "T20",  "type": "domestic"},
-    {"code": "super50", "name": "Super 50 Cup",                 "format": "ODI",  "type": "domestic"},
+    {"code": "tests",   "name": "Test Matches",               "format": "Test", "type": "international"},
+    {"code": "odis",    "name": "One Day Internationals",      "format": "ODI",  "type": "international"},
+    {"code": "t20is",   "name": "T20 Internationals",          "format": "T20",  "type": "international"},
+    {"code": "ipl",     "name": "Indian Premier League",       "format": "T20",  "type": "league"},
+    {"code": "bbl",     "name": "Big Bash League",             "format": "T20",  "type": "league"},
+    {"code": "psl",     "name": "Pakistan Super League",       "format": "T20",  "type": "league"},
+    {"code": "cpl",     "name": "Caribbean Premier League",    "format": "T20",  "type": "league"},
+    {"code": "sa20",    "name": "SA20",                        "format": "T20",  "type": "league"},
+    {"code": "lpl",     "name": "Lanka Premier League",        "format": "T20",  "type": "league"},
+    {"code": "hundred", "name": "The Hundred",                 "format": "T20",  "type": "league"},
+    {"code": "ilt20",   "name": "International League T20",    "format": "T20",  "type": "league"},
+    {"code": "mlc",     "name": "Major League Cricket",        "format": "T20",  "type": "league"},
 ]
 
-BASE_URL = "https://cricsheet.org/downloads/{code}_male_csv2.zip"
+BASE_URL  = "https://cricsheet.org/downloads/{code}_male_csv2.zip"
 STATS_DIR = "stats"
 
 
 def download_zip(code):
     url = BASE_URL.format(code=code)
-    print(f"  📥 Downloading {url} ...")
+    print(f"  📥 {url}")
     req = urllib.request.Request(url, headers={"User-Agent": "cricket-stats-fetcher/1.0"})
-    with urllib.request.urlopen(req, timeout=60) as r:
+    with urllib.request.urlopen(req, timeout=120) as r:
         return r.read()
 
 
-def parse_zip(zip_bytes, comp):
-    """Parse ball-by-ball CSV zip and return aggregated stats."""
-    format_ = comp["format"]
+# ── SCORECARD BUILDER ────────────────────────────────────────────────────────
+def build_scorecard(match_id, rows):
+    """Build a full match scorecard from ball-by-ball rows."""
+    if not rows:
+        return None
 
-    batters  = defaultdict(lambda: {
-        "runs": 0, "balls": 0, "fours": 0, "sixes": 0,
-        "fifties": 0, "hundreds": 0, "matches": set(), "innings_list": []
+    r0 = rows[0]
+    season   = r0.get("season", "")
+    venue    = r0.get("venue", "")
+    date     = r0.get("start_date", "") or r0.get("date", "")
+
+    # Collect teams in batting order
+    team_order = []
+    for row in rows:
+        t = row.get("batting_team", "")
+        if t and t not in team_order:
+            team_order.append(t)
+
+    winner     = ""
+    win_margin = ""
+    for row in rows:
+        w = row.get("winner", "")
+        if w:
+            winner = w
+            win_margin = row.get("won_by", "") or ""
+            break
+
+    innings_data = defaultdict(lambda: {
+        "batting_team": "",
+        "bowling_team": "",
+        "batters": defaultdict(lambda: {
+            "runs": 0, "balls": 0, "fours": 0, "sixes": 0,
+            "dismissal": "", "bowler": "", "order": 999
+        }),
+        "bowlers": defaultdict(lambda: {
+            "overs": 0, "balls": 0, "maidens": 0,
+            "runs": 0, "wickets": 0
+        }),
+        "extras": {"wides": 0, "noballs": 0, "byes": 0, "legbyes": 0, "penalty": 0},
+        "total_runs": 0,
+        "total_wickets": 0,
+        "overs_bowled": 0,
+        "fall_of_wickets": [],
+        "batter_order": [],
     })
-    bowlers  = defaultdict(lambda: {
-        "runs": 0, "balls": 0, "wickets": 0, "matches": set()
-    })
-    teams    = defaultdict(lambda: {"wins": 0, "matches": set()})
+
+    # Track ball number per over for maiden detection
+    over_runs = defaultdict(lambda: defaultdict(int))  # innings -> over -> runs
+
+    for row in rows:
+        inn        = int(row.get("innings", 1))
+        batter     = row.get("striker", "").strip()
+        non_str    = row.get("non_striker", "").strip()
+        bowler     = row.get("bowler", "").strip()
+        bat_team   = row.get("batting_team", "").strip()
+        bowl_team  = row.get("bowling_team", "").strip()
+        runs_bat   = int(row.get("runs_off_bat", 0) or 0)
+        extras_tot = int(row.get("extras", 0) or 0)
+        wides      = int(row.get("wides", 0) or 0)
+        noballs    = int(row.get("noballs", 0) or 0)
+        byes       = int(row.get("byes", 0) or 0)
+        legbyes    = int(row.get("legbyes", 0) or 0)
+        penalty    = int(row.get("penalty", 0) or 0)
+        wicket_t   = row.get("wicket_type", "").strip()
+        player_out = row.get("player_dismissed", "").strip()
+        fielder    = row.get("fielders", "") or row.get("fielder", "")
+        over_num   = row.get("ball", "0").split(".")[0] if "." in str(row.get("ball","")) else row.get("over","0")
+
+        d = innings_data[inn]
+        d["batting_team"]  = bat_team
+        d["bowling_team"]  = bowl_team
+        d["total_runs"]   += runs_bat + extras_tot
+
+        # Batter order
+        if batter and batter not in d["batter_order"]:
+            d["batter_order"].append(batter)
+        if non_str and non_str not in d["batter_order"]:
+            d["batter_order"].append(non_str)
+
+        # Batter stats (only count if not wide)
+        if batter and not wides:
+            b = d["batters"][batter]
+            b["runs"]  += runs_bat
+            b["balls"] += 1
+            if runs_bat == 4: b["fours"] += 1
+            if runs_bat == 6: b["sixes"] += 1
+
+        # Bowler stats
+        if bowler:
+            bl = d["bowlers"][bowler]
+            bl["runs"] += runs_bat + wides + noballs
+            if not wides and not noballs:
+                bl["balls"] += 1
+            over_runs[inn][str(over_num)] += runs_bat + wides + noballs
+
+        # Wicket
+        if wicket_t and player_out:
+            d["total_wickets"] += 1
+            if player_out in d["batters"]:
+                dismissal_str = format_dismissal(wicket_t, bowler, fielder)
+                d["batters"][player_out]["dismissal"] = dismissal_str
+                d["batters"][player_out]["bowler"]    = bowler
+            d["fall_of_wickets"].append({
+                "wicket": d["total_wickets"],
+                "player": player_out,
+                "runs":   d["total_runs"],
+            })
+
+        # Extras breakdown
+        d["extras"]["wides"]   += wides
+        d["extras"]["noballs"] += noballs
+        d["extras"]["byes"]    += byes
+        d["extras"]["legbyes"] += legbyes
+        d["extras"]["penalty"] += penalty
+
+    # Calculate overs and maidens
+    for inn, d in innings_data.items():
+        max_over = 0
+        for bowler, bl in d["bowlers"].items():
+            overs_full = bl["balls"] // 6
+            overs_part = bl["balls"] % 6
+            bl["overs"] = overs_full + overs_part / 10
+            bl["economy"] = round(bl["runs"] / bl["balls"] * 6, 2) if bl["balls"] else 0
+        for over_str, runs in over_runs[inn].items():
+            try:
+                max_over = max(max_over, int(over_str) + 1)
+                if runs == 0:
+                    for bl in d["bowlers"].values():
+                        pass  # maiden detection needs per-bowler over tracking; simplified here
+            except:
+                pass
+        d["overs_bowled"] = max_over
+
+    # Serialise
+    def serialise_innings(inn_num, d):
+        batters_out = []
+        for name in d["batter_order"]:
+            if name not in d["batters"]:
+                continue
+            b = d["batters"][name]
+            sr = round(b["runs"] / b["balls"] * 100, 1) if b["balls"] else 0
+            batters_out.append({
+                "name":      name,
+                "runs":      b["runs"],
+                "balls":     b["balls"],
+                "fours":     b["fours"],
+                "sixes":     b["sixes"],
+                "sr":        sr,
+                "dismissal": b["dismissal"] or "not out",
+                "bowler":    b["bowler"],
+            })
+
+        bowlers_out = sorted([
+            {
+                "name":     name,
+                "overs":    round(bl["overs"], 1),
+                "runs":     bl["runs"],
+                "wickets":  bl["wickets"],
+                "economy":  bl["economy"],
+                "maidens":  bl["maidens"],
+            }
+            for name, bl in d["bowlers"].items()
+        ], key=lambda x: -x["wickets"])
+
+        extras = d["extras"]
+        extras_total = sum(extras.values())
+
+        return {
+            "innings":        inn_num,
+            "batting_team":   d["batting_team"],
+            "bowling_team":   d["bowling_team"],
+            "total_runs":     d["total_runs"],
+            "total_wickets":  d["total_wickets"],
+            "overs":          d["overs_bowled"],
+            "extras":         extras,
+            "extras_total":   extras_total,
+            "batters":        batters_out,
+            "bowlers":        bowlers_out,
+            "fall_of_wickets": d["fall_of_wickets"],
+        }
+
+    innings_list = [serialise_innings(k, v) for k, v in sorted(innings_data.items())]
+
+    # Match summary for index
+    teams = [i["batting_team"] for i in innings_list]
+    scores = [f"{i['total_runs']}/{i['total_wickets']} ({i['overs']} ov)" for i in innings_list]
+
+    return {
+        "match_id":   match_id,
+        "season":     season,
+        "date":       date,
+        "venue":      venue,
+        "teams":      teams[:2] if len(teams) >= 2 else teams,
+        "scores":     scores[:2] if len(scores) >= 2 else scores,
+        "winner":     winner,
+        "win_margin": win_margin,
+        "innings":    innings_list,
+    }
+
+
+def format_dismissal(wicket_type, bowler, fielder):
+    wt = wicket_type.lower()
+    if wt == "bowled":
+        return f"b {bowler}"
+    elif wt == "caught":
+        f = fielder.split("|")[0].strip() if fielder else ""
+        return f"c {f} b {bowler}" if f else f"c & b {bowler}"
+    elif wt == "lbw":
+        return f"lbw b {bowler}"
+    elif wt == "run out":
+        f = fielder.split("|")[0].strip() if fielder else ""
+        return f"run out ({f})" if f else "run out"
+    elif wt == "stumped":
+        f = fielder.split("|")[0].strip() if fielder else ""
+        return f"st {f} b {bowler}" if f else f"st b {bowler}"
+    elif wt == "hit wicket":
+        return f"hit wicket b {bowler}"
+    elif wt == "caught and bowled":
+        return f"c & b {bowler}"
+    elif wt == "obstructing the field":
+        return "obstructing the field"
+    elif wt == "retired hurt":
+        return "retired hurt"
+    else:
+        return wicket_type
+
+
+# ── MAIN PARSER ──────────────────────────────────────────────────────────────
+def parse_zip(zip_bytes, comp):
+    format_ = comp["format"]
+    code    = comp["code"]
+
+    batters  = defaultdict(lambda: {"runs":0,"balls":0,"fours":0,"sixes":0,"fifties":0,"hundreds":0,"matches":set()})
+    bowlers  = defaultdict(lambda: {"runs":0,"balls":0,"wickets":0,"matches":set()})
+    teams    = defaultdict(lambda: {"wins":0,"matches":set()})
     seasons  = set()
-    total_matches = 0
+    match_index = []
+
+    matches_dir = os.path.join(STATS_DIR, "matches", code)
+    os.makedirs(matches_dir, exist_ok=True)
 
     with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
         csv_files = [f for f in zf.namelist() if f.endswith(".csv") and "info" not in f]
-        total_matches = len(csv_files)
-        print(f"  🔄 Processing {total_matches} matches ...")
+        total = len(csv_files)
+        print(f"  🔄 {total} matches ...")
 
         for fname in csv_files:
             with zf.open(fname) as f:
                 try:
                     rows = list(csv.DictReader(io.TextIOWrapper(f, encoding="utf-8")))
-                except Exception:
+                except:
                     continue
                 if not rows:
                     continue
 
-                match_id = rows[0].get("match_id", fname)
-                season   = rows[0].get("season", "")
+                match_id = rows[0].get("match_id", fname.replace(".csv",""))
+                season   = rows[0].get("season","")
                 if season:
                     seasons.add(season)
 
-                # per-innings run tracker for milestones
-                inn_runs = defaultdict(int)  # (innings, batter) -> runs
+                inn_runs = defaultdict(lambda: defaultdict(int))
 
                 for row in rows:
-                    batter      = row.get("striker", "").strip()
-                    bowler      = row.get("bowler", "").strip()
-                    bat_team    = row.get("batting_team", "").strip()
-                    bowl_team   = row.get("bowling_team", "").strip()
-                    runs_bat    = int(row.get("runs_off_bat", 0) or 0)
-                    extras      = int(row.get("extras", 0) or 0)
-                    wicket_type = row.get("wicket_type", "").strip()
-                    innings     = row.get("innings", "1")
-                    winner      = row.get("winner", "").strip()
+                    batter     = row.get("striker","").strip()
+                    bowler     = row.get("bowler","").strip()
+                    bat_team   = row.get("batting_team","").strip()
+                    bowl_team  = row.get("bowling_team","").strip()
+                    runs_bat   = int(row.get("runs_off_bat",0) or 0)
+                    extras     = int(row.get("extras",0) or 0)
+                    wicket_t   = row.get("wicket_type","").strip()
+                    innings    = row.get("innings","1")
+                    winner     = row.get("winner","").strip()
 
-                    # Teams
                     for t in [bat_team, bowl_team]:
-                        if t:
-                            teams[t]["matches"].add(match_id)
+                        if t: teams[t]["matches"].add(match_id)
                     if winner:
                         teams[winner]["wins"] += 1
 
-                    # Batter
                     if batter:
                         b = batters[batter]
-                        b["runs"]   += runs_bat
-                        b["balls"]  += 1
+                        b["runs"]  += runs_bat
+                        b["balls"] += 1
                         b["matches"].add(match_id)
                         if runs_bat == 4: b["fours"] += 1
                         if runs_bat == 6: b["sixes"] += 1
-                        inn_runs[(innings, batter)] += runs_bat
+                        inn_runs[innings][batter] += runs_bat
 
-                    # Bowler
-                    if bowler and format_ != "Test":  # skip Test bowling aggregation complexity
+                    if bowler:
                         bl = bowlers[bowler]
                         bl["runs"]  += runs_bat + extras
                         bl["balls"] += 1
                         bl["matches"].add(match_id)
-                        if wicket_type and wicket_type not in (
-                            "run out", "retired hurt", "obstructing the field"
-                        ):
-                            bl["wickets"] += 1
-                    elif bowler and format_ == "Test":
-                        bl = bowlers[bowler]
-                        bl["runs"]  += runs_bat + extras
-                        bl["balls"] += 1
-                        bl["matches"].add(match_id)
-                        if wicket_type and wicket_type not in (
-                            "run out", "retired hurt", "obstructing the field"
-                        ):
+                        if wicket_t and wicket_t not in ("run out","retired hurt","obstructing the field"):
                             bl["wickets"] += 1
 
-                # Milestones
-                for (inn, batter), runs in inn_runs.items():
-                    if batter in batters:
-                        if runs >= 100:
-                            batters[batter]["hundreds"] += 1
-                        elif runs >= 50:
-                            batters[batter]["fifties"]  += 1
+                for inn, bmap in inn_runs.items():
+                    for batter, runs in bmap.items():
+                        if runs >= 100: batters[batter]["hundreds"] += 1
+                        elif runs >= 50: batters[batter]["fifties"] += 1
 
-    return batters, bowlers, teams, sorted(seasons), total_matches
+                # Build and save scorecard
+                sc = build_scorecard(match_id, rows)
+                if sc:
+                    sc_path = os.path.join(matches_dir, f"{match_id}.json")
+                    with open(sc_path, "w", encoding="utf-8") as sf:
+                        json.dump(sc, sf, ensure_ascii=False, separators=(",",":"))
+                    # Add to match index (lightweight)
+                    match_index.append({
+                        "id":     match_id,
+                        "season": sc["season"],
+                        "date":   sc["date"],
+                        "teams":  sc["teams"],
+                        "scores": sc["scores"],
+                        "winner": sc["winner"],
+                        "venue":  sc["venue"],
+                    })
+
+    # Save match index
+    match_index.sort(key=lambda x: x.get("date",""), reverse=True)
+    with open(os.path.join(matches_dir, "index.json"), "w", encoding="utf-8") as f:
+        json.dump({"matches": match_index}, f, ensure_ascii=False, separators=(",",":"))
+
+    return batters, bowlers, teams, sorted(seasons), total
 
 
 def build_output(batters, bowlers, teams, seasons, total_matches, comp):
-    format_ = comp["format"]
-
-    # ── Batting ──────────────────────────────────────────────────────────────
     batting_list = []
     for name, s in batters.items():
         m = len(s["matches"])
-        if m < 3 or s["balls"] < 10:
-            continue
+        if m < 3 or s["balls"] < 10: continue
         sr  = round(s["runs"] / s["balls"] * 100, 2) if s["balls"] else 0
-        avg = round(s["runs"] / max(m, 1), 2)
-        batting_list.append({
-            "name": name,
-            "matches": m,
-            "runs": s["runs"],
-            "balls": s["balls"],
-            "avg": avg,
-            "sr": sr,
-            "fours": s["fours"],
-            "sixes": s["sixes"],
-            "fifties": s["fifties"],
-            "hundreds": s["hundreds"],
-        })
+        batting_list.append({"name":name,"matches":m,"runs":s["runs"],"balls":s["balls"],
+            "avg":round(s["runs"]/max(m,1),2),"sr":sr,"fours":s["fours"],"sixes":s["sixes"],
+            "fifties":s["fifties"],"hundreds":s["hundreds"]})
     batting_list.sort(key=lambda x: x["runs"], reverse=True)
 
-    # ── Bowling ───────────────────────────────────────────────────────────────
     bowling_list = []
     for name, s in bowlers.items():
         m = len(s["matches"])
-        if m < 3 or s["balls"] < 12:
-            continue
-        overs   = round(s["balls"] // 6 + (s["balls"] % 6) / 10, 1)
-        economy = round(s["runs"] / s["balls"] * 6, 2) if s["balls"] else 0
-        avg     = round(s["runs"] / s["wickets"], 2) if s["wickets"] else None
-        bowling_list.append({
-            "name": name,
-            "matches": m,
-            "wickets": s["wickets"],
-            "runs": s["runs"],
-            "balls": s["balls"],
-            "overs": overs,
-            "economy": economy,
-            "avg": avg,
-        })
+        if m < 3 or s["balls"] < 12: continue
+        overs   = round(s["balls"]//6 + (s["balls"]%6)/10, 1)
+        economy = round(s["runs"]/s["balls"]*6, 2) if s["balls"] else 0
+        avg     = round(s["runs"]/s["wickets"], 2) if s["wickets"] else None
+        bowling_list.append({"name":name,"matches":m,"wickets":s["wickets"],"runs":s["runs"],
+            "overs":overs,"economy":economy,"avg":avg})
     bowling_list.sort(key=lambda x: x["wickets"], reverse=True)
 
-    # ── Sixes ─────────────────────────────────────────────────────────────────
     sixes_list = sorted(
-        [{"name": n, "sixes": s["sixes"], "matches": len(s["matches"])}
-         for n, s in batters.items() if s["sixes"] > 0],
-        key=lambda x: x["sixes"], reverse=True
-    )[:30]
+        [{"name":n,"sixes":s["sixes"],"matches":len(s["matches"])} for n,s in batters.items() if s["sixes"]>0],
+        key=lambda x: x["sixes"], reverse=True)[:30]
 
-    # ── Teams ─────────────────────────────────────────────────────────────────
     teams_list = []
     for name, s in teams.items():
-        if not name:
-            continue
+        if not name: continue
         m = len(s["matches"])
-        if m < 3:
-            continue
-        win_pct = round(s["wins"] / m * 100, 1)
-        teams_list.append({
-            "team": name,
-            "matches": m,
-            "wins": s["wins"],
-            "win_pct": win_pct,
-        })
+        if m < 3: continue
+        teams_list.append({"team":name,"matches":m,"wins":s["wins"],"win_pct":round(s["wins"]/m*100,1)})
     teams_list.sort(key=lambda x: x["wins"], reverse=True)
 
     return {
-        "competition": comp["name"],
-        "code": comp["code"],
-        "format": format_,
-        "type": comp["type"],
+        "competition":   comp["name"],
+        "code":          comp["code"],
+        "format":        comp["format"],
+        "type":          comp["type"],
         "total_matches": total_matches,
-        "seasons": seasons,
-        "last_updated": datetime.datetime.now().strftime("%d %b %Y, %H:%M"),
-        "batting":  batting_list[:50],
-        "bowling":  bowling_list[:50],
-        "sixes":    sixes_list,
-        "teams":    teams_list,
+        "seasons":       seasons,
+        "last_updated":  datetime.datetime.now().strftime("%d %b %Y, %H:%M"),
+        "batting":       batting_list[:50],
+        "bowling":       bowling_list[:50],
+        "sixes":         sixes_list,
+        "teams":         teams_list,
     }
 
 
 def fetch_competition(comp):
     code = comp["code"]
-    print(f"\n{'─'*50}")
-    print(f"🏏 {comp['name']} ({code})")
+    print(f"\n{'─'*50}\n🏏 {comp['name']} ({code})")
     try:
         zip_bytes = download_zip(code)
         batters, bowlers, teams, seasons, total = parse_zip(zip_bytes, comp)
         data = build_output(batters, bowlers, teams, seasons, total, comp)
         out_path = os.path.join(STATS_DIR, f"{code}.json")
         with open(out_path, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, separators=(",", ":"))
+            json.dump(data, f, ensure_ascii=False, separators=(",",":"))
         print(f"  ✅ {total} matches → {out_path}")
-        return {
-            "code": code,
-            "name": comp["name"],
-            "format": comp["format"],
-            "type": comp["type"],
-            "total_matches": total,
-            "seasons": seasons,
-        }
+        return {"code":code,"name":comp["name"],"format":comp["format"],"type":comp["type"],
+                "total_matches":total,"seasons":seasons}
     except Exception as e:
         print(f"  ❌ Failed: {e}")
         return None
@@ -279,31 +444,25 @@ def fetch_competition(comp):
 
 def build_index(results):
     index = {
-        "last_updated": datetime.datetime.now().strftime("%d %b %Y, %H:%M"),
-        "competitions": [r for r in results if r],
+        "last_updated":  datetime.datetime.now().strftime("%d %b %Y, %H:%M"),
+        "competitions":  [r for r in results if r],
     }
     with open(os.path.join(STATS_DIR, "index.json"), "w", encoding="utf-8") as f:
         json.dump(index, f, ensure_ascii=False, indent=2)
-    print(f"\n📋 index.json written with {len(index['competitions'])} competitions")
+    print(f"\n📋 index.json — {len(index['competitions'])} competitions")
 
 
 def main():
     os.makedirs(STATS_DIR, exist_ok=True)
-
-    # Allow filtering: python fetch_all_cricket.py --comp ipl psl
     filter_codes = []
     if "--comp" in sys.argv:
         idx = sys.argv.index("--comp")
         filter_codes = sys.argv[idx+1:]
 
     comps = [c for c in COMPETITIONS if not filter_codes or c["code"] in filter_codes]
-    print(f"🚀 Fetching {len(comps)} competition(s) from Cricsheet...")
+    print(f"🚀 Fetching {len(comps)} competition(s) ...")
 
-    results = []
-    for comp in comps:
-        result = fetch_competition(comp)
-        results.append(result)
-
+    results = [fetch_competition(c) for c in comps]
     build_index(results)
     print("\n✅ All done!")
 

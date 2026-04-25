@@ -3,389 +3,341 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Cricket Stats — All Formats & Leagues</title>
-<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<title>IPL & Cricket Stats</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Bebas+Neue&display=swap" rel="stylesheet">
 <style>
 :root {
-  --gold: #C9A84C;
-  --gold-bright: #E8C96A;
-  --gold-dim: rgba(201,168,76,0.15);
-  --bg: #080C10;
-  --surface: #0F1419;
-  --surface2: #161D25;
-  --surface3: #1E2730;
-  --border: #232D38;
-  --text: #D8E4F0;
-  --muted: #5A7080;
-  --green: #3DBF7A;
-  --red: #E85555;
-  --blue: #4DA6E8;
+  --gold: #B8860B;
+  --gold-light: #DAA520;
+  --gold-bg: #FFF8E7;
+  --blue: #1E3A5F;
+  --blue-mid: #2E5A8F;
+  --blue-light: #EBF3FF;
+  --bg: #F5F7FA;
+  --surface: #FFFFFF;
+  --surface2: #F0F2F5;
+  --border: #E2E6EA;
+  --text: #1A2332;
+  --muted: #6B7A8D;
+  --green: #1A7A4A;
+  --green-bg: #E8F5EE;
+  --red: #C0392B;
+  --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
 }
 
 * { margin:0; padding:0; box-sizing:border-box; }
-html { scroll-behavior: smooth; }
+html { scroll-behavior:smooth; }
 
 body {
   background: var(--bg);
   color: var(--text);
-  font-family: 'DM Sans', sans-serif;
-  min-height: 100vh;
-}
-
-/* ── HERO ── */
-.hero {
-  background:
-    radial-gradient(ellipse 100% 80% at 50% -10%, rgba(201,168,76,0.1) 0%, transparent 60%),
-    linear-gradient(180deg, #0A1018 0%, var(--bg) 100%);
-  padding: 64px 24px 48px;
-  text-align: center;
-  border-bottom: 1px solid var(--border);
-  position: relative;
-  overflow: hidden;
-}
-
-.hero-bg-text {
-  position: absolute;
-  font-family: 'Bebas Neue', sans-serif;
-  font-size: clamp(120px, 20vw, 280px);
-  color: rgba(201,168,76,0.04);
-  top: 50%; left: 50%;
-  transform: translate(-50%, -50%);
-  white-space: nowrap;
-  pointer-events: none;
-  letter-spacing: 8px;
-}
-
-.hero-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  background: var(--gold-dim);
-  border: 1px solid rgba(201,168,76,0.3);
-  color: var(--gold);
-  font-family: 'DM Mono', monospace;
-  font-size: 10px;
-  letter-spacing: 3px;
-  padding: 5px 14px;
-  border-radius: 2px;
-  text-transform: uppercase;
-  margin-bottom: 20px;
-}
-
-.hero h1 {
-  font-family: 'Bebas Neue', sans-serif;
-  font-size: clamp(52px, 10vw, 96px);
-  letter-spacing: 6px;
-  background: linear-gradient(135deg, var(--gold-bright) 0%, var(--gold) 50%, #8A6820 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  line-height: 1;
-}
-
-.hero-sub {
-  color: var(--muted);
+  font-family: 'Inter', sans-serif;
   font-size: 14px;
-  margin-top: 12px;
-  letter-spacing: 0.5px;
+  line-height: 1.5;
 }
 
-.hero-meta {
-  display: flex;
-  justify-content: center;
-  gap: 24px;
-  margin-top: 24px;
-  flex-wrap: wrap;
-}
-
-.hero-meta-item {
-  text-align: center;
-}
-
-.hero-meta-item .num {
-  font-family: 'Bebas Neue', sans-serif;
-  font-size: 28px;
-  color: var(--gold);
-  display: block;
-}
-
-.hero-meta-item .lbl {
-  font-size: 10px;
-  color: var(--muted);
-  letter-spacing: 2px;
-  text-transform: uppercase;
-}
-
-/* ── FILTER BAR ── */
-.filter-bar {
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
+/* HEADER */
+.header {
+  background: var(--blue);
   padding: 0 24px;
   position: sticky;
   top: 0;
-  z-index: 100;
+  z-index: 200;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
 }
 
-.filter-inner {
+.header-inner {
   max-width: 1200px;
   margin: 0 auto;
+  display: flex;
+  align-items: center;
+  height: 56px;
+  gap: 0;
+}
+
+.logo {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 24px;
+  letter-spacing: 3px;
+  color: #FFFFFF;
+  margin-right: 32px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.logo span { color: var(--gold-light); }
+
+.nav {
   display: flex;
   align-items: center;
   gap: 0;
   overflow-x: auto;
   scrollbar-width: none;
+  flex: 1;
 }
 
-.filter-inner::-webkit-scrollbar { display: none; }
+.nav::-webkit-scrollbar { display: none; }
 
-.filter-group {
-  display: flex;
-  align-items: center;
-  gap: 0;
-  border-right: 1px solid var(--border);
-  padding-right: 16px;
-  margin-right: 16px;
+.nav-btn {
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.65);
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 0 16px;
+  height: 56px;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+  border-bottom: 3px solid transparent;
+  letter-spacing: 0.3px;
+}
+
+.nav-btn:hover { color: #fff; }
+.nav-btn.active { color: var(--gold-light); border-bottom-color: var(--gold-light); }
+
+.header-meta {
+  margin-left: auto;
+  font-size: 11px;
+  color: rgba(255,255,255,0.4);
+  font-weight: 400;
+  white-space: nowrap;
   flex-shrink: 0;
 }
 
-.filter-group:last-child { border-right: none; }
-
-.filter-label {
-  font-family: 'DM Mono', monospace;
-  font-size: 9px;
-  color: var(--muted);
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  margin-right: 8px;
-  white-space: nowrap;
+/* HERO STRIP */
+.hero-strip {
+  background: linear-gradient(135deg, var(--blue) 0%, var(--blue-mid) 100%);
+  padding: 40px 24px 36px;
+  color: white;
 }
 
-.filter-btn {
-  background: none;
-  border: none;
-  color: var(--muted);
-  font-family: 'DM Sans', sans-serif;
+.hero-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.hero-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(40px, 7vw, 72px);
+  letter-spacing: 4px;
+  line-height: 1;
+  color: #fff;
+}
+
+.hero-title span { color: var(--gold-light); }
+
+.hero-sub {
+  color: rgba(255,255,255,0.65);
   font-size: 13px;
-  padding: 14px 12px;
-  cursor: pointer;
-  transition: color 0.15s;
-  white-space: nowrap;
-  border-bottom: 2px solid transparent;
+  margin-top: 8px;
+  letter-spacing: 0.3px;
 }
 
-.filter-btn:hover { color: var(--text); }
-.filter-btn.active { color: var(--gold); border-bottom-color: var(--gold); }
-
-/* ── COMPETITION GRID ── */
-.comp-section {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 32px 24px;
-}
-
-.section-label {
-  font-family: 'DM Mono', monospace;
-  font-size: 10px;
-  letter-spacing: 3px;
-  color: var(--muted);
-  text-transform: uppercase;
-  margin-bottom: 16px;
-  margin-top: 32px;
-}
-
-.section-label:first-child { margin-top: 0; }
-
-.comp-grid {
+.kpi-strip {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 10px;
-}
-
-.comp-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 16px 20px;
-  cursor: pointer;
-  transition: all 0.2s;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.comp-card:hover { border-color: var(--gold); background: var(--surface2); }
-.comp-card.active { border-color: var(--gold); background: var(--gold-dim); }
-
-.comp-card-left .comp-name {
-  font-weight: 500;
-  font-size: 14px;
-  color: var(--text);
-}
-
-.comp-card-left .comp-meta {
-  font-size: 11px;
-  color: var(--muted);
-  margin-top: 2px;
-}
-
-.comp-card-right {
-  font-family: 'Bebas Neue', sans-serif;
-  font-size: 20px;
-  color: var(--gold);
-}
-
-.format-badge {
-  display: inline-block;
-  font-family: 'DM Mono', monospace;
-  font-size: 9px;
-  letter-spacing: 1px;
-  padding: 2px 7px;
-  border-radius: 2px;
-  margin-left: 6px;
-  vertical-align: middle;
-}
-
-.format-badge.Test { background: rgba(61,191,122,0.15); color: var(--green); }
-.format-badge.ODI  { background: rgba(77,166,232,0.15); color: var(--blue); }
-.format-badge.T20  { background: rgba(201,168,76,0.15); color: var(--gold); }
-
-/* ── STATS VIEW ── */
-.stats-view {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 24px 80px;
-}
-
-.stats-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 24px 0 20px;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 24px;
-  flex-wrap: wrap;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 12px;
+  margin-top: 28px;
 }
 
-.stats-title {
-  font-family: 'Bebas Neue', sans-serif;
-  font-size: 32px;
-  letter-spacing: 3px;
-  color: var(--text);
+.kpi-card {
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 8px;
+  padding: 14px 16px;
 }
 
-.stats-title .comp-format {
-  font-size: 14px;
-  font-family: 'DM Mono', monospace;
-  color: var(--muted);
-  letter-spacing: 2px;
-  display: block;
+.kpi-card .k-label {
+  font-size: 10px;
+  color: rgba(255,255,255,0.55);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
   margin-bottom: 4px;
 }
 
-.back-btn {
-  background: var(--surface2);
+.kpi-card .k-val {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 28px;
+  color: var(--gold-light);
+  line-height: 1;
+}
+
+.kpi-card .k-name {
+  font-size: 11px;
+  color: rgba(255,255,255,0.55);
+  margin-top: 2px;
+}
+
+/* TOOLBAR */
+.toolbar {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0 24px;
+  position: sticky;
+  top: 56px;
+  z-index: 100;
+  box-shadow: var(--shadow);
+}
+
+.toolbar-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  height: 48px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.toolbar-inner::-webkit-scrollbar { display: none; }
+
+.toolbar-label {
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.toolbar-sep {
+  width: 1px;
+  height: 20px;
+  background: var(--border);
+  flex-shrink: 0;
+}
+
+.pill-group {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.pill {
+  background: none;
   border: 1px solid var(--border);
   color: var(--muted);
-  font-family: 'DM Sans', sans-serif;
-  font-size: 13px;
-  padding: 8px 16px;
-  border-radius: 3px;
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 12px;
+  border-radius: 20px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.15s;
+  white-space: nowrap;
 }
 
-.back-btn:hover { color: var(--text); border-color: var(--gold); }
+.pill:hover { border-color: var(--blue-mid); color: var(--blue); }
+.pill.active { background: var(--blue); border-color: var(--blue); color: #fff; }
+.pill.gold.active { background: var(--gold); border-color: var(--gold); color: #fff; }
 
-/* Stat cards */
-.kpi-row {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 10px;
-  margin-bottom: 28px;
-}
-
-.kpi {
+/* SEASON SELECTOR */
+.season-select {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 16px;
-  position: relative;
-  overflow: hidden;
+  color: var(--text);
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s;
 }
 
-.kpi::after {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 2px;
-  background: linear-gradient(90deg, var(--gold), transparent);
-}
+.season-select:focus { border-color: var(--blue-mid); }
 
-.kpi .k-label { font-size: 9px; color: var(--muted); letter-spacing: 2px; text-transform: uppercase; }
-.kpi .k-val   { font-family: 'Bebas Neue', sans-serif; font-size: 32px; color: var(--gold); line-height: 1.1; }
-.kpi .k-name  { font-size: 11px; color: var(--muted); margin-top: 2px; }
-
-/* Tabs */
-.stat-tabs {
+/* YEAR RANGE PICKER */
+.year-range {
   display: flex;
-  gap: 2px;
-  margin-bottom: 20px;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.year-input {
+  width: 70px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  outline: none;
+  text-align: center;
+}
+
+.year-input:focus { border-color: var(--blue-mid); }
+
+.year-range-label {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* MAIN LAYOUT */
+.main {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+/* SECTION TITLE */
+.section-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 12px;
+  margin-top: 28px;
+  padding-bottom: 8px;
   border-bottom: 1px solid var(--border);
 }
 
-.stat-tab {
-  background: none;
-  border: none;
-  border-bottom: 2px solid transparent;
-  color: var(--muted);
-  font-family: 'DM Sans', sans-serif;
-  font-size: 13px;
-  font-weight: 500;
-  padding: 10px 18px;
-  cursor: pointer;
-  transition: all 0.15s;
-  margin-bottom: -1px;
-}
+.section-title:first-child { margin-top: 0; }
 
-.stat-tab:hover { color: var(--text); }
-.stat-tab.active { color: var(--gold); border-bottom-color: var(--gold); }
-
-/* Table */
-.tbl-wrap {
+/* CARD */
+.card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: 10px;
+  box-shadow: var(--shadow);
   overflow: hidden;
 }
 
+/* TABLE */
 .tbl-toolbar {
-  padding: 14px 20px;
+  padding: 12px 16px;
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
   gap: 10px;
+  background: var(--surface2);
 }
 
-.tbl-search {
-  background: var(--surface2);
+.search-input {
+  background: var(--surface);
   border: 1px solid var(--border);
   color: var(--text);
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 13px;
-  padding: 7px 14px;
-  border-radius: 3px;
+  padding: 6px 12px;
+  border-radius: 6px;
   outline: none;
-  width: 220px;
-  transition: border-color 0.2s;
+  width: 200px;
+  transition: border-color 0.15s;
 }
 
-.tbl-search:focus { border-color: var(--gold); }
-.tbl-search::placeholder { color: var(--muted); }
+.search-input:focus { border-color: var(--blue-mid); }
+.search-input::placeholder { color: var(--muted); }
 
 .tbl-count {
-  font-family: 'DM Mono', monospace;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
   margin-left: auto;
 }
@@ -393,9 +345,9 @@ body {
 table { width: 100%; border-collapse: collapse; }
 
 thead th {
-  font-family: 'DM Mono', monospace;
-  font-size: 9px;
-  letter-spacing: 2px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1px;
   text-transform: uppercase;
   color: var(--muted);
   padding: 10px 14px;
@@ -407,100 +359,177 @@ thead th {
   white-space: nowrap;
 }
 
-thead th:hover { color: var(--gold); }
-thead th:first-child { text-align: left; padding-left: 20px; }
-thead th.sorted { color: var(--gold); }
+thead th:hover { color: var(--blue); }
+thead th.sorted { color: var(--blue); }
+thead th:first-child { text-align: left; }
 
-tbody tr { border-bottom: 1px solid rgba(35,45,56,0.7); transition: background 0.1s; }
-tbody tr:hover { background: rgba(201,168,76,0.04); }
+tbody tr {
+  border-bottom: 1px solid var(--border);
+  transition: background 0.1s;
+}
+
+tbody tr:hover { background: var(--blue-light); }
 tbody tr:last-child { border-bottom: none; }
 
-td { padding: 12px 14px; font-size: 13px; text-align: right; color: var(--muted); }
-td:first-child { text-align: left; padding-left: 20px; }
+td {
+  padding: 11px 14px;
+  font-size: 13px;
+  text-align: right;
+  color: var(--muted);
+}
 
-.rank { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--border); width: 28px; display: inline-block; }
-.pname { color: var(--text); font-weight: 500; }
-.hi { color: var(--gold-bright); font-family: 'DM Mono', monospace; font-weight: 500; }
+td:first-child { text-align: left; }
 
+.rank {
+  font-size: 11px;
+  color: #C5CDD6;
+  width: 24px;
+  display: inline-block;
+  font-weight: 500;
+}
+
+.rank.top3 { color: var(--gold); }
+
+.pname {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.hi {
+  color: var(--blue);
+  font-weight: 600;
+}
+
+/* WIN BAR */
 .win-bar { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
-.win-bar-bg { width: 80px; height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; }
-.win-bar-fill { height: 100%; background: linear-gradient(90deg, var(--gold), var(--gold-bright)); border-radius: 2px; }
+.win-bar-bg { width: 80px; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+.win-bar-fill { height: 100%; background: var(--gold-light); border-radius: 2px; }
 
-/* Sixes grid */
+/* SIXES GRID */
 .six-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: 10px;
+  padding: 16px;
 }
 
 .six-card {
-  background: var(--surface);
+  background: var(--surface2);
   border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 16px;
+  border-radius: 8px;
+  padding: 14px;
   display: flex;
   align-items: center;
-  gap: 14px;
-  transition: all 0.2s;
+  gap: 12px;
+  transition: all 0.15s;
 }
 
-.six-card:hover { border-color: var(--gold); }
+.six-card:hover { border-color: var(--gold-light); background: var(--gold-bg); }
 
 .six-num {
-  font-family: 'Bebas Neue', sans-serif;
-  font-size: 14px;
+  font-size: 11px;
   color: var(--muted);
-  width: 24px;
+  width: 20px;
   flex-shrink: 0;
+  font-weight: 500;
 }
+
+.six-num.top3 { color: var(--gold); font-weight: 600; }
 
 .six-count {
   font-family: 'Bebas Neue', sans-serif;
-  font-size: 30px;
-  color: var(--gold);
+  font-size: 28px;
+  color: var(--blue);
   line-height: 1;
 }
 
 .six-name { font-size: 13px; font-weight: 500; color: var(--text); }
 .six-sub  { font-size: 11px; color: var(--muted); }
 
-/* Player search page */
-.player-search-wrap {
-  padding: 32px 0;
+/* COMP GRID */
+.comp-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+  margin-bottom: 24px;
 }
 
-.player-search-input {
+.comp-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: var(--shadow);
+}
+
+.comp-card:hover { border-color: var(--blue-mid); box-shadow: var(--shadow-md); transform: translateY(-1px); }
+.comp-card.active { border-color: var(--blue); background: var(--blue-light); }
+
+.comp-name { font-weight: 500; font-size: 14px; color: var(--text); }
+.comp-meta { font-size: 11px; color: var(--muted); margin-top: 3px; }
+.comp-matches {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 22px;
+  color: var(--blue);
+}
+
+.format-badge {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.format-badge.Test { background: var(--green-bg); color: var(--green); }
+.format-badge.ODI  { background: var(--blue-light); color: var(--blue); }
+.format-badge.T20  { background: var(--gold-bg); color: var(--gold); }
+
+/* PLAYER SEARCH */
+.player-search-wrap { padding: 24px 0; }
+
+.player-search-big {
   width: 100%;
   background: var(--surface);
   border: 1px solid var(--border);
   color: var(--text);
-  font-family: 'DM Sans', sans-serif;
-  font-size: 16px;
-  padding: 14px 20px;
-  border-radius: 4px;
+  font-family: 'Inter', sans-serif;
+  font-size: 15px;
+  padding: 12px 16px;
+  border-radius: 8px;
   outline: none;
   transition: border-color 0.2s;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
+  box-shadow: var(--shadow);
 }
 
-.player-search-input:focus { border-color: var(--gold); }
-.player-search-input::placeholder { color: var(--muted); }
-
-.player-results { display: grid; gap: 10px; }
+.player-search-big:focus { border-color: var(--blue-mid); }
+.player-search-big::placeholder { color: var(--muted); }
 
 .player-result-card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 20px;
+  border-radius: 10px;
+  padding: 18px;
+  margin-bottom: 10px;
+  box-shadow: var(--shadow);
 }
 
 .player-result-card h3 {
-  font-family: 'Bebas Neue', sans-serif;
-  font-size: 22px;
-  letter-spacing: 2px;
+  font-size: 16px;
+  font-weight: 600;
   color: var(--text);
-  margin-bottom: 14px;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
 }
 
 .player-comps {
@@ -512,39 +541,113 @@ td:first-child { text-align: left; padding-left: 20px; }
 .player-comp-row {
   background: var(--surface2);
   border: 1px solid var(--border);
-  border-radius: 3px;
-  padding: 10px 14px;
+  border-radius: 6px;
+  padding: 10px 12px;
 }
 
-.player-comp-name {
+.player-comp-name { font-size: 11px; color: var(--muted); margin-bottom: 6px; font-weight: 500; letter-spacing: 0.3px; }
+
+.player-comp-stats { display: flex; gap: 14px; font-size: 12px; }
+.player-comp-stats span { color: var(--muted); }
+.player-comp-stats strong { color: var(--blue); font-weight: 600; }
+
+/* BACK BTN */
+.back-btn {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 7px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.back-btn:hover { color: var(--blue); border-color: var(--blue-mid); }
+
+/* STATS HEADER */
+.stats-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.stats-title-wrap .comp-label {
   font-size: 11px;
   color: var(--muted);
-  margin-bottom: 6px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+  font-weight: 500;
 }
 
-.player-comp-stats {
+.stats-title-wrap h2 {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 28px;
+  letter-spacing: 2px;
+  color: var(--text);
+}
+
+/* STAT TABS */
+.stat-tabs {
   display: flex;
-  gap: 16px;
-  font-family: 'DM Mono', monospace;
-  font-size: 12px;
+  gap: 2px;
+  margin-bottom: 16px;
+  border-bottom: 2px solid var(--border);
 }
 
-.player-comp-stats span { color: var(--muted); }
-.player-comp-stats strong { color: var(--gold); }
+.stat-tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: all 0.15s;
+  margin-bottom: -2px;
+}
 
-/* Loading / empty */
+.stat-tab:hover { color: var(--text); }
+.stat-tab.active { color: var(--blue); border-bottom-color: var(--blue); }
+
+/* SEASON TAG */
+.season-tag {
+  display: inline-block;
+  background: var(--gold-bg);
+  border: 1px solid #E8C96A;
+  color: var(--gold);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 3px;
+  letter-spacing: 1px;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
+/* LOADING / EMPTY */
 .loading, .empty {
   text-align: center;
-  padding: 60px 20px;
+  padding: 48px 20px;
   color: var(--muted);
-  font-family: 'DM Mono', monospace;
   font-size: 13px;
 }
 
 .spinner {
-  width: 28px; height: 28px;
+  width: 24px; height: 24px;
   border: 2px solid var(--border);
-  border-top-color: var(--gold);
+  border-top-color: var(--blue);
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
   margin: 0 auto 12px;
@@ -552,306 +655,444 @@ td:first-child { text-align: left; padding-left: 20px; }
 
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes fadeUp {
-  from { opacity:0; transform: translateY(12px); }
+  from { opacity:0; transform: translateY(8px); }
   to   { opacity:1; transform: translateY(0); }
 }
+.animate { animation: fadeUp 0.3s ease both; }
 
-.animate { animation: fadeUp 0.4s ease both; }
+/* SEASON MODE BANNER */
+.season-banner {
+  background: var(--gold-bg);
+  border: 1px solid #E8C96A;
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-size: 13px;
+  color: var(--gold);
+  font-weight: 500;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 
 footer {
   text-align: center;
-  padding: 28px;
+  padding: 24px;
   border-top: 1px solid var(--border);
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
-  font-family: 'DM Mono', monospace;
+  margin-top: 40px;
 }
 
-footer a { color: var(--gold); text-decoration: none; }
+footer a { color: var(--blue); text-decoration: none; }
 
 @media (max-width: 640px) {
-  .kpi-row { grid-template-columns: repeat(2, 1fr); }
+  .kpi-strip { grid-template-columns: repeat(2, 1fr); }
   td:nth-child(n+6) { display: none; }
   th:nth-child(n+6) { display: none; }
+  .hero-strip { padding: 24px 16px; }
+  .main { padding: 16px; }
 }
 </style>
 </head>
 <body>
 
+<!-- HEADER -->
+<div class="header">
+  <div class="header-inner">
+    <div class="logo">IPL <span>STATS</span></div>
+    <nav class="nav">
+      <button class="nav-btn active" onclick="setView('ipl', this)">IPL</button>
+      <button class="nav-btn" onclick="setView('international', this)">International</button>
+      <button class="nav-btn" onclick="setView('player', this)">Player Search</button>
+      <a href="matches.html" class="nav-btn" style="text-decoration:none;display:flex;align-items:center;">Matches</a>
+    </nav>
+    <div class="header-meta" id="header-updated">Loading...</div>
+  </div>
+</div>
+
 <!-- HERO -->
-<div class="hero">
-  <div class="hero-bg-text">CRICKET</div>
-  <div class="hero-badge">🏏 Powered by Cricsheet</div>
-  <h1>Cricket Stats</h1>
-  <p class="hero-sub">All formats · All leagues · Ball-by-ball data since 2004</p>
-  <div class="hero-meta" id="hero-meta">
-    <div class="hero-meta-item">
-      <span class="num" id="meta-matches">—</span>
-      <span class="lbl">Total Matches</span>
-    </div>
-    <div class="hero-meta-item">
-      <span class="num" id="meta-comps">—</span>
-      <span class="lbl">Competitions</span>
-    </div>
-    <div class="hero-meta-item">
-      <span class="num" id="meta-updated">—</span>
-      <span class="lbl">Last Updated</span>
+<div class="hero-strip" id="hero-strip">
+  <div class="hero-inner">
+    <div class="hero-title">Indian <span>Premier</span> League</div>
+    <div class="hero-sub">Ball-by-ball data · Cricsheet · 2008 – present</div>
+    <div class="kpi-strip" id="hero-kpis">
+      <div class="kpi-card"><div class="k-label">Loading</div><div class="k-val">—</div></div>
     </div>
   </div>
 </div>
 
-<!-- FILTER BAR -->
-<div class="filter-bar">
-  <div class="filter-inner">
-    <div class="filter-group">
-      <span class="filter-label">View</span>
-      <button class="filter-btn active" onclick="setView('browse', this)">Browse</button>
-      <button class="filter-btn" onclick="setView('player', this)">Player Search</button>
+<!-- TOOLBAR -->
+<div class="toolbar">
+  <div class="toolbar-inner" id="toolbar-inner">
+    <span class="toolbar-label">Season</span>
+    <select class="season-select" id="season-select" onchange="onSeasonChange()">
+      <option value="all">All Seasons</option>
+    </select>
+    <div class="toolbar-sep"></div>
+    <span class="toolbar-label">Range</span>
+    <div class="year-range">
+      <input class="year-input" type="number" id="year-from" placeholder="2008" min="2008" max="2026" onchange="onYearRange()">
+      <span class="year-range-label">to</span>
+      <input class="year-input" type="number" id="year-to" placeholder="2026" min="2008" max="2026" onchange="onYearRange()">
     </div>
-    <div class="filter-group" id="format-filters">
-      <span class="filter-label">Format</span>
-      <button class="filter-btn active" onclick="setFormat('all', this)">All</button>
-      <button class="filter-btn" onclick="setFormat('Test', this)">Test</button>
-      <button class="filter-btn" onclick="setFormat('ODI', this)">ODI</button>
-      <button class="filter-btn" onclick="setFormat('T20', this)">T20</button>
-    </div>
-    <div class="filter-group" id="type-filters">
-      <span class="filter-label">Type</span>
-      <button class="filter-btn active" onclick="setType('all', this)">All</button>
-      <button class="filter-btn" onclick="setType('international', this)">International</button>
-      <button class="filter-btn" onclick="setType('league', this)">Leagues</button>
-      <button class="filter-btn" onclick="setType('domestic', this)">Domestic</button>
+    <div class="toolbar-sep"></div>
+    <div class="pill-group" id="stat-pills">
+      <button class="pill active" onclick="showStatTab('batting', this)">Batting</button>
+      <button class="pill" onclick="showStatTab('bowling', this)">Bowling</button>
+      <button class="pill" onclick="showStatTab('sixes', this)">Sixes</button>
+      <button class="pill" onclick="showStatTab('teams', this)">Teams</button>
     </div>
   </div>
 </div>
 
-<!-- BROWSE VIEW -->
-<div id="view-browse">
-  <!-- Competition picker -->
-  <div id="comp-picker" class="comp-section animate"></div>
+<!-- MAIN -->
+<div class="main">
 
-  <!-- Stats panel -->
-  <div id="stats-panel" style="display:none">
-    <div class="stats-view">
+  <!-- IPL VIEW -->
+  <div id="view-ipl">
+    <div id="season-banner" style="display:none" class="season-banner">
+      Showing season: <strong id="banner-season"></strong>
+    </div>
+    <div id="ipl-content">
+      <div class="loading"><div class="spinner"></div>Loading IPL data...</div>
+    </div>
+  </div>
+
+  <!-- INTERNATIONAL VIEW -->
+  <div id="view-international" style="display:none">
+    <div id="int-picker">
+      <p class="section-title">Select Competition</p>
+      <div class="comp-grid" id="int-comp-grid"></div>
+    </div>
+    <div id="int-stats" style="display:none">
       <div class="stats-header">
-        <div>
-          <span class="comp-format" id="sp-format"></span>
-          <span class="stats-title" id="sp-title"></span>
+        <div class="stats-title-wrap">
+          <div class="comp-label" id="int-label"></div>
+          <h2 id="int-title"></h2>
         </div>
-        <button class="back-btn" onclick="showPicker()">← All Competitions</button>
+        <button class="back-btn" onclick="showIntPicker()">← Back</button>
       </div>
-      <div class="kpi-row" id="sp-kpis"></div>
-      <div class="stat-tabs">
-        <button class="stat-tab active" onclick="showStatTab('batting', this)">🏏 Batting</button>
-        <button class="stat-tab" onclick="showStatTab('bowling', this)">🎳 Bowling</button>
-        <button class="stat-tab" onclick="showStatTab('sixes', this)">💥 Sixes</button>
-        <button class="stat-tab" onclick="showStatTab('teams', this)">🏆 Teams</button>
-      </div>
-      <div id="stat-content"></div>
+      <div id="int-kpis" class="kpi-strip" style="margin-bottom:20px"></div>
+      <div id="int-content"></div>
     </div>
   </div>
-</div>
 
-<!-- PLAYER SEARCH VIEW -->
-<div id="view-player" style="display:none">
-  <div class="stats-view">
+  <!-- PLAYER SEARCH VIEW -->
+  <div id="view-player" style="display:none">
     <div class="player-search-wrap">
-      <input class="player-search-input" type="text" placeholder="Search player name across all competitions... (e.g. Kohli, Warner, Bumrah)" oninput="searchPlayer(this.value)">
-      <div id="player-results" class="player-results">
-        <div class="empty">Type a player name to search across all loaded competitions</div>
+      <input class="player-search-big" type="text" placeholder="Search any player across all loaded competitions... e.g. Kohli, Bumrah, Warner" oninput="searchPlayer(this.value)">
+      <div id="player-results">
+        <div class="empty">Type a player name to begin searching</div>
       </div>
     </div>
   </div>
+
 </div>
 
 <footer>
   Data: <a href="https://cricsheet.org" target="_blank">cricsheet.org</a> &nbsp;·&nbsp;
-  Auto-updated via GitHub Actions &nbsp;·&nbsp;
+  Auto-updated daily at 2:00 AM IST via GitHub Actions &nbsp;·&nbsp;
   <span id="footer-updated"></span>
 </footer>
 
 <script>
-// ── State ────────────────────────────────────────────────────────────────────
 let index = null;
-let loadedData = {};   // code -> parsed JSON
-let currentComp = null;
+let loadedData = {};
+let currentView = 'ipl';
 let currentStatTab = 'batting';
+let currentIntComp = null;
 let currentSort = {};
-let filterFormat = 'all';
-let filterType = 'all';
-let currentView = 'browse';
+let activeSeason = 'all';
+let yearFrom = null, yearTo = null;
 
-// ── Boot ─────────────────────────────────────────────────────────────────────
 async function boot() {
   try {
     const res = await fetch('stats/index.json');
     index = await res.json();
-    document.getElementById('meta-matches').textContent =
-      index.competitions.reduce((s, c) => s + (c.total_matches || 0), 0).toLocaleString();
-    document.getElementById('meta-comps').textContent = index.competitions.length;
-    document.getElementById('meta-updated').textContent = index.last_updated.split(',')[0];
+    document.getElementById('header-updated').textContent = 'Updated: ' + index.last_updated;
     document.getElementById('footer-updated').textContent = 'Updated: ' + index.last_updated;
-    renderPicker();
+    await loadComp('ipl');
+    buildIntGrid();
   } catch(e) {
-    document.getElementById('comp-picker').innerHTML =
-      `<div class="empty">⚠️ Could not load stats/index.json<br><small>Run fetch_all_cricket.py first, then push stats/ folder to GitHub</small></div>`;
+    document.getElementById('ipl-content').innerHTML =
+      '<div class="empty">Could not load stats/index.json<br><small>Run fetch_all_cricket.py and push the stats/ folder</small></div>';
   }
 }
 
-// ── Views ────────────────────────────────────────────────────────────────────
+// ── VIEW SWITCHING ────────────────────────────────────────────────────────────
 function setView(name, btn) {
-  document.querySelectorAll('.filter-btn').forEach(b => {
-    if (b.closest('#view-browse, #view-player')) return;
-    b.classList.remove('active');
-  });
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   currentView = name;
-  document.getElementById('view-browse').style.display = name === 'browse' ? '' : 'none';
-  document.getElementById('view-player').style.display  = name === 'player' ? '' : 'none';
-  document.getElementById('format-filters').style.display = name === 'browse' ? '' : 'none';
-  document.getElementById('type-filters').style.display   = name === 'browse' ? '' : 'none';
-}
-
-function setFormat(f, btn) {
-  filterFormat = f;
-  btn.closest('.filter-group').querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  renderPicker();
-}
-
-function setType(t, btn) {
-  filterType = t;
-  btn.closest('.filter-group').querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  renderPicker();
-}
-
-// ── Competition picker ────────────────────────────────────────────────────────
-function renderPicker() {
-  if (!index) return;
-
-  let comps = index.competitions.filter(c => {
-    if (filterFormat !== 'all' && c.format !== filterFormat) return false;
-    if (filterType   !== 'all' && c.type   !== filterType)   return false;
-    return true;
+  ['ipl','international','player'].forEach(v => {
+    document.getElementById('view-' + v).style.display = v === name ? '' : 'none';
   });
 
-  const groups = {
-    international: { label: 'International', items: [] },
-    league:        { label: 'T20 Leagues',   items: [] },
-    domestic:      { label: 'Domestic',      items: [] },
+  const toolbarEl = document.getElementById('toolbar-inner');
+  const isIpl = name === 'ipl';
+  toolbarEl.style.display = (name === 'player') ? 'none' : '';
+
+  if (name === 'ipl') {
+    document.getElementById('hero-strip').querySelector('.hero-title').innerHTML = 'Indian <span style="color:var(--gold-light)">Premier</span> League';
+    document.getElementById('hero-strip').querySelector('.hero-sub').textContent = 'Ball-by-ball data · Cricsheet · 2008 – present';
+    refreshIPLView();
+  } else if (name === 'international') {
+    document.getElementById('hero-strip').querySelector('.hero-title').innerHTML = 'International <span style="color:var(--gold-light)">Cricket</span>';
+    document.getElementById('hero-strip').querySelector('.hero-sub').textContent = 'Tests · ODIs · T20 Internationals · Cricsheet data';
+    updateHeroKPIs(null);
+  }
+}
+
+// ── SEASON CONTROLS ───────────────────────────────────────────────────────────
+function populateSeasons(seasons) {
+  const sel = document.getElementById('season-select');
+  sel.innerHTML = '<option value="all">All Seasons</option>';
+  [...seasons].sort((a,b) => b.localeCompare(a)).forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = s; opt.textContent = s;
+    sel.appendChild(opt);
+  });
+}
+
+function onSeasonChange() {
+  activeSeason = document.getElementById('season-select').value;
+  yearFrom = null; yearTo = null;
+  document.getElementById('year-from').value = '';
+  document.getElementById('year-to').value = '';
+  updateSeasonBanner();
+  refreshIPLView();
+}
+
+function onYearRange() {
+  yearFrom = parseInt(document.getElementById('year-from').value) || null;
+  yearTo   = parseInt(document.getElementById('year-to').value)   || null;
+  activeSeason = 'all';
+  document.getElementById('season-select').value = 'all';
+  updateSeasonBanner();
+  refreshIPLView();
+}
+
+function updateSeasonBanner() {
+  const banner = document.getElementById('season-banner');
+  const bannerText = document.getElementById('banner-season');
+  if (activeSeason !== 'all') {
+    banner.style.display = 'flex';
+    bannerText.textContent = activeSeason;
+  } else if (yearFrom || yearTo) {
+    banner.style.display = 'flex';
+    bannerText.textContent = (yearFrom || '2008') + ' – ' + (yearTo || '2026');
+  } else {
+    banner.style.display = 'none';
+  }
+}
+
+// ── FILTER DATA BY SEASON ─────────────────────────────────────────────────────
+function filterBySeason(data) {
+  if (!data) return data;
+  if (activeSeason === 'all' && !yearFrom && !yearTo) return data;
+
+  const filterSeason = (item) => {
+    if (!item.season) return true;
+    const yr = parseInt(item.season);
+    if (activeSeason !== 'all') return item.season === activeSeason;
+    if (yearFrom && yr < yearFrom) return false;
+    if (yearTo   && yr > yearTo)   return false;
+    return true;
   };
 
-  comps.forEach(c => groups[c.type]?.items.push(c));
+  return {
+    ...data,
+    batting: data.batting_by_season
+      ? aggregateSeasonData(data.batting_by_season, filterSeason, 'batting')
+      : data.batting,
+    bowling: data.bowling_by_season
+      ? aggregateSeasonData(data.bowling_by_season, filterSeason, 'bowling')
+      : data.bowling,
+    sixes: data.sixes,
+    teams: data.teams,
+  };
+}
 
-  let html = '';
-  for (const [, grp] of Object.entries(groups)) {
-    if (!grp.items.length) continue;
-    html += `<p class="section-label">${grp.label}</p><div class="comp-grid">`;
-    grp.items.forEach(c => {
-      html += `
-        <div class="comp-card ${currentComp === c.code ? 'active' : ''}" onclick="loadComp('${c.code}')">
-          <div class="comp-card-left">
-            <div class="comp-name">${c.name} <span class="format-badge ${c.format}">${c.format}</span></div>
-            <div class="comp-meta">${c.total_matches} matches · ${c.seasons?.length || '?'} seasons</div>
-          </div>
-          <div class="comp-card-right">${c.total_matches}</div>
-        </div>`;
+function aggregateSeasonData(bySeason, filterFn, type) {
+  const agg = {};
+  Object.entries(bySeason).forEach(([season, players]) => {
+    if (!filterFn({season})) return;
+    players.forEach(p => {
+      if (!agg[p.name]) agg[p.name] = { name: p.name, matches: 0, runs: 0, balls: 0, fours: 0, sixes: 0, fifties: 0, hundreds: 0, wickets: 0, econ_runs: 0, econ_balls: 0 };
+      const a = agg[p.name];
+      a.matches  += p.matches  || 0;
+      a.runs     += p.runs     || 0;
+      a.balls    += p.balls    || 0;
+      a.fours    += p.fours    || 0;
+      a.sixes    += p.sixes    || 0;
+      a.fifties  += p.fifties  || 0;
+      a.hundreds += p.hundreds || 0;
+      a.wickets  += p.wickets  || 0;
+      a.econ_runs  += p.runs   || 0;
+      a.econ_balls += p.balls  || 0;
     });
-    html += '</div>';
-  }
-
-  if (!html) html = '<div class="empty">No competitions match your filters</div>';
-  document.getElementById('comp-picker').innerHTML = html;
+  });
+  return Object.values(agg).map(a => ({
+    ...a,
+    avg: a.matches ? +(a.runs / a.matches).toFixed(2) : 0,
+    sr:  a.balls   ? +((a.runs / a.balls) * 100).toFixed(2) : 0,
+    economy: a.econ_balls ? +((a.econ_runs / a.econ_balls) * 6).toFixed(2) : 0,
+  }));
 }
 
-// ── Load competition ──────────────────────────────────────────────────────────
+// ── LOAD COMPETITION ──────────────────────────────────────────────────────────
 async function loadComp(code) {
-  currentComp = code;
-  renderPicker();
-
-  document.getElementById('comp-picker').style.display = 'none';
-  document.getElementById('stats-panel').style.display = '';
-
-  document.getElementById('stat-content').innerHTML = '<div class="loading"><div class="spinner"></div>Loading stats...</div>';
-
-  if (!loadedData[code]) {
-    try {
-      const res = await fetch(`stats/${code}.json`);
-      loadedData[code] = await res.json();
-    } catch(e) {
-      document.getElementById('stat-content').innerHTML =
-        `<div class="empty">❌ Could not load stats/${code}.json</div>`;
-      return;
+  if (loadedData[code]) return loadedData[code];
+  try {
+    const res = await fetch('stats/' + code + '.json');
+    loadedData[code] = await res.json();
+    if (code === 'ipl') {
+      populateSeasons(loadedData[code].seasons || []);
+      updateHeroKPIs(loadedData[code]);
     }
+    return loadedData[code];
+  } catch(e) {
+    return null;
   }
-
-  const d = loadedData[code];
-  document.getElementById('sp-format').textContent = d.format + ' · ' + d.type;
-  document.getElementById('sp-title').textContent  = d.competition;
-
-  renderKPIs(d);
-  showStatTab(currentStatTab, document.querySelector('.stat-tab.active'));
 }
 
-function showPicker() {
-  currentComp = null;
-  document.getElementById('comp-picker').style.display = '';
-  document.getElementById('stats-panel').style.display = 'none';
-  renderPicker();
+// ── IPL VIEW ──────────────────────────────────────────────────────────────────
+function refreshIPLView() {
+  const d = loadedData['ipl'];
+  if (!d) return;
+  updateHeroKPIs(d);
+  renderStatTab(d);
 }
 
-// ── KPIs ─────────────────────────────────────────────────────────────────────
-function renderKPIs(d) {
-  const topBat = d.batting[0];
+async function renderStatTab(rawData) {
+  const d = (activeSeason !== 'all' || yearFrom || yearTo) ? filterBySeason(rawData) : rawData;
+  document.getElementById('ipl-content').innerHTML = '<div class="loading"><div class="spinner"></div>Processing...</div>';
+  setTimeout(() => {
+    if (currentStatTab === 'batting')  renderBatting(d, 'ipl-content');
+    else if (currentStatTab === 'bowling') renderBowling(d, 'ipl-content');
+    else if (currentStatTab === 'sixes')   renderSixes(d, 'ipl-content');
+    else if (currentStatTab === 'teams')   renderTeams(d, 'ipl-content');
+  }, 50);
+}
+
+function showStatTab(tab, btn) {
+  currentStatTab = tab;
+  document.querySelectorAll('#stat-pills .pill').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  if (currentView === 'ipl' && loadedData['ipl']) {
+    renderStatTab(loadedData['ipl']);
+  } else if (currentView === 'international' && currentIntComp && loadedData[currentIntComp]) {
+    renderIntStats(loadedData[currentIntComp]);
+  }
+}
+
+// ── HERO KPIS ─────────────────────────────────────────────────────────────────
+function updateHeroKPIs(d) {
+  if (!d) {
+    document.getElementById('hero-kpis').innerHTML = '';
+    return;
+  }
+  const topBat  = d.batting[0];
   const topBowl = d.bowling[0];
   const topSix  = d.sixes[0];
-  const topTeam = [...d.teams].sort((a,b) => b.win_pct - a.win_pct)[0];
-
-  document.getElementById('sp-kpis').innerHTML = `
-    ${topBat  ? kpiCard('Most Runs',    topBat.runs.toLocaleString(),  topBat.name)  : ''}
-    ${topBowl ? kpiCard('Most Wickets', topBowl.wickets, topBowl.name) : ''}
-    ${topSix  ? kpiCard('Most Sixes',   topSix.sixes,   topSix.name)  : ''}
-    ${topTeam ? kpiCard('Best Win %',   topTeam.win_pct + '%', topTeam.team) : ''}
-    <div class="kpi"><div class="k-label">Total Matches</div><div class="k-val">${d.total_matches.toLocaleString()}</div><div class="k-name">${d.seasons?.length || '?'} seasons</div></div>
+  const topTeam = [...d.teams].sort((a,b) => b.wins - a.wins)[0];
+  document.getElementById('hero-kpis').innerHTML = `
+    ${topBat  ? kpi('Most Runs',    topBat.runs.toLocaleString(),  topBat.name)  : ''}
+    ${topBowl ? kpi('Most Wickets', topBowl.wickets, topBowl.name) : ''}
+    ${topSix  ? kpi('Most Sixes',   topSix.sixes,   topSix.name)  : ''}
+    ${topTeam ? kpi('Most Wins',    topTeam.wins,   topTeam.team) : ''}
+    <div class="kpi-card"><div class="k-label">Total Matches</div><div class="k-val">${d.total_matches.toLocaleString()}</div><div class="k-name">${(d.seasons||[]).length} seasons</div></div>
   `;
 }
 
-function kpiCard(label, val, name) {
-  return `<div class="kpi"><div class="k-label">${label}</div><div class="k-val">${val}</div><div class="k-name">${name}</div></div>`;
+function kpi(label, val, name) {
+  return `<div class="kpi-card"><div class="k-label">${label}</div><div class="k-val">${val}</div><div class="k-name">${name}</div></div>`;
 }
 
-// ── Stat tabs ─────────────────────────────────────────────────────────────────
-function showStatTab(tab, btn) {
-  currentStatTab = tab;
-  document.querySelectorAll('.stat-tab').forEach(b => b.classList.remove('active'));
-  if (btn) btn.classList.add('active');
-
-  const d = loadedData[currentComp];
-  if (!d) return;
-
-  if (tab === 'batting')  renderBatting(d);
-  else if (tab === 'bowling') renderBowling(d);
-  else if (tab === 'sixes')   renderSixes(d);
-  else if (tab === 'teams')   renderTeams(d);
+// ── INTERNATIONAL ─────────────────────────────────────────────────────────────
+function buildIntGrid() {
+  if (!index) return;
+  const intComps = index.competitions.filter(c => c.type === 'international');
+  document.getElementById('int-comp-grid').innerHTML = intComps.map(c => `
+    <div class="comp-card" onclick="loadIntComp('${c.code}')">
+      <div>
+        <div class="comp-name">${c.name} <span class="format-badge ${c.format}">${c.format}</span></div>
+        <div class="comp-meta">${c.total_matches} matches</div>
+      </div>
+      <div class="comp-matches">${c.total_matches}</div>
+    </div>`).join('');
 }
 
-// ── Tables ───────────────────────────────────────────────────────────────────
-function renderBatting(d) {
+async function loadIntComp(code) {
+  currentIntComp = code;
+  document.getElementById('int-picker').style.display = 'none';
+  document.getElementById('int-stats').style.display = '';
+  document.getElementById('int-content').innerHTML = '<div class="loading"><div class="spinner"></div>Loading...</div>';
+
+  const d = await loadComp(code);
+  if (!d) {
+    document.getElementById('int-content').innerHTML = '<div class="empty">Failed to load data</div>';
+    return;
+  }
+
+  const comp = index.competitions.find(c => c.code === code);
+  document.getElementById('int-label').textContent = comp.format + ' · International';
+  document.getElementById('int-title').textContent = comp.name;
+
+  const topBat  = d.batting[0];
+  const topBowl = d.bowling[0];
+  const topTeam = [...d.teams].sort((a,b) => b.wins - a.wins)[0];
+  document.getElementById('int-kpis').innerHTML = `
+    ${topBat  ? intKpi('Most Runs',    topBat.runs.toLocaleString(),  topBat.name)  : ''}
+    ${topBowl ? intKpi('Most Wickets', topBowl.wickets, topBowl.name) : ''}
+    ${topTeam ? intKpi('Most Wins',    topTeam.wins,   topTeam.team) : ''}
+    <div style="background:var(--blue-light);border:1px solid var(--border);border-radius:8px;padding:14px 16px;">
+      <div style="font-size:10px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:4px;">Total Matches</div>
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:28px;color:var(--blue);line-height:1;">${d.total_matches.toLocaleString()}</div>
+    </div>
+  `;
+
+  renderIntStats(d);
+}
+
+function intKpi(label, val, name) {
+  return `<div style="background:var(--blue-light);border:1px solid var(--border);border-radius:8px;padding:14px 16px;">
+    <div style="font-size:10px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:4px;">${label}</div>
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:28px;color:var(--blue);line-height:1;">${val}</div>
+    <div style="font-size:11px;color:var(--muted);margin-top:2px;">${name}</div>
+  </div>`;
+}
+
+function renderIntStats(d) {
+  if (currentStatTab === 'batting')  renderBatting(d, 'int-content');
+  else if (currentStatTab === 'bowling') renderBowling(d, 'int-content');
+  else if (currentStatTab === 'sixes')   renderSixes(d, 'int-content');
+  else if (currentStatTab === 'teams')   renderTeams(d, 'int-content');
+}
+
+function showIntPicker() {
+  currentIntComp = null;
+  document.getElementById('int-picker').style.display = '';
+  document.getElementById('int-stats').style.display = 'none';
+}
+
+// ── RENDER TABLES ─────────────────────────────────────────────────────────────
+function renderBatting(d, target) {
   const cols = [
-    {k:'matches',  l:'Mat'},
-    {k:'runs',     l:'Runs', hi:true},
-    {k:'avg',      l:'Avg'},
-    {k:'sr',       l:'SR'},
-    {k:'fours',    l:'4s'},
-    {k:'sixes',    l:'6s'},
-    {k:'fifties',  l:'50s'},
-    {k:'hundreds', l:'100s'},
+    {k:'matches', l:'Mat'},
+    {k:'runs',    l:'Runs', hi:true},
+    {k:'avg',     l:'Avg'},
+    {k:'sr',      l:'SR'},
+    {k:'fours',   l:'4s'},
+    {k:'sixes',   l:'6s'},
+    {k:'fifties', l:'50s'},
+    {k:'hundreds',l:'100s'},
   ];
-  renderTable('batting', d.batting, cols, 'runs', d);
+  renderTable(target, 'bat', d.batting || [], cols, 'runs');
 }
 
-function renderBowling(d) {
+function renderBowling(d, target) {
   const cols = [
     {k:'matches',  l:'Mat'},
     {k:'wickets',  l:'Wkts', hi:true},
@@ -860,147 +1101,134 @@ function renderBowling(d) {
     {k:'overs',    l:'Overs'},
     {k:'runs',     l:'Runs'},
   ];
-  renderTable('bowling', d.bowling, cols, 'wickets', d);
+  renderTable(target, 'bowl', d.bowling || [], cols, 'wickets');
 }
 
-function renderTable(type, rows, cols, defaultSort, d) {
-  if (!currentSort[type]) currentSort[type] = { key: defaultSort, dir: -1 };
-  const { key, dir } = currentSort[type];
+function renderTable(target, type, rows, cols, defaultSort) {
+  const key = currentSort[type]?.key || defaultSort;
+  const dir = currentSort[type]?.dir || -1;
 
   const sorted = [...rows].sort((a, b) => {
     const av = a[key] ?? -999, bv = b[key] ?? -999;
     return (av < bv ? -1 : av > bv ? 1 : 0) * dir;
   });
 
-  const headerCols = cols.map(c =>
-    `<th class="${key === c.k ? 'sorted' : ''}" onclick="sortTable('${type}', '${c.k}', ${key===c.k ? dir*-1 : -1})">${c.l}${key===c.k ? (dir===-1?'↓':'↑') : ''}</th>`
+  const thCols = cols.map(c =>
+    `<th class="${key===c.k?'sorted':''}" onclick="sortTbl('${target}','${type}','${c.k}',${key===c.k?dir*-1:-1},'${target}')">${c.l}${key===c.k?(dir===-1?'↓':'↑'):''}</th>`
   ).join('');
 
-  const bodyRows = sorted.slice(0, 50).map((r, i) =>
-    `<tr>
-      <td><span class="rank">${i+1}</span> <span class="pname">${r.name}</span></td>
-      ${cols.map(c => `<td class="${c.hi ? 'hi' : ''}">${r[c.k] ?? '—'}</td>`).join('')}
-    </tr>`
-  ).join('');
+  const trs = sorted.slice(0, 50).map((r, i) => `
+    <tr>
+      <td><span class="rank ${i<3?'top3':''}">${i+1}</span> <span class="pname">${r.name}</span></td>
+      ${cols.map(c => `<td class="${c.hi?'hi':''}">${r[c.k] ?? '—'}</td>`).join('')}
+    </tr>`).join('');
 
-  document.getElementById('stat-content').innerHTML = `
-    <div class="tbl-wrap animate">
+  document.getElementById(target).innerHTML = `
+    <div class="card animate">
       <div class="tbl-toolbar">
-        <input class="tbl-search" placeholder="Filter players..." oninput="filterTable(this, '${type}')">
+        <input class="search-input" placeholder="Filter players..." oninput="filterRows(this,'tbl-body-${type}-${target}')">
         <span class="tbl-count">${sorted.length} players</span>
       </div>
       <table>
-        <thead><tr><th onclick="sortTable('${type}', 'name', ${key==='name'?dir*-1:1})">Player</th>${headerCols}</tr></thead>
-        <tbody id="tbl-body-${type}">${bodyRows}</tbody>
+        <thead><tr>
+          <th onclick="sortTbl('${target}','${type}','name',${key==='name'?dir*-1:1},'${target}')">Player</th>
+          ${thCols}
+        </tr></thead>
+        <tbody id="tbl-body-${type}-${target}">${trs}</tbody>
       </table>
     </div>`;
 }
 
-function sortTable(type, key, dir) {
+function sortTbl(target, type, key, dir, renderTarget) {
   currentSort[type] = { key, dir };
-  if (type === 'batting')  renderBatting(loadedData[currentComp]);
-  if (type === 'bowling')  renderBowling(loadedData[currentComp]);
-  if (type === 'teams')    renderTeams(loadedData[currentComp]);
+  if (target === 'ipl-content') renderStatTab(loadedData['ipl']);
+  else if (target === 'int-content') renderIntStats(loadedData[currentIntComp]);
 }
 
-function filterTable(input, type) {
+function filterRows(input, tbodyId) {
   const q = input.value.toLowerCase();
-  document.querySelectorAll(`#tbl-body-${type} tr`).forEach(row => {
+  document.querySelectorAll('#' + tbodyId + ' tr').forEach(row => {
     row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
   });
 }
 
-function renderSixes(d) {
-  const html = d.sixes.map((p, i) => `
+function renderSixes(d, target) {
+  const html = (d.sixes || []).slice(0, 30).map((p, i) => `
     <div class="six-card">
-      <div class="six-num">${i+1}</div>
+      <div class="six-num ${i<3?'top3':''}">${i+1}</div>
       <div>
         <div class="six-count">${p.sixes}</div>
         <div class="six-name">${p.name}</div>
         <div class="six-sub">${p.matches} matches</div>
       </div>
     </div>`).join('');
-  document.getElementById('stat-content').innerHTML = `<div class="six-grid animate">${html}</div>`;
+  document.getElementById(target).innerHTML = `<div class="card animate"><div class="six-grid">${html}</div></div>`;
 }
 
-function renderTeams(d) {
+function renderTeams(d, target) {
   const key = currentSort['teams']?.key || 'wins';
   const dir = currentSort['teams']?.dir || -1;
-  const sorted = [...d.teams].sort((a, b) => ((a[key]??-1) < (b[key]??-1) ? -1 : 1) * dir);
-  const maxWins = Math.max(...d.teams.map(t => t.wins));
+  const sorted = [...(d.teams||[])].sort((a,b) => ((a[key]??-1)<(b[key]??-1)?-1:1)*dir);
+  const maxWins = Math.max(...(d.teams||[]).map(t => t.wins), 1);
 
-  const cols = [
-    {k:'matches',  l:'Matches'},
-    {k:'wins',     l:'Wins', hi:true},
-    {k:'win_pct',  l:'Win %'},
-  ];
-
-  const headerCols = cols.map(c =>
-    `<th class="${key===c.k?'sorted':''}" onclick="sortTable('teams','${c.k}',${key===c.k?dir*-1:-1})">${c.l}${key===c.k?(dir===-1?'↓':'↑'):''}</th>`
+  const cols = [{k:'matches',l:'Matches'},{k:'wins',l:'Wins',hi:true},{k:'win_pct',l:'Win %'}];
+  const thCols = cols.map(c =>
+    `<th class="${key===c.k?'sorted':''}" onclick="sortTbl('${target}','teams','${c.k}',${key===c.k?dir*-1:-1},'${target}')">${c.l}${key===c.k?(dir===-1?'↓':'↑'):''}</th>`
   ).join('');
 
-  const rows = sorted.map((t, i) => `
+  const trs = sorted.map((t,i) => `
     <tr>
-      <td><span class="rank">${i+1}</span> <span class="pname">${t.team}</span></td>
+      <td><span class="rank ${i<3?'top3':''}">${i+1}</span> <span class="pname">${t.team}</span></td>
       <td>${t.matches}</td>
       <td class="hi">${t.wins}</td>
       <td>${t.win_pct}%</td>
-      <td>
-        <div class="win-bar">
-          <div class="win-bar-bg"><div class="win-bar-fill" style="width:${(t.wins/maxWins*100).toFixed(1)}%"></div></div>
-        </div>
-      </td>
+      <td><div class="win-bar"><div class="win-bar-bg"><div class="win-bar-fill" style="width:${(t.wins/maxWins*100).toFixed(0)}%"></div></div></div></td>
     </tr>`).join('');
 
-  document.getElementById('stat-content').innerHTML = `
-    <div class="tbl-wrap animate">
+  document.getElementById(target).innerHTML = `
+    <div class="card animate">
       <div class="tbl-toolbar"><span class="tbl-count">${sorted.length} teams</span></div>
       <table>
-        <thead><tr><th>Team</th>${headerCols}<th></th></tr></thead>
-        <tbody>${rows}</tbody>
+        <thead><tr><th>Team</th>${thCols}<th></th></tr></thead>
+        <tbody>${trs}</tbody>
       </table>
     </div>`;
 }
 
-// ── Player search ─────────────────────────────────────────────────────────────
+// ── PLAYER SEARCH ─────────────────────────────────────────────────────────────
 function searchPlayer(query) {
   query = query.trim().toLowerCase();
   if (query.length < 2) {
-    document.getElementById('player-results').innerHTML =
-      '<div class="empty">Type at least 2 characters</div>';
+    document.getElementById('player-results').innerHTML = '<div class="empty">Type at least 2 characters</div>';
     return;
   }
 
-  // Search across all loaded competitions
-  const found = {};  // name -> [{comp, batting, bowling}]
-
+  const found = {};
   for (const [code, data] of Object.entries(loadedData)) {
-    data.batting.forEach(p => {
+    const compName = index?.competitions?.find(c => c.code === code)?.name || code;
+    data.batting?.forEach(p => {
       if (p.name.toLowerCase().includes(query)) {
         if (!found[p.name]) found[p.name] = [];
-        found[p.name].push({ comp: data.competition, code, batting: p, bowling: null });
+        const ex = found[p.name].find(x => x.code === code);
+        if (ex) ex.batting = p; else found[p.name].push({ comp: compName, code, batting: p, bowling: null });
       }
     });
-    data.bowling.forEach(p => {
+    data.bowling?.forEach(p => {
       if (p.name.toLowerCase().includes(query)) {
-        const existing = found[p.name]?.find(x => x.code === code);
-        if (existing) existing.bowling = p;
-        else {
-          if (!found[p.name]) found[p.name] = [];
-          found[p.name].push({ comp: data.competition, code, batting: null, bowling: p });
-        }
+        if (!found[p.name]) found[p.name] = [];
+        const ex = found[p.name].find(x => x.code === code);
+        if (ex) ex.bowling = p; else found[p.name].push({ comp: compName, code, batting: null, bowling: p });
       }
     });
   }
 
   if (!Object.keys(found).length) {
-    const loaded = Object.keys(loadedData).length;
     document.getElementById('player-results').innerHTML =
-      `<div class="empty">No results found<br><small>Currently searching ${loaded} loaded competition(s). Click competitions to load more data.</small></div>`;
+      `<div class="empty">No results found<br><small>Searching ${Object.keys(loadedData).length} loaded competition(s)</small></div>`;
     return;
   }
 
-  const html = Object.entries(found).map(([name, comps]) => `
+  document.getElementById('player-results').innerHTML = Object.entries(found).map(([name, comps]) => `
     <div class="player-result-card animate">
       <h3>${name}</h3>
       <div class="player-comps">
@@ -1014,8 +1242,6 @@ function searchPlayer(query) {
           </div>`).join('')}
       </div>
     </div>`).join('');
-
-  document.getElementById('player-results').innerHTML = html;
 }
 
 boot();

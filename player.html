@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Player Profile — Cricket Stats</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Bebas+Neue&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+:root{--gold:#B8860B;--gold-light:#DAA520;--gold-bg:#FFF8E7;--blue:#1E3A5F;--blue-mid:#2E5A8F;--blue-light:#EBF3FF;--bg:#F5F7FA;--surface:#FFFFFF;--surface2:#F0F2F5;--border:#E2E6EA;--text:#1A2332;--muted:#6B7A8D;--green:#1A7A4A;--green-bg:#E8F5EE;--red:#C0392B;--shadow:0 1px 3px rgba(0,0,0,0.08);--shadow-md:0 4px 12px rgba(0,0,0,0.08);}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-size:14px;line-height:1.5;}
+.header{background:var(--blue);padding:0 24px;position:sticky;top:0;z-index:200;box-shadow:0 2px 8px rgba(0,0,0,0.15);}
+.header-inner{max-width:1200px;margin:0 auto;display:flex;align-items:center;height:56px;gap:16px;}
+.logo{font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:3px;color:#fff;text-decoration:none;flex-shrink:0;}
+.logo span{color:var(--gold-light);}
+.breadcrumb{display:flex;align-items:center;gap:8px;font-size:13px;color:rgba(255,255,255,0.6);}
+.breadcrumb a{color:rgba(255,255,255,0.6);text-decoration:none;}
+.breadcrumb a:hover{color:#fff;}
+.breadcrumb .sep{opacity:0.4;}
+.breadcrumb .current{color:#fff;font-weight:500;}
+
+/* HERO */
+.player-hero{background:linear-gradient(135deg,var(--blue) 0%,var(--blue-mid) 100%);padding:32px 24px;color:#fff;}
+.player-hero-inner{max-width:1200px;margin:0 auto;display:flex;align-items:center;gap:28px;flex-wrap:wrap;}
+.player-photo-wrap{width:120px;height:120px;border-radius:50%;overflow:hidden;border:3px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.1);flex-shrink:0;display:flex;align-items:center;justify-content:center;}
+.player-photo-wrap img{width:100%;height:100%;object-fit:cover;}
+.player-photo-placeholder{font-size:48px;opacity:0.6;}
+.player-hero-info{flex:1;}
+.player-name{font-family:'Bebas Neue',sans-serif;font-size:clamp(28px,5vw,52px);letter-spacing:4px;line-height:1;margin-bottom:8px;}
+.player-tags{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;}
+.player-tag{display:inline-block;font-size:10px;font-weight:600;letter-spacing:1px;padding:3px 10px;border-radius:3px;border:1px solid rgba(255,255,255,0.3);color:rgba(255,255,255,0.8);}
+.player-kpis{display:flex;gap:24px;flex-wrap:wrap;}
+.player-kpi{text-align:center;}
+.player-kpi .pk-val{font-family:'Bebas Neue',sans-serif;font-size:28px;color:var(--gold-light);display:block;line-height:1;}
+.player-kpi .pk-label{font-size:10px;color:rgba(255,255,255,0.55);letter-spacing:1px;text-transform:uppercase;}
+
+/* TABS */
+.profile-tabs{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;position:sticky;top:56px;z-index:100;box-shadow:var(--shadow);}
+.profile-tabs-inner{max-width:1200px;margin:0 auto;display:flex;gap:0;overflow-x:auto;scrollbar-width:none;}
+.profile-tabs-inner::-webkit-scrollbar{display:none;}
+.ptab{background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);font-family:'Inter',sans-serif;font-size:13px;font-weight:500;padding:0 18px;height:44px;cursor:pointer;transition:all 0.15s;white-space:nowrap;margin-bottom:-1px;}
+.ptab:hover{color:var(--text);}
+.ptab.active{color:var(--blue);border-bottom-color:var(--blue);}
+
+/* MAIN */
+.main{max-width:1200px;margin:0 auto;padding:24px;}
+.tab-panel{display:none;}
+.tab-panel.active{display:block;}
+
+/* CHARTS */
+.charts-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin-bottom:24px;}
+.chart-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px;box-shadow:var(--shadow);}
+.chart-card h3{font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:14px;}
+.chart-wrap{position:relative;height:240px;}
+.chart-wrap-sm{position:relative;height:200px;}
+
+/* STAT CARDS */
+.stat-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:24px;}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px;box-shadow:var(--shadow);}
+.stat-card .sc-label{font-size:10px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:4px;}
+.stat-card .sc-val{font-family:'Bebas Neue',sans-serif;font-size:26px;color:var(--blue);line-height:1;}
+.stat-card .sc-sub{font-size:11px;color:var(--muted);margin-top:2px;}
+
+/* TABLE */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;box-shadow:var(--shadow);margin-bottom:16px;}
+.card-title{padding:10px 16px;background:var(--surface2);border-bottom:1px solid var(--border);font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);}
+table{width:100%;border-collapse:collapse;}
+thead th{font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);padding:9px 14px;text-align:right;background:var(--surface2);border-bottom:1px solid var(--border);white-space:nowrap;}
+thead th:first-child{text-align:left;}
+tbody tr{border-bottom:1px solid var(--border);transition:background 0.1s;}
+tbody tr:hover{background:var(--blue-light);}
+tbody tr:last-child{border-bottom:none;}
+td{padding:10px 14px;font-size:13px;text-align:right;color:var(--muted);}
+td:first-child{text-align:left;color:var(--text);font-weight:500;}
+.hi{color:var(--blue);font-weight:600;}
+
+/* COMPETITION TABS */
+.comp-tabs{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap;}
+.comp-tab{background:var(--surface2);border:1px solid var(--border);color:var(--muted);font-size:12px;font-weight:500;padding:5px 14px;border-radius:20px;cursor:pointer;transition:all 0.15s;}
+.comp-tab:hover{border-color:var(--blue-mid);color:var(--blue);}
+.comp-tab.active{background:var(--blue);border-color:var(--blue);color:#fff;}
+
+.no-data{padding:32px;text-align:center;color:var(--muted);font-size:13px;}
+
+.loading{text-align:center;padding:60px;color:var(--muted);font-size:13px;}
+.spinner{width:24px;height:24px;border:2px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin 0.7s linear infinite;margin:0 auto 12px;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-size:12px;color:var(--muted);margin-top:40px;}
+footer a{color:var(--blue);text-decoration:none;}
+@media(max-width:640px){.player-hero-inner{gap:16px;}.main{padding:16px;}.charts-grid{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-inner">
+    <a href="index.html" class="logo">IPL <span>STATS</span></a>
+    <div class="breadcrumb">
+      <a href="index.html">Home</a><span class="sep">›</span>
+      <span class="current" id="bc-name">Player Profile</span>
+    </div>
+  </div>
+</div>
+
+<div class="player-hero">
+  <div class="player-hero-inner">
+    <div class="player-photo-wrap">
+      <img id="player-photo" src="" alt="" style="display:none" onerror="this.style.display='none';document.getElementById('player-photo-fallback').style.display=''">
+      <span id="player-photo-fallback" class="player-photo-placeholder">🏏</span>
+    </div>
+    <div class="player-hero-info">
+      <div class="player-name" id="hero-name">Loading...</div>
+      <div class="player-tags" id="hero-tags"></div>
+      <div class="player-kpis" id="hero-kpis"></div>
+    </div>
+  </div>
+</div>
+
+<div class="profile-tabs">
+  <div class="profile-tabs-inner">
+    <button class="ptab active" onclick="showTab('batting',this)">Batting</button>
+    <button class="ptab" onclick="showTab('bowling',this)">Bowling</button>
+    <button class="ptab" onclick="showTab('overview',this)">By Competition</button>
+  </div>
+</div>
+
+<div class="main">
+  <div id="tab-batting" class="tab-panel active">
+    <div id="batting-content"><div class="loading"><div class="spinner"></div>Loading...</div></div>
+  </div>
+  <div id="tab-bowling" class="tab-panel">
+    <div id="bowling-content"><div class="no-data">Loading...</div></div>
+  </div>
+  <div id="tab-overview" class="tab-panel">
+    <div id="overview-content"><div class="no-data">Loading...</div></div>
+  </div>
+</div>
+
+<footer>Data: <a href="https://cricsheet.org" target="_blank">cricsheet.org</a> &nbsp;·&nbsp; Auto-updated daily</footer>
+
+<script>
+const COMPS=[
+  {code:'ipl',name:'IPL',format:'T20'},
+  {code:'t20is',name:'T20Is',format:'T20'},
+  {code:'odis',name:'ODIs',format:'ODI'},
+  {code:'tests',name:'Tests',format:'Test'},
+];
+const COLORS=['#1E3A5F','#E85D04','#2D9648','#7B2FBE','#D4A017','#1A7A9A','#C0392B','#4A4A8A'];
+
+let playerName='';
+let allData={};   // code -> comp JSON
+let charts=[];
+
+async function boot(){
+  playerName=decodeURIComponent(new URLSearchParams(window.location.search).get('name')||'');
+  if(!playerName){document.getElementById('hero-name').textContent='No player specified';return;}
+  document.getElementById('hero-name').textContent=playerName;
+  document.getElementById('bc-name').textContent=playerName;
+  document.title=playerName+' — Cricket Stats';
+
+  // Try to load player photo from Wikipedia API (free, no key)
+  loadPhoto(playerName);
+
+  // Load all competitions
+  await Promise.all(COMPS.map(c=>loadComp(c.code)));
+
+  renderHero();
+  renderBatting();
+  renderBowling();
+  renderOverview();
+}
+
+async function loadComp(code){
+  try{
+    const r=await fetch(`stats/${code}.json`);
+    allData[code]=await r.json();
+  }catch(e){}
+}
+
+async function loadPhoto(name){
+  try{
+    // Wikipedia REST API - free, no key needed
+    const query=encodeURIComponent(name.replace(' ','_')+'_cricketer');
+    const r=await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${query}`);
+    const d=await r.json();
+    if(d.thumbnail?.source){
+      const img=document.getElementById('player-photo');
+      img.src=d.thumbnail.source;
+      img.style.display='block';
+      document.getElementById('player-photo-fallback').style.display='none';
+    }
+  }catch(e){}
+}
+
+function getPlayerBatting(code){
+  return allData[code]?.batting?.find(p=>p.name===playerName)||null;
+}
+function getPlayerBowling(code){
+  return allData[code]?.bowling?.find(p=>p.name===playerName)||null;
+}
+
+function renderHero(){
+  const ipl=getPlayerBatting('ipl');
+  const t20=getPlayerBatting('t20is');
+  const odi=getPlayerBatting('odis');
+  const test=getPlayerBatting('tests');
+  const bowl=getPlayerBowling('ipl')||getPlayerBowling('t20is')||getPlayerBowling('odis');
+
+  // Tags
+  const tags=[];
+  if(ipl) tags.push('IPL');
+  if(t20) tags.push('T20I');
+  if(odi) tags.push('ODI');
+  if(test) tags.push('Test');
+  document.getElementById('hero-tags').innerHTML=tags.map(t=>`<span class="player-tag">${t}</span>`).join('');
+
+  // KPIs - use best batting source
+  const bat=ipl||t20||odi||test;
+  const kpis=[];
+  if(bat){
+    kpis.push({label:'Runs',val:bat.runs.toLocaleString()});
+    kpis.push({label:'Matches',val:bat.matches});
+    kpis.push({label:'Avg',val:bat.avg});
+    kpis.push({label:'SR',val:bat.sr});
+    if(bat.hundreds) kpis.push({label:'100s',val:bat.hundreds});
+    if(bat.fifties)  kpis.push({label:'50s',val:bat.fifties});
+    if(bat.sixes)    kpis.push({label:'Sixes',val:bat.sixes});
+  }
+  if(bowl){
+    kpis.push({label:'Wickets',val:bowl.wickets});
+    kpis.push({label:'Economy',val:bowl.economy});
+  }
+  document.getElementById('hero-kpis').innerHTML=kpis.map(k=>`
+    <div class="player-kpi">
+      <span class="pk-val">${k.val}</span>
+      <span class="pk-label">${k.label}</span>
+    </div>`).join('');
+}
+
+function showTab(name,btn){
+  document.querySelectorAll('.ptab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+}
+
+// ── BATTING TAB ──────────────────────────────────────────────────────────────
+function renderBatting(){
+  killCharts();
+  const rows=COMPS.map(c=>({comp:c,bat:getPlayerBatting(c.code)})).filter(x=>x.bat);
+  if(!rows.length){document.getElementById('batting-content').innerHTML='<div class="no-data">No batting data found for this player</div>';return;}
+
+  const ipl=getPlayerBatting('ipl');
+
+  let html=`
+    <div class="stat-cards">
+      ${rows.map(r=>`
+        <div class="stat-card">
+          <div class="sc-label">${r.comp.name} Runs</div>
+          <div class="sc-val">${r.bat.runs.toLocaleString()}</div>
+          <div class="sc-sub">${r.bat.matches} matches · avg ${r.bat.avg}</div>
+        </div>`).join('')}
+    </div>
+    <div class="charts-grid">
+      <div class="chart-card" style="grid-column:1/-1">
+        <h3>Runs Across Competitions</h3>
+        <div class="chart-wrap-sm"><canvas id="ch-bat-comp"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h3>Strike Rate vs Average</h3>
+        <div class="chart-wrap"><canvas id="ch-bat-scatter"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h3>Boundary Breakdown</h3>
+        <div class="chart-wrap"><canvas id="ch-bat-bounds"></canvas></div>
+      </div>
+      ${ipl?`
+      <div class="chart-card">
+        <h3>Milestones (IPL)</h3>
+        <div class="chart-wrap"><canvas id="ch-bat-milestones"></canvas></div>
+      </div>`:''}
+    </div>`;
+
+  // Detailed table
+  html+=`<div class="card"><div class="card-title">Career Batting Stats</div>
+    <table><thead><tr><th>Competition</th><th>Mat</th><th>Runs</th><th>Avg</th><th>SR</th><th>4s</th><th>6s</th><th>50s</th><th>100s</th></tr></thead>
+    <tbody>${rows.map(r=>`<tr>
+      <td>${r.comp.name} <span style="font-size:10px;color:var(--muted)">(${r.comp.format})</span></td>
+      <td>${r.bat.matches}</td><td class="hi">${r.bat.runs.toLocaleString()}</td>
+      <td>${r.bat.avg}</td><td>${r.bat.sr}</td>
+      <td>${r.bat.fours||'—'}</td><td>${r.bat.sixes||'—'}</td>
+      <td>${r.bat.fifties||'—'}</td><td>${r.bat.hundreds||'—'}</td>
+    </tr>`).join('')}</tbody></table>
+  </div>`;
+
+  document.getElementById('batting-content').innerHTML=html;
+
+  setTimeout(()=>{
+    // Runs by competition bar
+    const ctx1=document.getElementById('ch-bat-comp')?.getContext('2d');
+    if(ctx1){
+      charts.push(new Chart(ctx1,{type:'bar',data:{
+        labels:rows.map(r=>r.comp.name),
+        datasets:[
+          {label:'Runs',data:rows.map(r=>r.bat.runs),backgroundColor:COLORS.slice(0,rows.length),borderRadius:4},
+        ]
+      },options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:11}}},y:{grid:{color:'#E2E6EA'},ticks:{font:{size:11}}}}}}));
+    }
+
+    // SR vs Avg scatter (player vs all others in same comp)
+    const scCtx=document.getElementById('ch-bat-scatter')?.getContext('2d');
+    if(scCtx){
+      const bestComp=rows[0];
+      const allBat=allData[bestComp.comp.code]?.batting||[];
+      const others=allBat.filter(p=>p.name!==playerName&&p.matches>=5).map(p=>({x:p.avg,y:p.sr}));
+      const me={x:bestComp.bat.avg,y:bestComp.bat.sr};
+      charts.push(new Chart(scCtx,{type:'scatter',data:{datasets:[
+        {label:'Other Players',data:others,backgroundColor:'rgba(107,122,141,0.2)',pointRadius:3},
+        {label:playerName,data:[me],backgroundColor:'#E85D04',pointRadius:8,pointStyle:'star'},
+      ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:'top',labels:{font:{size:10},boxWidth:10}}},scales:{x:{title:{display:true,text:'Average',font:{size:10}},grid:{color:'#E2E6EA'},ticks:{font:{size:10}}},y:{title:{display:true,text:'Strike Rate',font:{size:10}},grid:{color:'#E2E6EA'},ticks:{font:{size:10}}}}}}));
+    }
+
+    // Boundary breakdown donut
+    const bndCtx=document.getElementById('ch-bat-bounds')?.getContext('2d');
+    if(bndCtx){
+      const allFours=rows.reduce((s,r)=>s+(r.bat.fours||0),0);
+      const allSixes=rows.reduce((s,r)=>s+(r.bat.sixes||0),0);
+      const totalRuns=rows.reduce((s,r)=>s+r.bat.runs,0);
+      const boundRuns=allFours*4+allSixes*6;
+      const other=Math.max(0,totalRuns-boundRuns);
+      charts.push(new Chart(bndCtx,{type:'doughnut',data:{labels:['Fours (runs)','Sixes (runs)','Other runs'],datasets:[{data:[allFours*4,allSixes*6,other],backgroundColor:['#2E5A8F','#E85D04','#E2E6EA'],borderWidth:2,borderColor:'#fff'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{font:{size:11},boxWidth:12}}}}}));
+    }
+
+    // Milestones bar (IPL)
+    const msCtx=document.getElementById('ch-bat-milestones')?.getContext('2d');
+    if(msCtx&&ipl){
+      charts.push(new Chart(msCtx,{type:'bar',data:{labels:['Fifties','Hundreds','Matches'],datasets:[{data:[ipl.fifties||0,ipl.hundreds||0,ipl.matches],backgroundColor:['#DAA520','#C0392B','#2E5A8F'],borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:11}}},y:{grid:{color:'#E2E6EA'},ticks:{font:{size:11}}}}}}));
+    }
+  },100);
+}
+
+// ── BOWLING TAB ───────────────────────────────────────────────────────────────
+function renderBowling(){
+  const rows=COMPS.map(c=>({comp:c,bowl:getPlayerBowling(c.code)})).filter(x=>x.bowl);
+  if(!rows.length){document.getElementById('bowling-content').innerHTML='<div class="no-data">No bowling data found for this player</div>';return;}
+
+  let html=`
+    <div class="stat-cards">
+      ${rows.map(r=>`<div class="stat-card">
+        <div class="sc-label">${r.comp.name} Wickets</div>
+        <div class="sc-val">${r.bowl.wickets}</div>
+        <div class="sc-sub">${r.bowl.matches} matches · econ ${r.bowl.economy}</div>
+      </div>`).join('')}
+    </div>
+    <div class="charts-grid">
+      <div class="chart-card">
+        <h3>Wickets by Competition</h3>
+        <div class="chart-wrap"><canvas id="ch-bowl-comp"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h3>Economy vs Average</h3>
+        <div class="chart-wrap"><canvas id="ch-bowl-econ"></canvas></div>
+      </div>
+    </div>`;
+
+  html+=`<div class="card"><div class="card-title">Career Bowling Stats</div>
+    <table><thead><tr><th>Competition</th><th>Mat</th><th>Wkts</th><th>Avg</th><th>Econ</th><th>Overs</th><th>Runs</th></tr></thead>
+    <tbody>${rows.map(r=>`<tr>
+      <td>${r.comp.name} <span style="font-size:10px;color:var(--muted)">(${r.comp.format})</span></td>
+      <td>${r.bowl.matches}</td><td class="hi">${r.bowl.wickets}</td>
+      <td>${r.bowl.avg||'—'}</td><td>${r.bowl.economy}</td>
+      <td>${r.bowl.overs}</td><td>${r.bowl.runs.toLocaleString()}</td>
+    </tr>`).join('')}</tbody></table>
+  </div>`;
+
+  document.getElementById('bowling-content').innerHTML=html;
+
+  setTimeout(()=>{
+    const ctx1=document.getElementById('ch-bowl-comp')?.getContext('2d');
+    if(ctx1){
+      charts.push(new Chart(ctx1,{type:'bar',data:{
+        labels:rows.map(r=>r.comp.name),
+        datasets:[{label:'Wickets',data:rows.map(r=>r.bowl.wickets),backgroundColor:COLORS.slice(0,rows.length),borderRadius:4}]
+      },options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:11}}},y:{grid:{color:'#E2E6EA'},ticks:{font:{size:11}}}}}}));
+    }
+
+    const ctx2=document.getElementById('ch-bowl-econ')?.getContext('2d');
+    if(ctx2){
+      charts.push(new Chart(ctx2,{type:'radar',data:{
+        labels:rows.map(r=>r.comp.name),
+        datasets:[
+          {label:'Economy',data:rows.map(r=>r.bowl.economy),borderColor:'#E85D04',backgroundColor:'rgba(232,93,4,0.1)',pointRadius:4},
+          {label:'Avg/5',data:rows.map(r=>(r.bowl.avg||0)/5),borderColor:'#1E3A5F',backgroundColor:'rgba(30,58,95,0.1)',pointRadius:4},
+        ]
+      },options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:'top',labels:{font:{size:10},boxWidth:10}}},scales:{r:{ticks:{font:{size:9}},grid:{color:'#E2E6EA'}}}}}));
+    }
+  },100);
+}
+
+// ── OVERVIEW TAB ──────────────────────────────────────────────────────────────
+function renderOverview(){
+  const batRows=COMPS.map(c=>({comp:c,bat:getPlayerBatting(c.code),bowl:getPlayerBowling(c.code)})).filter(x=>x.bat||x.bowl);
+  if(!batRows.length){document.getElementById('overview-content').innerHTML='<div class="no-data">No data found</div>';return;}
+
+  let html=`<div class="charts-grid">
+    <div class="chart-card" style="grid-column:1/-1">
+      <h3>Performance Snapshot — All Competitions</h3>
+      <div class="chart-wrap"><canvas id="ch-ov-radar"></canvas></div>
+    </div>
+  </div>`;
+
+  html+=`<div class="card"><div class="card-title">All-Format Summary</div>
+    <table><thead><tr><th>Competition</th><th>Format</th><th>Mat</th><th>Runs</th><th>Bat Avg</th><th>SR</th><th>Wkts</th><th>Economy</th></tr></thead>
+    <tbody>${batRows.map(r=>`<tr>
+      <td>${r.comp.name}</td>
+      <td><span style="font-size:10px;padding:2px 6px;border-radius:3px;background:var(--blue-light);color:var(--blue);font-weight:600">${r.comp.format}</span></td>
+      <td>${r.bat?.matches||r.bowl?.matches||'—'}</td>
+      <td class="hi">${r.bat?.runs?.toLocaleString()||'—'}</td>
+      <td>${r.bat?.avg||'—'}</td>
+      <td>${r.bat?.sr||'—'}</td>
+      <td>${r.bowl?.wickets||'—'}</td>
+      <td>${r.bowl?.economy||'—'}</td>
+    </tr>`).join('')}</tbody></table>
+  </div>`;
+
+  document.getElementById('overview-content').innerHTML=html;
+
+  setTimeout(()=>{
+    const ctx=document.getElementById('ch-ov-radar')?.getContext('2d');
+    if(ctx&&batRows.length){
+      const maxRuns=Math.max(...batRows.map(r=>r.bat?.runs||0),1);
+      const maxWkts=Math.max(...batRows.map(r=>r.bowl?.wickets||0),1);
+      charts.push(new Chart(ctx,{type:'bar',data:{
+        labels:batRows.map(r=>r.comp.name),
+        datasets:[
+          {label:'Runs (scaled)',data:batRows.map(r=>r.bat?Math.round(r.bat.runs/maxRuns*100):0),backgroundColor:'rgba(30,58,95,0.7)',borderRadius:3},
+          {label:'Wickets (scaled)',data:batRows.map(r=>r.bowl?Math.round(r.bowl.wickets/maxWkts*100):0),backgroundColor:'rgba(232,93,4,0.7)',borderRadius:3},
+        ]
+      },options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:'top',labels:{font:{size:10},boxWidth:10}},tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${c.raw}%`}}},scales:{x:{grid:{display:false},ticks:{font:{size:11}}},y:{grid:{color:'#E2E6EA'},ticks:{font:{size:11},callback:v=>v+'%'}}}}}));
+    }
+  },100);
+}
+
+function killCharts(){charts.forEach(c=>{try{c.destroy();}catch(e){}});charts=[];}
+boot();
+</script>
+</body>
+</html>

@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Match Browser — Cricket Stats</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Bebas+Neue&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+:root{--gold:#B8860B;--gold-light:#DAA520;--gold-bg:#FFF8E7;--blue:#1E3A5F;--blue-mid:#2E5A8F;--blue-light:#EBF3FF;--bg:#F5F7FA;--surface:#FFFFFF;--surface2:#F0F2F5;--border:#E2E6EA;--text:#1A2332;--muted:#6B7A8D;--green:#1A7A4A;--green-bg:#E8F5EE;--red:#C0392B;--shadow:0 1px 3px rgba(0,0,0,0.08);--shadow-md:0 4px 12px rgba(0,0,0,0.08);}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-size:14px;line-height:1.5;}
+.header{background:var(--blue);padding:0 24px;position:sticky;top:0;z-index:200;box-shadow:0 2px 8px rgba(0,0,0,0.15);}
+.header-inner{max-width:1200px;margin:0 auto;display:flex;align-items:center;height:56px;gap:16px;}
+.logo{font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:3px;color:#fff;text-decoration:none;flex-shrink:0;}
+.logo span{color:var(--gold-light);}
+.breadcrumb{display:flex;align-items:center;gap:8px;font-size:13px;color:rgba(255,255,255,0.6);}
+.breadcrumb a{color:rgba(255,255,255,0.6);text-decoration:none;}
+.breadcrumb a:hover{color:#fff;}
+.breadcrumb .sep{opacity:0.4;}
+.breadcrumb .current{color:#fff;font-weight:500;}
+.toolbar{background:var(--surface);border-bottom:1px solid var(--border);padding:12px 24px;position:sticky;top:56px;z-index:100;box-shadow:var(--shadow);}
+.toolbar-inner{max-width:1200px;margin:0 auto;display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+select,input{background:var(--surface);border:1px solid var(--border);color:var(--text);font-family:'Inter',sans-serif;font-size:13px;padding:7px 10px;border-radius:6px;outline:none;transition:border-color 0.15s;}
+select:focus,input:focus{border-color:var(--blue-mid);}
+#match-search{width:220px;}
+#match-search::placeholder{color:var(--muted);}
+.filter-label{font-size:11px;color:var(--muted);font-weight:500;}
+.main{max-width:1200px;margin:0 auto;padding:24px;}
+.match-list{display:grid;gap:10px;}
+.match-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px 20px;cursor:pointer;transition:all 0.15s;box-shadow:var(--shadow);display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;}
+.match-card:hover{border-color:var(--blue-mid);box-shadow:var(--shadow-md);transform:translateY(-1px);}
+.match-teams{font-size:15px;font-weight:600;margin-bottom:4px;}
+.match-scores{font-size:13px;color:var(--muted);margin-bottom:6px;}
+.match-meta{font-size:11px;color:var(--muted);display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+.badge-green{background:var(--green-bg);color:var(--green);font-size:11px;font-weight:600;padding:3px 10px;border-radius:4px;}
+.badge-gold{background:var(--gold-bg);color:var(--gold);font-size:10px;font-weight:600;padding:2px 8px;border-radius:3px;}
+#scorecard-view{display:none;}
+.sc-header{background:linear-gradient(135deg,var(--blue) 0%,var(--blue-mid) 100%);color:#fff;padding:32px 24px;margin:-24px -24px 28px;}
+.sc-header-inner{max-width:1200px;margin:0 auto;}
+.sc-teams{font-family:'Bebas Neue',sans-serif;font-size:clamp(22px,5vw,42px);letter-spacing:3px;line-height:1;margin-bottom:8px;}
+.sc-teams .vs{font-size:0.45em;color:rgba(255,255,255,0.4);margin:0 10px;}
+.sc-result{font-size:14px;color:rgba(255,255,255,0.75);margin-bottom:14px;}
+.sc-meta-row{display:flex;gap:20px;flex-wrap:wrap;}
+.sc-meta-item{font-size:12px;color:rgba(255,255,255,0.55);}
+.sc-meta-item strong{color:rgba(255,255,255,0.9);font-weight:500;}
+.charts-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin-bottom:28px;}
+.chart-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px;box-shadow:var(--shadow);}
+.chart-card h3{font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:14px;}
+.chart-wrap{position:relative;height:230px;}
+.chart-wrap-lg{position:relative;height:260px;}
+.innings-block{margin-bottom:32px;}
+.innings-title{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:2px;color:var(--blue);margin-bottom:14px;display:flex;align-items:baseline;gap:12px;}
+.innings-total{font-size:13px;color:var(--muted);font-family:'Inter',sans-serif;font-weight:400;}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;box-shadow:var(--shadow);margin-bottom:12px;}
+.card-title{padding:10px 16px;background:var(--surface2);border-bottom:1px solid var(--border);font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);}
+table{width:100%;border-collapse:collapse;}
+thead th{font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);padding:9px 14px;text-align:right;background:var(--surface2);border-bottom:1px solid var(--border);white-space:nowrap;}
+thead th:first-child,thead th:nth-child(2){text-align:left;}
+tbody tr{border-bottom:1px solid var(--border);transition:background 0.1s;}
+tbody tr:hover{background:var(--blue-light);}
+tbody tr:last-child{border-bottom:none;}
+tbody tr.extras-row,tbody tr.total-row{background:var(--surface2);}
+tbody tr.total-row{font-weight:600;}
+td{padding:10px 14px;font-size:13px;text-align:right;color:var(--muted);}
+td:first-child{text-align:left;color:var(--text);font-weight:500;}
+td:nth-child(2){text-align:left;color:var(--muted);font-size:12px;}
+.runs-cell{color:var(--blue);font-weight:700;font-size:15px;}
+.runs-cell.fifty{color:var(--gold);}
+.runs-cell.hundred{color:var(--red);}
+.fow-wrap{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-bottom:12px;}
+.fow-title{font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;}
+.fow-list{display:flex;flex-wrap:wrap;gap:8px;}
+.fow-item{background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:4px 10px;font-size:12px;}
+.result-strip{display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--green-bg);border:1px solid #A8D5B5;border-radius:8px;margin-bottom:24px;font-size:13px;color:var(--green);font-weight:500;}
+.back-btn{background:var(--surface);border:1px solid var(--border);color:var(--muted);font-family:'Inter',sans-serif;font-size:13px;font-weight:500;padding:7px 14px;border-radius:6px;cursor:pointer;transition:all 0.15s;margin-bottom:20px;display:inline-flex;align-items:center;gap:6px;}
+.back-btn:hover{color:var(--blue);border-color:var(--blue-mid);}
+.plink{color:var(--blue);text-decoration:none;font-weight:500;}
+.plink:hover{text-decoration:underline;}
+.loading{text-align:center;padding:48px;color:var(--muted);font-size:13px;}
+.spinner{width:24px;height:24px;border:2px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin 0.7s linear infinite;margin:0 auto 12px;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.empty{text-align:center;padding:48px;color:var(--muted);font-size:13px;}
+footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-size:12px;color:var(--muted);margin-top:40px;}
+footer a{color:var(--blue);text-decoration:none;}
+@media(max-width:640px){.charts-grid{grid-template-columns:1fr;}.main{padding:16px;}.sc-header{padding:20px 16px;}td:nth-child(n+5){display:none;}th:nth-child(n+5){display:none;}}
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="header-inner">
+    <a href="index.html" class="logo">IPL <span>STATS</span></a>
+    <div class="breadcrumb">
+      <a href="index.html">Home</a><span class="sep">›</span>
+      <span class="current">Match Browser</span>
+    </div>
+  </div>
+</div>
+<div class="toolbar">
+  <div class="toolbar-inner">
+    <span class="filter-label">Competition</span>
+    <select id="comp-select" onchange="onCompChange()">
+      <option value="ipl">IPL</option>
+      <option value="tests">Tests</option>
+      <option value="odis">ODIs</option>
+      <option value="t20is">T20Is</option>
+    </select>
+    <span class="filter-label">Season</span>
+    <select id="season-sel" onchange="renderMatchList()">
+      <option value="all">All Seasons</option>
+    </select>
+    <input type="text" id="match-search" placeholder="Search team or venue..." oninput="renderMatchList()">
+  </div>
+</div>
+<div class="main">
+  <div id="list-view">
+    <div id="match-list-wrap"><div class="loading"><div class="spinner"></div>Loading...</div></div>
+  </div>
+  <div id="scorecard-view">
+    <button class="back-btn" onclick="showList()">← Back to matches</button>
+    <div id="scorecard-wrap"></div>
+  </div>
+</div>
+<footer>Data: <a href="https://cricsheet.org" target="_blank">cricsheet.org</a> &nbsp;·&nbsp; Auto-updated daily</footer>
+
+<script>
+const COLORS=['#1E3A5F','#E85D04','#2D9648','#7B2FBE','#D4A017','#1A7A9A','#C0392B','#4A4A8A','#1A7A4A','#8B4513'];
+let allMatches=[],currentComp='ipl',charts=[];
+
+async function boot(){await loadMatches('ipl');}
+
+async function loadMatches(comp){
+  currentComp=comp;
+  document.getElementById('match-list-wrap').innerHTML='<div class="loading"><div class="spinner"></div>Loading...</div>';
+  try{
+    const r=await fetch(`stats/matches/${comp}/index.json`);
+    const d=await r.json();
+    allMatches=d.matches||[];
+    populateSeasons();renderMatchList();
+  }catch(e){
+    document.getElementById('match-list-wrap').innerHTML=`<div class="empty">No match data for ${comp}<br><small>Run fetch_all_cricket.py first</small></div>`;
+  }
+}
+
+function onCompChange(){loadMatches(document.getElementById('comp-select').value);}
+
+function populateSeasons(){
+  const s=[...new Set(allMatches.map(m=>m.season).filter(Boolean))].sort((a,b)=>b.localeCompare(a));
+  const sel=document.getElementById('season-sel');
+  sel.innerHTML='<option value="all">All Seasons</option>';
+  s.forEach(x=>{const o=document.createElement('option');o.value=x;o.textContent=x;sel.appendChild(o);});
+}
+
+function renderMatchList(){
+  const season=document.getElementById('season-sel').value;
+  const q=document.getElementById('match-search').value.toLowerCase();
+  let f=allMatches;
+  if(season!=='all')f=f.filter(m=>m.season===season);
+  if(q)f=f.filter(m=>(m.teams||[]).join(' ').toLowerCase().includes(q)||(m.venue||'').toLowerCase().includes(q));
+  if(!f.length){document.getElementById('match-list-wrap').innerHTML='<div class="empty">No matches found</div>';return;}
+  const html=f.map(m=>{
+    const t1=(m.teams||[])[0]||'—',t2=(m.teams||[])[1]||'—';
+    const s1=(m.scores||[])[0]||'',s2=(m.scores||[])[1]||'';
+    const dt=m.date?new Date(m.date).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}):'';
+    return `<div class="match-card" onclick="loadScorecard('${m.id}')">
+      <div>
+        <div class="match-teams">${t1} vs ${t2}</div>
+        <div class="match-scores">${s1}${s2?' | '+s2:''}</div>
+        <div class="match-meta">
+          ${m.winner?`<span class="badge-green">🏆 ${m.winner} won</span>`:''}
+          ${m.season?`<span class="badge-gold">${m.season}</span>`:''}
+          ${dt?`<span>${dt}</span>`:''}
+          ${m.venue?`<span>📍 ${m.venue}</span>`:''}
+        </div>
+      </div>
+      <div style="color:var(--muted);font-size:20px">›</div>
+    </div>`;
+  }).join('');
+  document.getElementById('match-list-wrap').innerHTML=`<div style="font-size:12px;color:var(--muted);margin-bottom:12px">${f.length} matches</div><div class="match-list">${html}</div>`;
+}
+
+async function loadScorecard(id){
+  document.getElementById('list-view').style.display='none';
+  document.getElementById('scorecard-view').style.display='';
+  document.getElementById('scorecard-wrap').innerHTML='<div class="loading"><div class="spinner"></div>Loading scorecard...</div>';
+  killCharts();
+  try{
+    const r=await fetch(`stats/matches/${currentComp}/${id}.json`);
+    renderScorecard(await r.json());
+  }catch(e){document.getElementById('scorecard-wrap').innerHTML='<div class="empty">Scorecard not available</div>';}
+}
+
+function showList(){killCharts();document.getElementById('scorecard-view').style.display='none';document.getElementById('list-view').style.display='';}
+function killCharts(){charts.forEach(c=>{try{c.destroy();}catch(e){}});charts=[];}
+
+function renderScorecard(sc){
+  const t1=(sc.teams||[])[0]||'—',t2=(sc.teams||[])[1]||'—';
+  const dt=sc.date?new Date(sc.date).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}):'';
+  let html=`
+    <div class="sc-header"><div class="sc-header-inner">
+      <div class="sc-teams">${t1}<span class="vs">VS</span>${t2}</div>
+      <div class="sc-result">${sc.winner?sc.winner+' won'+(sc.win_margin?' · '+sc.win_margin:''):'Result unavailable'}</div>
+      <div class="sc-meta-row">
+        ${dt?`<div class="sc-meta-item"><strong>${dt}</strong></div>`:''}
+        ${sc.season?`<div class="sc-meta-item">Season <strong>${sc.season}</strong></div>`:''}
+        ${sc.venue?`<div class="sc-meta-item">📍 <strong>${sc.venue}</strong></div>`:''}
+      </div>
+    </div></div>`;
+
+  if(sc.winner) html+=`<div class="result-strip">🏆 ${sc.winner} won${sc.win_margin?' · '+sc.win_margin:''}</div>`;
+
+  // Match-level charts
+  html+=`<div class="charts-grid">
+    <div class="chart-card" style="grid-column:1/-1"><h3>Run Progression — Worm Chart</h3><div class="chart-wrap-lg"><canvas id="ch-worm"></canvas></div></div>
+    <div class="chart-card"><h3>Runs Per Over — ${t1}</h3><div class="chart-wrap"><canvas id="ch-ov1"></canvas></div></div>
+    <div class="chart-card"><h3>Runs Per Over — ${t2}</h3><div class="chart-wrap"><canvas id="ch-ov2"></canvas></div></div>
+  </div>`;
+
+  // Innings
+  (sc.innings||[]).forEach((inn,i)=>{
+    const id=`i${i}`;
+    const overs=inn.overs?` (${inn.overs} ov)`:'';
+    html+=`<div class="innings-block">
+      <div class="innings-title">${ord(i+1)} Innings — ${inn.batting_team}<span class="innings-total">${inn.total_runs}/${inn.total_wickets}${overs}</span></div>
+      <div class="charts-grid">
+        <div class="chart-card"><h3>Batting Share</h3><div class="chart-wrap"><canvas id="ch-pie-${id}"></canvas></div></div>
+        <div class="chart-card"><h3>Bowling Economy</h3><div class="chart-wrap"><canvas id="ch-econ-${id}"></canvas></div></div>
+        <div class="chart-card"><h3>Boundary Runs (4s &amp; 6s)</h3><div class="chart-wrap"><canvas id="ch-bound-${id}"></canvas></div></div>
+      </div>
+      <div class="card"><div class="card-title">Batting</div>
+        <table><thead><tr><th>Batter</th><th>Dismissal</th><th>R</th><th>B</th><th>4s</th><th>6s</th><th>SR</th></tr></thead>
+        <tbody>
+          ${(inn.batters||[]).map(b=>{
+            const m=b.runs>=100?'hundred':b.runs>=50?'fifty':'';
+            return `<tr><td><a class="plink" href="player.html?name=${encodeURIComponent(b.name)}">${b.name}</a></td><td>${b.dismissal||'not out'}</td><td class="runs-cell ${m}">${b.runs}</td><td>${b.balls}</td><td>${b.fours}</td><td>${b.sixes}</td><td>${b.sr}</td></tr>`;
+          }).join('')}
+          <tr class="extras-row"><td colspan="2">Extras</td><td colspan="5" style="text-align:left;padding-left:14px">${inn.extras_total||0} (w ${inn.extras?.wides||0}, nb ${inn.extras?.noballs||0}, b ${inn.extras?.byes||0}, lb ${inn.extras?.legbyes||0})</td></tr>
+          <tr class="total-row"><td colspan="2">Total</td><td colspan="5" style="text-align:left;padding-left:14px;color:var(--blue)">${inn.total_runs}/${inn.total_wickets}${overs}</td></tr>
+        </tbody></table>
+      </div>
+      ${(inn.fall_of_wickets||[]).length?`<div class="fow-wrap"><div class="fow-title">Fall of Wickets</div><div class="fow-list">${inn.fall_of_wickets.map(f=>`<div class="fow-item"><span style="color:var(--muted);font-size:10px">${f.wicket}wkt </span><span style="color:var(--blue);font-weight:600">${f.runs}</span><span style="color:var(--muted)"> (${f.player})</span></div>`).join('')}</div></div>`:''}
+      <div class="card"><div class="card-title">Bowling — ${inn.bowling_team}</div>
+        <table><thead><tr><th>Bowler</th><th></th><th>O</th><th>M</th><th>R</th><th>W</th><th>Econ</th></tr></thead>
+        <tbody>${(inn.bowlers||[]).map(b=>`<tr><td><a class="plink" href="player.html?name=${encodeURIComponent(b.name)}">${b.name}</a></td><td></td><td>${b.overs}</td><td>${b.maidens||0}</td><td>${b.runs}</td><td style="color:var(--blue);font-weight:600">${b.wickets}</td><td>${b.economy}</td></tr>`).join('')}</tbody>
+        </table>
+      </div>
+    </div>`;
+  });
+
+  document.getElementById('scorecard-wrap').innerHTML=html;
+  window.scrollTo(0,0);
+  setTimeout(()=>drawCharts(sc),120);
+}
+
+function drawCharts(sc){
+  const inn1=(sc.innings||[])[0],inn2=(sc.innings||[])[1];
+  const lOpts={responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false}},scales:{x:{grid:{color:'#E2E6EA'},ticks:{font:{size:10},color:'#6B7A8D'}},y:{grid:{color:'#E2E6EA'},ticks:{font:{size:10},color:'#6B7A8D'}}}};
+  const bOpts={responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:10},color:'#6B7A8D'}},y:{grid:{color:'#E2E6EA'},ticks:{font:{size:10},color:'#6B7A8D'}}}};
+
+  // Worm
+  const wCtx=document.getElementById('ch-worm')?.getContext('2d');
+  if(wCtx){
+    const ds=[];
+    [inn1,inn2].forEach((inn,i)=>{
+      if(!inn?.over_by_over?.length) return;
+      ds.push({label:inn.batting_team,data:inn.over_by_over.map(o=>o.cumulative),borderColor:COLORS[i],backgroundColor:'transparent',tension:0.4,pointRadius:2,borderWidth:2.5,borderDash:i===1?[5,3]:[]});
+    });
+    const maxLen=Math.max((inn1?.over_by_over||[]).length,(inn2?.over_by_over||[]).length);
+    charts.push(new Chart(wCtx,{type:'line',data:{labels:Array.from({length:maxLen},(_,i)=>i+1),datasets:ds},options:{...lOpts,plugins:{...lOpts.plugins,legend:{display:true,position:'top',labels:{font:{size:11},boxWidth:12}}}}}));
+  }
+
+  // Per-over bars
+  [inn1,inn2].forEach((inn,i)=>{
+    if(!inn) return;
+    const ctx=document.getElementById(`ch-ov${i+1}`)?.getContext('2d');
+    if(!ctx||!inn.over_by_over?.length) return;
+    const runs=inn.over_by_over.map(o=>o.runs);
+    charts.push(new Chart(ctx,{type:'bar',data:{labels:inn.over_by_over.map(o=>`${o.over}`),datasets:[{data:runs,backgroundColor:runs.map(r=>r>=15?'#C0392B':r>=10?'#E85D04':r>=6?'#DAA520':'#2E5A8F'),borderRadius:3}]},options:bOpts}));
+  });
+
+  // Per-innings charts
+  (sc.innings||[]).forEach((inn,i)=>{
+    const id=`i${i}`;
+
+    // Pie
+    const pieCtx=document.getElementById(`ch-pie-${id}`)?.getContext('2d');
+    if(pieCtx){
+      const top=[...(inn.batters||[])].sort((a,b)=>b.runs-a.runs).slice(0,6);
+      const others=(inn.batters||[]).reduce((s,b)=>s+(top.includes(b)?0:b.runs),0);
+      const labels=top.map(b=>b.name.split(' ').pop()),data=top.map(b=>b.runs);
+      if(others>0){labels.push('Others');data.push(others);}
+      charts.push(new Chart(pieCtx,{type:'doughnut',data:{labels,datasets:[{data,backgroundColor:COLORS.slice(0,labels.length),borderWidth:2,borderColor:'#fff'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{font:{size:10},boxWidth:10}},tooltip:{callbacks:{label:c=>` ${c.label}: ${c.raw} runs`}}}}}));
+    }
+
+    // Economy
+    const econCtx=document.getElementById(`ch-econ-${id}`)?.getContext('2d');
+    if(econCtx){
+      const bl=[...(inn.bowlers||[])].filter(b=>b.overs>0).sort((a,b)=>a.economy-b.economy);
+      charts.push(new Chart(econCtx,{type:'bar',data:{labels:bl.map(b=>b.name.split(' ').pop()),datasets:[{data:bl.map(b=>b.economy),backgroundColor:bl.map(b=>b.economy<=6?'#2D9648':b.economy<=8?'#DAA520':'#C0392B'),borderRadius:3}]},options:{...bOpts,indexAxis:'y'}}));
+    }
+
+    // Boundaries stacked
+    const bndCtx=document.getElementById(`ch-bound-${id}`)?.getContext('2d');
+    if(bndCtx){
+      const top=[...(inn.batters||[])].filter(b=>b.fours+b.sixes>0).sort((a,b)=>(b.fours+b.sixes)-(a.fours+a.sixes)).slice(0,8);
+      charts.push(new Chart(bndCtx,{type:'bar',data:{labels:top.map(b=>b.name.split(' ').pop()),datasets:[{label:'4s (runs)',data:top.map(b=>b.fours*4),backgroundColor:'#2E5A8F',borderRadius:2},{label:'6s (runs)',data:top.map(b=>b.sixes*6),backgroundColor:'#E85D04',borderRadius:2}]},options:{...bOpts,plugins:{...bOpts.plugins,legend:{display:true,position:'top',labels:{font:{size:10},boxWidth:10}}},scales:{x:{stacked:true,grid:{display:false},ticks:{font:{size:10}}},y:{stacked:true,grid:{color:'#E2E6EA'},ticks:{font:{size:10}}}}}}));
+    }
+  });
+}
+
+function ord(n){const s=['th','st','nd','rd'],v=n%100;return n+(s[(v-20)%10]||s[v]||s[0]);}
+boot();
+</script>
+</body>
+</html>
