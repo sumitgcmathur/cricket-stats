@@ -158,27 +158,48 @@ function renderMatchList(){
   if(season!=='all')f=f.filter(m=>m.season===season);
   if(q)f=f.filter(m=>(m.teams||[]).join(' ').toLowerCase().includes(q)||(m.venue||'').toLowerCase().includes(q));
   if(!f.length){document.getElementById('match-list-wrap').innerHTML='<div class="empty">No matches found</div>';return;}
-  const html=f.map(m=>{
-    const t1=(m.teams||[])[0]||'—',t2=(m.teams||[])[1]||'—';
-    const s1=(m.scores||[])[0]||'',s2=(m.scores||[])[1]||'';
+
+  // Build list using DOM instead of innerHTML to avoid quoting issues
+  const wrap = document.createElement('div');
+  const countEl = document.createElement('div');
+  countEl.style.cssText='font-size:12px;color:var(--muted);margin-bottom:12px';
+  countEl.textContent=f.length+' matches';
+  wrap.appendChild(countEl);
+
+  const list = document.createElement('div');
+  list.className='match-list';
+
+  f.forEach(m=>{
+    const t1=(m.teams||[])[0]||'—', t2=(m.teams||[])[1]||'—';
+    const s1=(m.scores||[])[0]||'', s2=(m.scores||[])[1]||'';
     const dt=m.date?new Date(m.date).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}):'';
-    const safeId=String(m.id).replace(/'/g,"\'");
-    return `<div class="match-card" onclick="loadScorecard('${safeId}')">
+
+    const card=document.createElement('div');
+    card.className='match-card';
+    card.style.cursor='pointer';
+    card.addEventListener('click', ()=>loadScorecard(m.id));
+
+    let metaHtml='';
+    if(m.winner) metaHtml+=`<span class="badge-green">🏆 ${m.winner} won</span>`;
+    if(m.season) metaHtml+=`<span class="badge-gold">${m.season}</span>`;
+    if(dt) metaHtml+=`<span>${dt}</span>`;
+    if(m.venue) metaHtml+=`<span>📍 ${m.venue}</span>`;
+
+    card.innerHTML=`
       <div>
         <div class="match-teams">${t1} vs ${t2}</div>
         <div class="match-scores">${s1}${s2?' | '+s2:''}</div>
-        <div class="match-meta">
-          ${m.winner?`<span class="badge-green">🏆 ${m.winner} won</span>`:''}
-          ${m.season?`<span class="badge-gold">${m.season}</span>`:''}
-          ${dt?`<span>${dt}</span>`:''}
-          ${m.venue?`<span>📍 ${m.venue}</span>`:''}
-        </div>
+        <div class="match-meta">${metaHtml}</div>
       </div>
-      <div style="color:var(--muted);font-size:20px">›</div>
-    </div>`;
-  }).join('');
-  document.getElementById('match-list-wrap').innerHTML=`<div style="font-size:12px;color:var(--muted);margin-bottom:12px">${f.length} matches</div><div class="match-list">${html}</div>`;
+      <div style="color:var(--muted);font-size:20px">›</div>`;
+    list.appendChild(card);
+  });
+
+  wrap.appendChild(list);
+  document.getElementById('match-list-wrap').innerHTML='';
+  document.getElementById('match-list-wrap').appendChild(wrap);
 }
+
 
 async function loadScorecard(id){
   document.getElementById('list-view').style.display='none';

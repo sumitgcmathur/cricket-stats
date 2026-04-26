@@ -266,10 +266,12 @@ function showTab(name,btn){
   if(!playerName) return;
   killCharts();
   // Small delay so DOM is visible before drawing charts
-  setTimeout(()=>{ try {
-    if(name==='batting') renderBatting();
-    else if(name==='bowling') renderBowling();
-    else if(name==='overview') renderOverview();
+  setTimeout(()=>{
+    try {
+      if(name==='batting') renderBatting();
+      else if(name==='bowling') renderBowling();
+      else if(name==='overview') renderOverview();
+    } catch(e) { console.error('Tab render error:', e); }
   }, 50);
 }
 
