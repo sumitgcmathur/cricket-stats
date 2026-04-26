@@ -427,7 +427,9 @@ def parse_zip(zip_bytes, comp):
     return batters, bowlers, teams, sorted(seasons), total
 
 
-def build_output(batters, bowlers, teams, seasons, total_matches, comp):
+def build_output(batters, bowlers, teams, seasons, total_matches, comp, team_season_matches=None):
+    if team_season_matches is None:
+        team_season_matches = {}
     batting_list = []
     for name, s in batters.items():
         m = len(s["matches"])
@@ -505,7 +507,7 @@ def fetch_competition(comp):
     try:
         zip_bytes = download_zip(code)
         batters, bowlers, teams, seasons, total = parse_zip(zip_bytes, comp)
-        data = build_output(batters, bowlers, teams, seasons, total, comp)
+        data = build_output(batters, bowlers, teams, seasons, total, comp, team_season_matches)
         out_path = os.path.join(STATS_DIR, f"{code}.json")
         with open(out_path, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, separators=(",",":"))
