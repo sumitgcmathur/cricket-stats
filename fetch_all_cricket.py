@@ -424,7 +424,7 @@ def parse_zip(zip_bytes, comp):
     with open(os.path.join(matches_dir, "index.json"), "w", encoding="utf-8") as f:
         json.dump({"matches": match_index}, f, ensure_ascii=False, separators=(",",":"))
 
-    return batters, bowlers, teams, sorted(seasons), total
+    return batters, bowlers, teams, sorted(seasons), total, team_season_matches
 
 
 def build_output(batters, bowlers, teams, seasons, total_matches, comp, team_season_matches=None):
@@ -506,8 +506,8 @@ def fetch_competition(comp):
     print(f"\n{'─'*50}\n🏏 {comp['name']} ({code})")
     try:
         zip_bytes = download_zip(code)
-        batters, bowlers, teams, seasons, total = parse_zip(zip_bytes, comp)
-        data = build_output(batters, bowlers, teams, seasons, total, comp, team_season_matches)
+        batters, bowlers, teams, seasons, total, tsm = parse_zip(zip_bytes, comp)
+        data = build_output(batters, bowlers, teams, seasons, total, comp, tsm)
         out_path = os.path.join(STATS_DIR, f"{code}.json")
         with open(out_path, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, separators=(",",":"))
