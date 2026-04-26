@@ -258,14 +258,7 @@ function buildScorecard(sv,sc){
     sv.appendChild(rs);
   }
 
-  // Worm chart
-  const wGrid=document.createElement('div');wGrid.className='charts-grid';
-  wGrid.innerHTML='<div class="chart-card full-width"><h3>Run Progression — Worm Chart</h3><div class="chart-wrap-lg"><canvas id="ch-worm"></canvas></div></div>'+
-    '<div class="chart-card"><h3>Runs Per Over — '+t1+'</h3><div class="chart-wrap"><canvas id="ch-ov1"></canvas></div></div>'+
-    '<div class="chart-card"><h3>Runs Per Over — '+t2+'</h3><div class="chart-wrap"><canvas id="ch-ov2"></canvas></div></div>';
-  sv.appendChild(wGrid);
-
-  // Innings
+  // Innings (tables first)
   (sc.innings||[]).forEach((inn,i)=>{
     const overs=inn.overs?' ('+inn.overs+' ov)':'';
     const id='i'+i;
@@ -275,13 +268,6 @@ function buildScorecard(sv,sc){
     const title=document.createElement('div');title.className='innings-title';
     title.innerHTML=ord(i+1)+' Innings — <strong style="color:var(--text);font-family:Inter,sans-serif;font-size:14px">'+inn.batting_team+'</strong><span class="innings-total">'+inn.total_runs+'/'+inn.total_wickets+overs+'</span>';
     block.appendChild(title);
-
-    // Per-innings charts
-    const ig=document.createElement('div');ig.className='charts-grid';
-    ig.innerHTML='<div class="chart-card"><h3>Batting Share</h3><div class="chart-wrap"><canvas id="ch-pie-'+id+'"></canvas></div></div>'+
-      '<div class="chart-card"><h3>Bowling Economy</h3><div class="chart-wrap"><canvas id="ch-econ-'+id+'"></canvas></div></div>'+
-      '<div class="chart-card"><h3>Boundary Runs</h3><div class="chart-wrap"><canvas id="ch-bound-'+id+'"></canvas></div></div>';
-    block.appendChild(ig);
 
     // Batting table
     const bc=document.createElement('div');bc.className='card';
@@ -294,7 +280,7 @@ function buildScorecard(sv,sc){
     (inn.batters||[]).forEach(b=>{
       const tr=document.createElement('tr');
       const nc=document.createElement('td');
-      const ns=document.createElement('span');ns.className='plink';ns.textContent=b.name;ns.onclick=()=>goPlayer(b.name);
+      const ns=document.createElement('a');ns.className='plink';ns.textContent=b.name;ns.href='player.html?name='+encodeURIComponent(b.name);
       nc.appendChild(ns);tr.appendChild(nc);
       const dc=document.createElement('td');dc.textContent=b.dismissal||'not out';dc.style.fontSize='12px';tr.appendChild(dc);
       const rc=document.createElement('td');rc.className='runs-cell'+(b.runs>=100?' hundred':b.runs>=50?' fifty':'');rc.textContent=b.runs;tr.appendChild(rc);
@@ -335,7 +321,7 @@ function buildScorecard(sv,sc){
     (inn.bowlers||[]).forEach(b=>{
       const tr=document.createElement('tr');
       const nc=document.createElement('td');
-      const ns=document.createElement('span');ns.className='plink';ns.textContent=b.name;ns.onclick=()=>goPlayer(b.name);
+      const ns=document.createElement('a');ns.className='plink';ns.textContent=b.name;ns.href='player.html?name='+encodeURIComponent(b.name);
       nc.appendChild(ns);tr.appendChild(nc);
       tr.appendChild(document.createElement('td'));
       [b.overs,b.maidens||0,b.runs].forEach(v=>{const td=document.createElement('td');td.textContent=v??'—';tr.appendChild(td);});
@@ -344,8 +330,24 @@ function buildScorecard(sv,sc){
       bwbody.appendChild(tr);
     });
     bwtbl.appendChild(bwbody);bwc.appendChild(bwtbl);block.appendChild(bwc);
+
+    // Per-innings charts AFTER tables
+    const ig=document.createElement('div');ig.className='charts-grid';
+    ig.style.marginTop='16px';
+    ig.innerHTML='<div class="chart-card"><h3>Batting Share</h3><div class="chart-wrap"><canvas id="ch-pie-'+id+'"></canvas></div></div>'+
+      '<div class="chart-card"><h3>Bowling Economy</h3><div class="chart-wrap"><canvas id="ch-econ-'+id+'"></canvas></div></div>'+
+      '<div class="chart-card"><h3>Boundary Runs</h3><div class="chart-wrap"><canvas id="ch-bound-'+id+'"></canvas></div></div>';
+    block.appendChild(ig);
     sv.appendChild(block);
   });
+
+  // Worm chart and per-over charts at bottom
+  const wGrid=document.createElement('div');wGrid.className='charts-grid';
+  wGrid.style.marginTop='8px';
+  wGrid.innerHTML='<div class="chart-card full-width"><h3>Run Progression — Worm Chart</h3><div class="chart-wrap-lg"><canvas id="ch-worm"></canvas></div></div>'+
+    '<div class="chart-card"><h3>Runs Per Over — '+t1+'</h3><div class="chart-wrap"><canvas id="ch-ov1"></canvas></div></div>'+
+    '<div class="chart-card"><h3>Runs Per Over — '+t2+'</h3><div class="chart-wrap"><canvas id="ch-ov2"></canvas></div></div>';
+  sv.appendChild(wGrid);
 
   window.scrollTo(0,0);
   setTimeout(()=>drawCharts(sc),300);

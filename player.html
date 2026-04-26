@@ -199,33 +199,31 @@ async function loadComp(code){
 }
 
 async function loadPhoto(name){
-  try{
-    // Use Wikipedia API via a CORS-friendly endpoint
-    const query=encodeURIComponent(name.replace(/ /g,'_'));
-    // Try ESPN Cricinfo style photo first, fallback to Wikipedia
-    const urls=[
-      `https://en.wikipedia.org/api/rest_v1/page/summary/${query}_cricketer`,
-      `https://en.wikipedia.org/api/rest_v1/page/summary/${query}`,
-    ];
-    for(const url of urls){
-      try{
-        const r=await fetch(url);
-        if(!r.ok) continue;
-        const d=await r.json();
-        if(d.thumbnail?.source){
-          const img=document.getElementById('player-photo');
-          // Use a CORS proxy to load the image
-          img.crossOrigin='anonymous';
-          img.src=d.thumbnail.source;
+  // Wikipedia REST API supports CORS for the summary endpoint
+  // The thumbnail images are served from upload.wikimedia.org which also supports CORS
+  const attempts = [
+    name.replace(/ /g,'_') + '_cricketer',
+    name.replace(/ /g,'_'),
+    name.split(' ').pop().replace(/ /g,'_') + '_cricketer',
+  ];
+  for(const query of attempts){
+    try{
+      const url = 'https://en.wikipedia.org/api/rest_v1/page/summary/'+encodeURIComponent(query);
+      const r = await fetch(url, {headers:{'Accept':'application/json'}});
+      if(!r.ok) continue;
+      const d = await r.json();
+      if(d.thumbnail?.source){
+        const img = document.getElementById('player-photo');
+        img.onload = () => {
           img.style.display='block';
           document.getElementById('player-photo-fallback').style.display='none';
-          console.log('Photo loaded for', name, 'from', url);
-          return;
-        }
-      }catch(e){ continue; }
-    }
-    console.log('No photo found for', name);
-  }catch(e){ console.warn('loadPhoto error:', e); }
+        };
+        img.onerror = () => { img.style.display='none'; };
+        img.src = d.thumbnail.source;
+        return;
+      }
+    }catch(e){ continue; }
+  }
 }
 
 function getPlayerBatting(code){
