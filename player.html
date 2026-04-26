@@ -200,17 +200,32 @@ async function loadComp(code){
 
 async function loadPhoto(name){
   try{
-    // Wikipedia REST API - free, no key needed
-    const query=encodeURIComponent(name.replace(/ /g,'_')+'_cricketer');
-    const r=await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${query}`);
-    const d=await r.json();
-    if(d.thumbnail?.source){
-      const img=document.getElementById('player-photo');
-      img.src=d.thumbnail.source;
-      img.style.display='block';
-      document.getElementById('player-photo-fallback').style.display='none';
+    // Use Wikipedia API via a CORS-friendly endpoint
+    const query=encodeURIComponent(name.replace(/ /g,'_'));
+    // Try ESPN Cricinfo style photo first, fallback to Wikipedia
+    const urls=[
+      `https://en.wikipedia.org/api/rest_v1/page/summary/${query}_cricketer`,
+      `https://en.wikipedia.org/api/rest_v1/page/summary/${query}`,
+    ];
+    for(const url of urls){
+      try{
+        const r=await fetch(url);
+        if(!r.ok) continue;
+        const d=await r.json();
+        if(d.thumbnail?.source){
+          const img=document.getElementById('player-photo');
+          // Use a CORS proxy to load the image
+          img.crossOrigin='anonymous';
+          img.src=d.thumbnail.source;
+          img.style.display='block';
+          document.getElementById('player-photo-fallback').style.display='none';
+          console.log('Photo loaded for', name, 'from', url);
+          return;
+        }
+      }catch(e){ continue; }
     }
-  }catch(e){}
+    console.log('No photo found for', name);
+  }catch(e){ console.warn('loadPhoto error:', e); }
 }
 
 function getPlayerBatting(code){

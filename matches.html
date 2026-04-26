@@ -241,63 +241,162 @@ function showList(){
 function killCharts(){charts.forEach(c=>{try{c.destroy();}catch(e){}});charts=[];}
 
 function renderScorecard(sc){
-  const t1=(sc.teams||[])[0]||'—',t2=(sc.teams||[])[1]||'—';
+  const wrap = document.getElementById('scorecard-wrap');
+  wrap.innerHTML = '';
+
+  const t1=(sc.teams||[])[0]||'—', t2=(sc.teams||[])[1]||'—';
   const dt=sc.date?new Date(sc.date).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}):'';
-  let html=`
-    <div class="sc-header"><div class="sc-header-inner">
-      <div class="sc-teams">${t1}<span class="vs">VS</span>${t2}</div>
-      <div class="sc-result">${sc.winner?sc.winner+' won'+(sc.win_margin?' · '+sc.win_margin:''):'Result unavailable'}</div>
-      <div class="sc-meta-row">
-        ${dt?`<div class="sc-meta-item"><strong>${dt}</strong></div>`:''}
-        ${sc.season?`<div class="sc-meta-item">Season <strong>${sc.season}</strong></div>`:''}
-        ${sc.venue?`<div class="sc-meta-item">📍 <strong>${sc.venue}</strong></div>`:''}
-      </div>
-    </div></div>`;
 
-  if(sc.winner) html+=`<div class="result-strip">🏆 ${sc.winner} won${sc.win_margin?' · '+sc.win_margin:''}</div>`;
-
-  // Match-level charts
-  html+=`<div class="charts-grid">
-    <div class="chart-card" style="grid-column:1/-1"><h3>Run Progression — Worm Chart</h3><div class="chart-wrap-lg"><canvas id="ch-worm"></canvas></div></div>
-    <div class="chart-card"><h3>Runs Per Over — ${t1}</h3><div class="chart-wrap"><canvas id="ch-ov1"></canvas></div></div>
-    <div class="chart-card"><h3>Runs Per Over — ${t2}</h3><div class="chart-wrap"><canvas id="ch-ov2"></canvas></div></div>
+  // Header
+  const hdr = ce('div','sc-header');
+  hdr.innerHTML = `<div class="sc-header-inner">
+    <div class="sc-teams">${esc(t1)}<span class="vs">VS</span>${esc(t2)}</div>
+    <div class="sc-result">${sc.winner?esc(sc.winner)+' won'+(sc.win_margin?' · '+esc(sc.win_margin):''):'Result unavailable'}</div>
+    <div class="sc-meta-row">
+      ${dt?'<div class="sc-meta-item"><strong>'+dt+'</strong></div>':''}
+      ${sc.season?'<div class="sc-meta-item">Season <strong>'+esc(sc.season)+'</strong></div>':''}
+      ${sc.venue?'<div class="sc-meta-item">📍 <strong>'+esc(sc.venue)+'</strong></div>':''}
+    </div>
   </div>`;
+  wrap.appendChild(hdr);
+
+  if(sc.winner){
+    const rs = ce('div','result-strip');
+    rs.textContent = '🏆 ' + sc.winner + ' won' + (sc.win_margin?' · '+sc.win_margin:'');
+    wrap.appendChild(rs);
+  }
+
+  // Match charts
+  const cg = ce('div','charts-grid');
+  cg.innerHTML = `
+    <div class="chart-card" style="grid-column:1/-1"><h3>Run Progression — Worm Chart</h3><div class="chart-wrap-lg"><canvas id="ch-worm"></canvas></div></div>
+    <div class="chart-card"><h3>Runs Per Over — ${esc(t1)}</h3><div class="chart-wrap"><canvas id="ch-ov1"></canvas></div></div>
+    <div class="chart-card"><h3>Runs Per Over — ${esc(t2)}</h3><div class="chart-wrap"><canvas id="ch-ov2"></canvas></div></div>`;
+  wrap.appendChild(cg);
 
   // Innings
   (sc.innings||[]).forEach((inn,i)=>{
-    const id=`i${i}`;
-    const overs=inn.overs?` (${inn.overs} ov)`:'';
-    html+=`<div class="innings-block">
-      <div class="innings-title">${ord(i+1)} Innings — ${inn.batting_team}<span class="innings-total">${inn.total_runs}/${inn.total_wickets}${overs}</span></div>
-      <div class="charts-grid">
-        <div class="chart-card"><h3>Batting Share</h3><div class="chart-wrap"><canvas id="ch-pie-${id}"></canvas></div></div>
-        <div class="chart-card"><h3>Bowling Economy</h3><div class="chart-wrap"><canvas id="ch-econ-${id}"></canvas></div></div>
-        <div class="chart-card"><h3>Boundary Runs (4s &amp; 6s)</h3><div class="chart-wrap"><canvas id="ch-bound-${id}"></canvas></div></div>
-      </div>
-      <div class="card"><div class="card-title">Batting</div>
-        <table><thead><tr><th>Batter</th><th>Dismissal</th><th>R</th><th>B</th><th>4s</th><th>6s</th><th>SR</th></tr></thead>
-        <tbody>
-          ${(inn.batters||[]).map(b=>{
-            const m=b.runs>=100?'hundred':b.runs>=50?'fifty':'';
-            return `<tr><td><span class="plink" style="cursor:pointer" data-player="${b.name.replace(/"/g,'&quot;')}" onclick="goPlayer(this.dataset.player)">${b.name}</span></td><td>${b.dismissal||'not out'}</td><td class="runs-cell ${m}">${b.runs}</td><td>${b.balls}</td><td>${b.sixes}</td><td>${b.sr}</td></tr>`;
-          }).join('')}
-          <tr class="extras-row"><td colspan="2">Extras</td><td colspan="5" style="text-align:left;padding-left:14px">${inn.extras_total||0} (w ${inn.extras?.wides||0}, nb ${inn.extras?.noballs||0}, b ${inn.extras?.byes||0}, lb ${inn.extras?.legbyes||0})</td></tr>
-          <tr class="total-row"><td colspan="2">Total</td><td colspan="5" style="text-align:left;padding-left:14px;color:var(--blue)">${inn.total_runs}/${inn.total_wickets}${overs}</td></tr>
-        </tbody></table>
-      </div>
-      ${(inn.fall_of_wickets||[]).length?`<div class="fow-wrap"><div class="fow-title">Fall of Wickets</div><div class="fow-list">${inn.fall_of_wickets.map(f=>`<div class="fow-item"><span style="color:var(--muted);font-size:10px">${f.wicket}wkt </span><span style="color:var(--blue);font-weight:600">${f.runs}</span><span style="color:var(--muted)"> (${f.player})</span></div>`).join('')}</div></div>`:''}
-      <div class="card"><div class="card-title">Bowling — ${inn.bowling_team}</div>
-        <table><thead><tr><th>Bowler</th><th></th><th>O</th><th>M</th><th>R</th><th>W</th><th>Econ</th></tr></thead>
-        <tbody>${(inn.bowlers||[]).map(b=>`<tr><td><span class="plink" style="cursor:pointer" data-player="${b.name.replace(/"/g,'&quot;')}" onclick="goPlayer(this.dataset.player)">${b.name}</span></td><td></td><td>${b.overs}</td><td>${b.maidens||0}</td><td>${b.runs}</td><td style="color:var(--blue);font-weight:600">${b.wickets}</td><td>${b.economy}</td></tr>`).join('')}</tbody>
-        </table>
-      </div>
-    </div>`;
+    const id='i'+i;
+    const overs=inn.overs?' ('+inn.overs+' ov)':'';
+    const block = ce('div','innings-block');
+
+    // Title
+    const title = ce('div','innings-title');
+    title.innerHTML = ord(i+1)+' Innings — <strong>'+esc(inn.batting_team)+'</strong> <span class="innings-total">'+inn.total_runs+'/'+inn.total_wickets+overs+'</span>';
+    block.appendChild(title);
+
+    // Charts grid
+    const icg = ce('div','charts-grid');
+    icg.innerHTML = `
+      <div class="chart-card"><h3>Batting Share</h3><div class="chart-wrap"><canvas id="ch-pie-${id}"></canvas></div></div>
+      <div class="chart-card"><h3>Bowling Economy</h3><div class="chart-wrap"><canvas id="ch-econ-${id}"></canvas></div></div>
+      <div class="chart-card"><h3>Boundary Runs</h3><div class="chart-wrap"><canvas id="ch-bound-${id}"></canvas></div></div>`;
+    block.appendChild(icg);
+
+    // Batting table
+    const batCard = ce('div','card');
+    const batTitle = ce('div','card-title'); batTitle.textContent='Batting'; batCard.appendChild(batTitle);
+    const batTable = document.createElement('table');
+    batTable.innerHTML='<thead><tr><th>Batter</th><th>Dismissal</th><th>R</th><th>B</th><th>4s</th><th>6s</th><th>SR</th></tr></thead>';
+    const batBody = document.createElement('tbody');
+
+    (inn.batters||[]).forEach(b=>{
+      const tr = document.createElement('tr');
+      const milestone = b.runs>=100?'hundred':b.runs>=50?'fifty':'';
+
+      // Player name cell - use DOM to avoid any escaping issues
+      const nameCell = document.createElement('td');
+      const nameSpan = document.createElement('span');
+      nameSpan.className='plink';
+      nameSpan.style.cursor='pointer';
+      nameSpan.textContent=b.name;
+      nameSpan.addEventListener('click',()=>goPlayer(b.name));
+      nameCell.appendChild(nameSpan);
+
+      const dismissalCell = document.createElement('td');
+      dismissalCell.textContent=b.dismissal||'not out';
+      dismissalCell.style.fontSize='12px';
+
+      const runsCell = document.createElement('td');
+      runsCell.className='runs-cell'+(milestone?' '+milestone:'');
+      runsCell.textContent=b.runs;
+
+      tr.appendChild(nameCell);
+      tr.appendChild(dismissalCell);
+      [b.runs,b.balls,b.fours,b.sixes,b.sr].forEach((v,vi)=>{
+        if(vi===0){ tr.appendChild(runsCell); return; }
+        const td=document.createElement('td'); td.textContent=v??'—'; tr.appendChild(td);
+      });
+      batBody.appendChild(tr);
+    });
+
+    // Extras row
+    const extRow=document.createElement('tr'); extRow.className='extras-row';
+    extRow.innerHTML='<td colspan="2">Extras</td><td colspan="5" style="text-align:left;padding-left:14px">'+(inn.extras_total||0)+' (w '+(inn.extras?.wides||0)+', nb '+(inn.extras?.noballs||0)+', b '+(inn.extras?.byes||0)+', lb '+(inn.extras?.legbyes||0)+')</td>';
+    batBody.appendChild(extRow);
+
+    // Total row
+    const totRow=document.createElement('tr'); totRow.className='total-row';
+    totRow.innerHTML='<td colspan="2">Total</td><td colspan="5" style="text-align:left;padding-left:14px;color:var(--blue)">'+inn.total_runs+'/'+inn.total_wickets+overs+'</td>';
+    batBody.appendChild(totRow);
+
+    batTable.appendChild(batBody);
+    batCard.appendChild(batTable);
+    block.appendChild(batCard);
+
+    // Fall of wickets
+    if((inn.fall_of_wickets||[]).length){
+      const fow=ce('div','fow-wrap');
+      const fowTitle=ce('div','fow-title'); fowTitle.textContent='Fall of Wickets'; fow.appendChild(fowTitle);
+      const fowList=ce('div','fow-list');
+      inn.fall_of_wickets.forEach(f=>{
+        const item=ce('div','fow-item');
+        item.innerHTML='<span style="color:var(--muted);font-size:10px">'+f.wicket+'wkt </span><span style="color:var(--blue);font-weight:600">'+f.runs+'</span><span style="color:var(--muted)"> ('+esc(f.player)+')</span>';
+        fowList.appendChild(item);
+      });
+      fow.appendChild(fowList);
+      block.appendChild(fow);
+    }
+
+    // Bowling table
+    const bowlCard=ce('div','card');
+    const bowlTitle=ce('div','card-title'); bowlTitle.textContent='Bowling — '+inn.bowling_team; bowlCard.appendChild(bowlTitle);
+    const bowlTable=document.createElement('table');
+    bowlTable.innerHTML='<thead><tr><th>Bowler</th><th></th><th>O</th><th>M</th><th>R</th><th>W</th><th>Econ</th></tr></thead>';
+    const bowlBody=document.createElement('tbody');
+
+    (inn.bowlers||[]).forEach(b=>{
+      const tr=document.createElement('tr');
+      const nameCell=document.createElement('td');
+      const nameSpan=document.createElement('span');
+      nameSpan.className='plink'; nameSpan.style.cursor='pointer';
+      nameSpan.textContent=b.name;
+      nameSpan.addEventListener('click',()=>goPlayer(b.name));
+      nameCell.appendChild(nameSpan);
+      tr.appendChild(nameCell);
+      tr.appendChild(document.createElement('td'));
+      [b.overs,b.maidens||0,b.runs,b.wickets,b.economy].forEach((v,vi)=>{
+        const td=document.createElement('td');
+        td.textContent=v??'—';
+        if(vi===3){td.style.color='var(--blue)';td.style.fontWeight='600';}
+        tr.appendChild(td);
+      });
+      bowlBody.appendChild(tr);
+    });
+
+    bowlTable.appendChild(bowlBody);
+    bowlCard.appendChild(bowlTable);
+    block.appendChild(bowlCard);
+    wrap.appendChild(block);
   });
 
-  document.getElementById('scorecard-wrap').innerHTML=html;
   window.scrollTo(0,0);
   setTimeout(()=>drawCharts(sc),120);
 }
+
+function ce(tag,cls){ const el=document.createElement(tag); if(cls)el.className=cls; return el; }
+function esc(s){ const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; }
+
 
 function drawCharts(sc){
   const inn1=(sc.innings||[])[0],inn2=(sc.innings||[])[1];

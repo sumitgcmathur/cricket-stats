@@ -284,7 +284,8 @@ def parse_zip(zip_bytes, comp):
 
     batters  = defaultdict(lambda: {"runs":0,"balls":0,"fours":0,"sixes":0,"fifties":0,"hundreds":0,"matches":set(),"dismissals":0})
     bowlers  = defaultdict(lambda: {"runs":0,"balls":0,"wickets":0,"matches":set()})
-    teams    = defaultdict(lambda: {"wins":0,"matches":set(),"_won_matches":set()})
+    teams    = defaultdict(lambda: {"wins":0,"matches":set()})
+    team_won_matches = defaultdict(set)  # track per-match wins separately
     seasons  = set()
     match_index = []
 
@@ -326,8 +327,8 @@ def parse_zip(zip_bytes, comp):
                     for t in [bat_team, bowl_team]:
                         if t: teams[t]["matches"].add(match_id)
                     # Track winner once per match only
-                    if winner and match_id not in teams[winner]["_won_matches"]:
-                        teams[winner]["_won_matches"].add(match_id)
+                    if winner and match_id not in team_won_matches[winner]:
+                        team_won_matches[winner].add(match_id)
                         teams[winner]["wins"] += 1
 
                     if batter:
