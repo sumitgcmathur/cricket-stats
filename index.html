@@ -959,7 +959,20 @@ function filterBySeason(data) {
     .filter(Boolean)
     .sort((a,b) => b.sixes - a.sixes);
 
-  return { ...data, batting: filteredBatting, bowling: data.bowling, sixes: filteredSixes, teams: data.teams };
+  // Filter teams by season
+  const filteredTeams = data.teams
+    .map(t => {
+      if (!t.by_season) return t; // no season data, return as-is
+      const matchingSeasons = Object.entries(t.by_season).filter(([s]) => seasonMatches(s));
+      if (!matchingSeasons.length) return null;
+      const totalMatches = matchingSeasons.reduce((sum,[,v]) => sum + (v.matches||0), 0);
+      const totalWins    = matchingSeasons.reduce((sum,[,v]) => sum + (v.wins||0), 0);
+      return { ...t, matches: totalMatches, wins: totalWins, win_pct: totalMatches ? +(totalWins/totalMatches*100).toFixed(1) : 0 };
+    })
+    .filter(Boolean)
+    .sort((a,b) => b.wins - a.wins);
+
+  return { ...data, batting: filteredBatting, bowling: data.bowling, sixes: filteredSixes, teams: filteredTeams };
 }
 
 function aggregateSeasonData() {} // kept for compatibility

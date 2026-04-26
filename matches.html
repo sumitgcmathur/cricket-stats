@@ -157,7 +157,8 @@ function fillSeasons(){
 }
 
 function renderList(){
-  showList();
+  document.getElementById('list-view').style.display='';
+  document.getElementById('sc-view').style.display='none';
   const season=document.getElementById('season-sel').value;
   const q=document.getElementById('srch').value.toLowerCase();
   let f=matches;

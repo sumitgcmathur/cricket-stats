@@ -284,8 +284,9 @@ def parse_zip(zip_bytes, comp):
 
     batters  = defaultdict(lambda: {"runs":0,"balls":0,"fours":0,"sixes":0,"fifties":0,"hundreds":0,"matches":set(),"dismissals":0,"by_season":{}})
     bowlers  = defaultdict(lambda: {"runs":0,"balls":0,"wickets":0,"matches":set()})
-    teams    = defaultdict(lambda: {"wins":0,"matches":set()})
+    teams    = defaultdict(lambda: {"wins":0,"matches":set(),"by_season":{}})
     team_won_matches = defaultdict(set)  # track per-match wins separately
+    team_season_matches = defaultdict(lambda: defaultdict(set))  # team->season->match_ids
     seasons  = set()
     match_index = []
 
@@ -331,6 +332,10 @@ def parse_zip(zip_bytes, comp):
                 if match_winner_from_info and match_id not in team_won_matches[match_winner_from_info]:
                     team_won_matches[match_winner_from_info].add(match_id)
                     teams[match_winner_from_info]["wins"] += 1
+                    if season:
+                        if season not in teams[match_winner_from_info]["by_season"]:
+                            teams[match_winner_from_info]["by_season"][season] = {"wins":0,"matches":0}
+                        teams[match_winner_from_info]["by_season"][season]["wins"] += 1
 
                 inn_runs = defaultdict(lambda: defaultdict(int))
 
@@ -345,7 +350,10 @@ def parse_zip(zip_bytes, comp):
                     innings    = row.get("innings","1")
 
                     for t in [bat_team, bowl_team]:
-                        if t: teams[t]["matches"].add(match_id)
+                        if t:
+                            teams[t]["matches"].add(match_id)
+                            if season:
+                                team_season_matches[t][season].add(match_id)
                     # winner field in ball rows is empty - tracked from info file above
                     pass
 
@@ -458,7 +466,9 @@ def build_output(batters, bowlers, teams, seasons, total_matches, comp):
     bowling_list.sort(key=lambda x: x["wickets"], reverse=True)
 
     sixes_list = sorted(
-        [{"name":n,"sixes":s["sixes"],"matches":len(s["matches"])} for n,s in batters.items() if s["sixes"]>0],
+        [{"name":n,"sixes":s["sixes"],"matches":len(s["matches"]),
+          "by_season":{ssn:ss["sixes"] for ssn,ss in s.get("by_season",{}).items() if ss.get("sixes",0)>0}}
+         for n,s in batters.items() if s["sixes"]>0],
         key=lambda x: x["sixes"], reverse=True)[:30]
 
     teams_list = []
@@ -466,7 +476,12 @@ def build_output(batters, bowlers, teams, seasons, total_matches, comp):
         if not name: continue
         m = len(s["matches"])
         if m < 3: continue
-        teams_list.append({"team":name,"matches":m,"wins":s["wins"],"win_pct":round(s["wins"]/m*100,1)})
+        # Build by_season for teams
+        by_season = {}
+        for ssn, sm in team_season_matches[name].items():
+            sw = s["by_season"].get(ssn,{}).get("wins",0)
+            by_season[ssn] = {"matches":len(sm),"wins":sw,"win_pct":round(sw/len(sm)*100,1) if sm else 0}
+        teams_list.append({"team":name,"matches":m,"wins":s["wins"],"win_pct":round(s["wins"]/m*100,1),"by_season":by_season})
     teams_list.sort(key=lambda x: x["wins"], reverse=True)
 
     return {
