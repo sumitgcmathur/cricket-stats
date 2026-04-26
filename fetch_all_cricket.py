@@ -293,7 +293,9 @@ def parse_zip(zip_bytes, comp):
     os.makedirs(matches_dir, exist_ok=True)
 
     with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
-        csv_files = [f for f in zf.namelist() if f.endswith(".csv") and "info" not in f]
+        all_files  = zf.namelist()
+        csv_files  = [f for f in all_files if f.endswith(".csv") and "_info" not in f]
+        info_files = {f.replace("_info.csv","").split("/")[-1]: f for f in all_files if f.endswith("_info.csv")}
         total = len(csv_files)
         print(f"  🔄 {total} matches ...")
 
@@ -306,10 +308,29 @@ def parse_zip(zip_bytes, comp):
                 if not rows:
                     continue
 
-                match_id = rows[0].get("match_id", fname.replace(".csv",""))
+                match_id = rows[0].get("match_id", fname.replace(".csv","").split("/")[-1])
                 season   = rows[0].get("season","")
                 if season:
                     seasons.add(season)
+
+                # Read winner from info file
+                match_winner_from_info = ""
+                info_key = fname.replace(".csv","").split("/")[-1]
+                if info_key in info_files:
+                    try:
+                        with zf.open(info_files[info_key]) as inf:
+                            for line in io.TextIOWrapper(inf, encoding="utf-8"):
+                                parts = line.strip().split(",")
+                                if len(parts) >= 3 and parts[0] == "info" and parts[1] == "winner":
+                                    match_winner_from_info = ",".join(parts[2:]).strip()
+                                    break
+                    except:
+                        pass
+
+                # Track winner from info file
+                if match_winner_from_info and match_id not in team_won_matches[match_winner_from_info]:
+                    team_won_matches[match_winner_from_info].add(match_id)
+                    teams[match_winner_from_info]["wins"] += 1
 
                 inn_runs = defaultdict(lambda: defaultdict(int))
 
@@ -322,14 +343,11 @@ def parse_zip(zip_bytes, comp):
                     extras     = int(row.get("extras",0) or 0)
                     wicket_t   = row.get("wicket_type","").strip()
                     innings    = row.get("innings","1")
-                    winner     = row.get("winner","").strip()
 
                     for t in [bat_team, bowl_team]:
                         if t: teams[t]["matches"].add(match_id)
-                    # Track winner once per match only
-                    if winner and match_id not in team_won_matches[winner]:
-                        team_won_matches[winner].add(match_id)
-                        teams[winner]["wins"] += 1
+                    # winner field in ball rows is empty - tracked from info file above
+                    pass
 
                     if batter:
                         b = batters[batter]
