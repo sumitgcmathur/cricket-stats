@@ -162,7 +162,8 @@ function renderMatchList(){
     const t1=(m.teams||[])[0]||'—',t2=(m.teams||[])[1]||'—';
     const s1=(m.scores||[])[0]||'',s2=(m.scores||[])[1]||'';
     const dt=m.date?new Date(m.date).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}):'';
-    return `<div class="match-card" onclick="loadScorecard('${m.id}')">
+    const safeId=String(m.id).replace(/'/g,"\'");
+    return `<div class="match-card" onclick="loadScorecard('${safeId}')">
       <div>
         <div class="match-teams">${t1} vs ${t2}</div>
         <div class="match-scores">${s1}${s2?' | '+s2:''}</div>

@@ -160,16 +160,26 @@ let charts=[];
 
 async function boot(){
   playerName=decodeURIComponent(new URLSearchParams(window.location.search).get('name')||'');
-  if(!playerName){document.getElementById('hero-name').textContent='No player specified';return;}
+  console.log('Loading player:', playerName);
+  if(!playerName){
+    document.getElementById('hero-name').textContent='No player specified';
+    document.getElementById('batting-content').innerHTML='<div class="no-data">No player name provided in URL</div>';
+    return;
+  }
   document.getElementById('hero-name').textContent=playerName;
   document.getElementById('bc-name').textContent=playerName;
   document.title=playerName+' — Cricket Stats';
 
-  // Try to load player photo from Wikipedia API (free, no key)
+  // Load photo async (non-blocking)
   loadPhoto(playerName);
 
   // Load all competitions
-  await Promise.all(COMPS.map(c=>loadComp(c.code)));
+  try {
+    await Promise.all(COMPS.map(c=>loadComp(c.code)));
+    console.log('Data loaded:', Object.keys(allData));
+  } catch(e) {
+    console.error('Error loading data:', e);
+  }
 
   renderHero();
   renderBatting();
@@ -180,14 +190,18 @@ async function boot(){
 async function loadComp(code){
   try{
     const r=await fetch(`stats/${code}.json`);
+    if(!r.ok) throw new Error('HTTP '+r.status);
     allData[code]=await r.json();
-  }catch(e){}
+    console.log(`Loaded ${code}: ${allData[code].batting?.length} batters`);
+  }catch(e){
+    console.warn(`Could not load stats/${code}.json:`, e.message);
+  }
 }
 
 async function loadPhoto(name){
   try{
     // Wikipedia REST API - free, no key needed
-    const query=encodeURIComponent(name.replace(' ','_')+'_cricketer');
+    const query=encodeURIComponent(name.replace(/ /g,'_')+'_cricketer');
     const r=await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${query}`);
     const d=await r.json();
     if(d.thumbnail?.source){
@@ -249,10 +263,14 @@ function showTab(name,btn){
   btn.classList.add('active');
   document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
   document.getElementById('tab-'+name).classList.add('active');
+  if(!playerName) return;
   killCharts();
-  if(name==='batting') renderBatting();
-  else if(name==='bowling') renderBowling();
-  else if(name==='overview') renderOverview();
+  // Small delay so DOM is visible before drawing charts
+  setTimeout(()=>{ try {
+    if(name==='batting') renderBatting();
+    else if(name==='bowling') renderBowling();
+    else if(name==='overview') renderOverview();
+  }, 50);
 }
 
 // ── BATTING TAB ──────────────────────────────────────────────────────────────
@@ -347,6 +365,7 @@ function renderBatting(){
     if(msCtx&&ipl){
       charts.push(new Chart(msCtx,{type:'bar',data:{labels:['Fifties','Hundreds','Matches'],datasets:[{data:[ipl.fifties||0,ipl.hundreds||0,ipl.matches],backgroundColor:['#DAA520','#C0392B','#2E5A8F'],borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:11}}},y:{grid:{color:'#E2E6EA'},ticks:{font:{size:11}}}}}}));
     }
+  } catch(e){ console.error('Chart error:', e); }
   },100);
 }
 
