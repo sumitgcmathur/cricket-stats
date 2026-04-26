@@ -23,9 +23,9 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-
 /* HERO */
 .player-hero{background:linear-gradient(135deg,var(--blue) 0%,var(--blue-mid) 100%);padding:32px 24px;color:#fff;}
 .player-hero-inner{max-width:1200px;margin:0 auto;display:flex;align-items:center;gap:28px;flex-wrap:wrap;}
-.player-photo-wrap{width:120px;height:120px;border-radius:50%;overflow:hidden;border:3px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.1);flex-shrink:0;display:flex;align-items:center;justify-content:center;}
+.player-photo-wrap{width:110px;height:110px;border-radius:50%;overflow:hidden;border:3px solid rgba(255,255,255,0.25);background:rgba(255,255,255,0.12);flex-shrink:0;display:flex;align-items:center;justify-content:center;}
 .player-photo-wrap img{width:100%;height:100%;object-fit:cover;}
-.player-photo-placeholder{font-size:48px;opacity:0.6;}
+.player-initials{font-family:'Bebas Neue',sans-serif;font-size:36px;color:rgba(255,255,255,0.7);letter-spacing:2px;}
 .player-hero-info{flex:1;}
 .player-name{font-family:'Bebas Neue',sans-serif;font-size:clamp(28px,5vw,52px);letter-spacing:4px;line-height:1;margin-bottom:8px;}
 .player-tags{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;}
@@ -111,9 +111,9 @@ footer a{color:var(--blue);text-decoration:none;}
 </div>
 <div class="player-hero">
   <div class="player-hero-inner">
-    <div class="player-photo-wrap">
-      <img id="player-photo" src="" alt="" style="display:none" onerror="this.style.display='none';document.getElementById('player-photo-fallback').style.display=''">
-      <span id="player-photo-fallback" class="player-photo-placeholder">🏏</span>
+    <div class="player-photo-wrap" id="photo-wrap">
+      <img id="player-photo" src="" alt="" style="display:none" onerror="this.style.display='none';showInitials()">
+      <span id="player-initials" class="player-initials"></span>
     </div>
     <div class="player-hero-info">
       <div class="player-name" id="hero-name">Loading...</div>
@@ -198,32 +198,47 @@ async function loadComp(code){
   }
 }
 
+function showInitials(){
+  const parts = playerName.split(' ');
+  const initials = parts.length >= 2
+    ? parts[0][0] + parts[parts.length-1][0]
+    : (parts[0]||'?')[0];
+  document.getElementById('player-initials').textContent = initials.toUpperCase();
+}
+
 async function loadPhoto(name){
-  // Wikipedia REST API supports CORS for the summary endpoint
-  // The thumbnail images are served from upload.wikimedia.org which also supports CORS
+  // Show initials first as placeholder
+  showInitials();
+
   const attempts = [
-    name.replace(/ /g,'_') + '_cricketer',
     name.replace(/ /g,'_'),
-    name.split(' ').pop().replace(/ /g,'_') + '_cricketer',
+    name.split(' ').pop().replace(/ /g,'_'),
+    name.replace(/ /g,'_') + '_(cricketer)',
+    name.replace(/ /g,'_') + '_cricketer',
   ];
   for(const query of attempts){
     try{
       const url = 'https://en.wikipedia.org/api/rest_v1/page/summary/'+encodeURIComponent(query);
-      const r = await fetch(url, {headers:{'Accept':'application/json'}});
+      const r = await fetch(url);
       if(!r.ok) continue;
       const d = await r.json();
       if(d.thumbnail?.source){
         const img = document.getElementById('player-photo');
         img.onload = () => {
-          img.style.display='block';
-          document.getElementById('player-photo-fallback').style.display='none';
+          img.style.display = 'block';
+          document.getElementById('player-initials').style.display = 'none';
+          console.log('Photo loaded for', name);
         };
-        img.onerror = () => { img.style.display='none'; };
+        img.onerror = () => {
+          img.style.display = 'none';
+          console.warn('Photo failed to load:', d.thumbnail.source);
+        };
         img.src = d.thumbnail.source;
         return;
       }
     }catch(e){ continue; }
   }
+  console.log('No Wikipedia photo found for', name);
 }
 
 function getPlayerBatting(code){

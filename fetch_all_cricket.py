@@ -217,6 +217,14 @@ def build_scorecard(match_id, rows):
         extras = d["extras"]
         extras_total = sum(extras.values())
 
+        # Build over_by_over from over_runs for this innings
+        inn_over_by_over = []
+        cumulative = 0
+        for ov in sorted(over_runs[inn_num].keys(), key=lambda x: int(x) if str(x).isdigit() else 0):
+            r = over_runs[inn_num][ov]
+            cumulative += r
+            inn_over_by_over.append({"over": int(ov)+1, "runs": r, "cumulative": cumulative})
+
         return {
             "innings":        inn_num,
             "batting_team":   d["batting_team"],
@@ -229,6 +237,7 @@ def build_scorecard(match_id, rows):
             "batters":        batters_out,
             "bowlers":        bowlers_out,
             "fall_of_wickets": d["fall_of_wickets"],
+            "over_by_over":   inn_over_by_over,
         }
 
     innings_list = [serialise_innings(k, v) for k, v in sorted(innings_data.items())]
