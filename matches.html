@@ -138,7 +138,10 @@ async function loadMatches(comp){
     allMatches=d.matches||[];
     populateSeasons();renderMatchList();
   }catch(e){
-    document.getElementById('match-list-wrap').innerHTML=`<div class="empty">No match data for ${comp}<br><small>Run fetch_all_cricket.py first</small></div>`;
+    console.error('Scorecard error:', e);
+    document.getElementById('scorecard-wrap').innerHTML=
+      `<div class="empty">⚠️ Could not load scorecard<br><small>${e.message}</small><br><br>
+       <button onclick="showList()" style="background:var(--blue);color:#fff;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:13px">← Back to matches</button></div>`;
   }
 }
 

@@ -282,7 +282,7 @@ def parse_zip(zip_bytes, comp):
     format_ = comp["format"]
     code    = comp["code"]
 
-    batters  = defaultdict(lambda: {"runs":0,"balls":0,"fours":0,"sixes":0,"fifties":0,"hundreds":0,"matches":set()})
+    batters  = defaultdict(lambda: {"runs":0,"balls":0,"fours":0,"sixes":0,"fifties":0,"hundreds":0,"matches":set(),"dismissals":0})
     bowlers  = defaultdict(lambda: {"runs":0,"balls":0,"wickets":0,"matches":set()})
     teams    = defaultdict(lambda: {"wins":0,"matches":set()})
     seasons  = set()
@@ -325,7 +325,11 @@ def parse_zip(zip_bytes, comp):
 
                     for t in [bat_team, bowl_team]:
                         if t: teams[t]["matches"].add(match_id)
-                    if winner:
+                    # Track winner once per match only
+                    if winner and match_id not in teams[winner].get("_won_matches", set()):
+                        if "_won_matches" not in teams[winner]:
+                            teams[winner]["_won_matches"] = set()
+                        teams[winner]["_won_matches"].add(match_id)
                         teams[winner]["wins"] += 1
 
                     if batter:
@@ -336,6 +340,11 @@ def parse_zip(zip_bytes, comp):
                         if runs_bat == 4: b["fours"] += 1
                         if runs_bat == 6: b["sixes"] += 1
                         inn_runs[innings][batter] += runs_bat
+
+                    # Track dismissals for correct batting average
+                    player_out = row.get("player_dismissed","").strip()
+                    if player_out and wicket_t and wicket_t not in ("retired hurt",):
+                        batters[player_out]["dismissals"] = batters[player_out].get("dismissals", 0) + 1
 
                     if bowler:
                         bl = bowlers[bowler]
@@ -381,8 +390,10 @@ def build_output(batters, bowlers, teams, seasons, total_matches, comp):
         m = len(s["matches"])
         if m < 3 or s["balls"] < 10: continue
         sr  = round(s["runs"] / s["balls"] * 100, 2) if s["balls"] else 0
+        dismissals = s.get("dismissals", 0)
+        avg = round(s["runs"]/dismissals, 2) if dismissals > 0 else s["runs"]  # not out avg
         batting_list.append({"name":name,"matches":m,"runs":s["runs"],"balls":s["balls"],
-            "avg":round(s["runs"]/max(m,1),2),"sr":sr,"fours":s["fours"],"sixes":s["sixes"],
+            "avg":avg,"sr":sr,"fours":s["fours"],"sixes":s["sixes"],
             "fifties":s["fifties"],"hundreds":s["hundreds"]})
     batting_list.sort(key=lambda x: x["runs"], reverse=True)
 
