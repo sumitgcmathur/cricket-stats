@@ -282,7 +282,7 @@ def parse_zip(zip_bytes, comp):
     format_ = comp["format"]
     code    = comp["code"]
 
-    batters  = defaultdict(lambda: {"runs":0,"balls":0,"fours":0,"sixes":0,"fifties":0,"hundreds":0,"matches":set(),"dismissals":0})
+    batters  = defaultdict(lambda: {"runs":0,"balls":0,"fours":0,"sixes":0,"fifties":0,"hundreds":0,"matches":set(),"dismissals":0,"by_season":{}})
     bowlers  = defaultdict(lambda: {"runs":0,"balls":0,"wickets":0,"matches":set()})
     teams    = defaultdict(lambda: {"wins":0,"matches":set()})
     team_won_matches = defaultdict(set)  # track per-match wins separately
@@ -339,11 +339,23 @@ def parse_zip(zip_bytes, comp):
                         if runs_bat == 4: b["fours"] += 1
                         if runs_bat == 6: b["sixes"] += 1
                         inn_runs[innings][batter] += runs_bat
+                        # Per-season tracking
+                        if season:
+                            if season not in b["by_season"]:
+                                b["by_season"][season] = {"runs":0,"balls":0,"fours":0,"sixes":0,"fifties":0,"hundreds":0,"matches":set(),"dismissals":0}
+                            bs = b["by_season"][season]
+                            bs["runs"]  += runs_bat
+                            bs["balls"] += 1
+                            bs["matches"].add(match_id)
+                            if runs_bat == 4: bs["fours"] += 1
+                            if runs_bat == 6: bs["sixes"] += 1
 
                     # Track dismissals for correct batting average
                     player_out = row.get("player_dismissed","").strip()
                     if player_out and wicket_t and wicket_t not in ("retired hurt",):
-                        batters[player_out]["dismissals"] = batters[player_out].get("dismissals", 0) + 1
+                        batters[player_out]["dismissals"] += 1
+                        if season and season in batters[player_out]["by_season"]:
+                            batters[player_out]["by_season"][season]["dismissals"] += 1
 
                     if bowler:
                         bl = bowlers[bowler]
@@ -355,8 +367,14 @@ def parse_zip(zip_bytes, comp):
 
                 for inn, bmap in inn_runs.items():
                     for batter, runs in bmap.items():
-                        if runs >= 100: batters[batter]["hundreds"] += 1
-                        elif runs >= 50: batters[batter]["fifties"] += 1
+                        if runs >= 100:
+                            batters[batter]["hundreds"] += 1
+                            if season and season in batters[batter]["by_season"]:
+                                batters[batter]["by_season"][season]["hundreds"] += 1
+                        elif runs >= 50:
+                            batters[batter]["fifties"] += 1
+                            if season and season in batters[batter]["by_season"]:
+                                batters[batter]["by_season"][season]["fifties"] += 1
 
                 # Build and save scorecard
                 sc = build_scorecard(match_id, rows)
@@ -391,9 +409,23 @@ def build_output(batters, bowlers, teams, seasons, total_matches, comp):
         sr  = round(s["runs"] / s["balls"] * 100, 2) if s["balls"] else 0
         dismissals = s.get("dismissals", 0)
         avg = round(s["runs"]/dismissals, 2) if dismissals > 0 else s["runs"]  # not out avg
+        # Build per-season summary
+        by_season = {}
+        for ssn, ss in s.get("by_season",{}).items():
+            sm = len(ss["matches"])
+            if sm < 1: continue
+            sd = ss.get("dismissals",0)
+            by_season[ssn] = {
+                "matches": sm, "runs": ss["runs"], "balls": ss["balls"],
+                "avg": round(ss["runs"]/sd,2) if sd else ss["runs"],
+                "sr":  round(ss["runs"]/ss["balls"]*100,2) if ss["balls"] else 0,
+                "fours": ss["fours"], "sixes": ss["sixes"],
+                "fifties": ss["fifties"], "hundreds": ss["hundreds"],
+            }
         batting_list.append({"name":name,"matches":m,"runs":s["runs"],"balls":s["balls"],
             "avg":avg,"sr":sr,"fours":s["fours"],"sixes":s["sixes"],
-            "fifties":s["fifties"],"hundreds":s["hundreds"]})
+            "fifties":s["fifties"],"hundreds":s["hundreds"],
+            "by_season":by_season})
     batting_list.sort(key=lambda x: x["runs"], reverse=True)
 
     bowling_list = []

@@ -901,54 +901,55 @@ function filterBySeason(data) {
   if (!data) return data;
   if (activeSeason === 'all' && !yearFrom && !yearTo) return data;
 
-  const filterSeason = (item) => {
-    if (!item.season) return true;
-    const yr = parseInt(item.season);
-    if (activeSeason !== 'all') return item.season === activeSeason;
+  // Filter function for a season string
+  const seasonMatches = (season) => {
+    if (!season) return false;
+    const yr = parseInt(season);
+    if (activeSeason !== 'all') return season === activeSeason;
     if (yearFrom && yr < yearFrom) return false;
     if (yearTo   && yr > yearTo)   return false;
     return true;
   };
 
-  return {
-    ...data,
-    batting: data.batting_by_season
-      ? aggregateSeasonData(data.batting_by_season, filterSeason, 'batting')
-      : data.batting,
-    bowling: data.bowling_by_season
-      ? aggregateSeasonData(data.bowling_by_season, filterSeason, 'bowling')
-      : data.bowling,
-    sixes: data.sixes,
-    teams: data.teams,
-  };
+  // Filter batting using by_season data
+  const filteredBatting = data.batting
+    .map(p => {
+      if (!p.by_season) return null;
+      // Sum up matching seasons
+      const matchingSeasons = Object.entries(p.by_season).filter(([s]) => seasonMatches(s));
+      if (!matchingSeasons.length) return null;
+      const agg = matchingSeasons.reduce((acc, [, s]) => {
+        acc.matches  += s.matches  || 0;
+        acc.runs     += s.runs     || 0;
+        acc.balls    += s.balls    || 0;
+        acc.fours    += s.fours    || 0;
+        acc.sixes    += s.sixes    || 0;
+        acc.fifties  += s.fifties  || 0;
+        acc.hundreds += s.hundreds || 0;
+        acc.dismissals += (s.dismissals || 0);
+        return acc;
+      }, {matches:0,runs:0,balls:0,fours:0,sixes:0,fifties:0,hundreds:0,dismissals:0});
+      if (!agg.runs) return null;
+      return {
+        ...p,
+        matches:  agg.matches,
+        runs:     agg.runs,
+        balls:    agg.balls,
+        fours:    agg.fours,
+        sixes:    agg.sixes,
+        fifties:  agg.fifties,
+        hundreds: agg.hundreds,
+        avg: agg.dismissals ? +(agg.runs/agg.dismissals).toFixed(2) : agg.runs,
+        sr:  agg.balls ? +((agg.runs/agg.balls)*100).toFixed(2) : 0,
+      };
+    })
+    .filter(Boolean)
+    .sort((a,b) => b.runs - a.runs);
+
+  return { ...data, batting: filteredBatting, bowling: data.bowling, sixes: data.sixes, teams: data.teams };
 }
 
-function aggregateSeasonData(bySeason, filterFn, type) {
-  const agg = {};
-  Object.entries(bySeason).forEach(([season, players]) => {
-    if (!filterFn({season})) return;
-    players.forEach(p => {
-      if (!agg[p.name]) agg[p.name] = { name: p.name, matches: 0, runs: 0, balls: 0, fours: 0, sixes: 0, fifties: 0, hundreds: 0, wickets: 0, econ_runs: 0, econ_balls: 0 };
-      const a = agg[p.name];
-      a.matches  += p.matches  || 0;
-      a.runs     += p.runs     || 0;
-      a.balls    += p.balls    || 0;
-      a.fours    += p.fours    || 0;
-      a.sixes    += p.sixes    || 0;
-      a.fifties  += p.fifties  || 0;
-      a.hundreds += p.hundreds || 0;
-      a.wickets  += p.wickets  || 0;
-      a.econ_runs  += p.runs   || 0;
-      a.econ_balls += p.balls  || 0;
-    });
-  });
-  return Object.values(agg).map(a => ({
-    ...a,
-    avg: a.matches ? +(a.runs / a.matches).toFixed(2) : 0,
-    sr:  a.balls   ? +((a.runs / a.balls) * 100).toFixed(2) : 0,
-    economy: a.econ_balls ? +((a.econ_runs / a.econ_balls) * 6).toFixed(2) : 0,
-  }));
-}
+function aggregateSeasonData() {} // kept for compatibility
 
 // ── LOAD COMPETITION ──────────────────────────────────────────────────────────
 async function loadComp(code) {

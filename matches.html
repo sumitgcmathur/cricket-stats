@@ -26,7 +26,7 @@ select:focus,input:focus{border-color:var(--blue-mid);}
 #match-search{width:220px;}
 #match-search::placeholder{color:var(--muted);}
 .filter-label{font-size:11px;color:var(--muted);font-weight:500;}
-.main{max-width:1200px;margin:0 auto;padding:24px;}
+.main{max-width:1200px;margin:0 auto;padding:24px;min-height:400px;}
 .match-list{display:grid;gap:10px;}
 .match-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px 20px;cursor:pointer;transition:all 0.15s;box-shadow:var(--shadow);display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;}
 .match-card:hover{border-color:var(--blue-mid);box-shadow:var(--shadow-md);transform:translateY(-1px);}
@@ -47,8 +47,8 @@ select:focus,input:focus{border-color:var(--blue-mid);}
 .charts-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin-bottom:28px;}
 .chart-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px;box-shadow:var(--shadow);}
 .chart-card h3{font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:14px;}
-.chart-wrap{position:relative;height:230px;}
-.chart-wrap-lg{position:relative;height:260px;}
+.chart-wrap{position:relative;height:230px;min-height:230px;}
+.chart-wrap-lg{position:relative;height:260px;min-height:260px;}
 .innings-block{margin-bottom:32px;}
 .innings-title{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:2px;color:var(--blue);margin-bottom:14px;display:flex;align-items:baseline;gap:12px;}
 .innings-total{font-size:13px;color:var(--muted);font-family:'Inter',sans-serif;font-weight:400;}
@@ -241,7 +241,10 @@ function showList(){
 function killCharts(){charts.forEach(c=>{try{c.destroy();}catch(e){}});charts=[];}
 
 function renderScorecard(sc){
+  // Hide first so browser doesn't try to layout while we're building
+  const view = document.getElementById('scorecard-view');
   const wrap = document.getElementById('scorecard-wrap');
+  view.style.display = 'none';
   wrap.innerHTML = '';
 
   const t1=(sc.teams||[])[0]||'—', t2=(sc.teams||[])[1]||'—';
@@ -390,8 +393,12 @@ function renderScorecard(sc){
     wrap.appendChild(block);
   });
 
+  // Show after all content appended, force reflow, then draw charts
+  view.style.display = '';
+  // Force reflow
+  void wrap.offsetHeight;
   window.scrollTo(0,0);
-  setTimeout(()=>drawCharts(sc),120);
+  setTimeout(()=>drawCharts(sc), 200);
 }
 
 function ce(tag,cls){ const el=document.createElement(tag); if(cls)el.className=cls; return el; }
