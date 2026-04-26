@@ -213,7 +213,14 @@ async function loadScorecard(id){
   try{
     const r=await fetch(`stats/matches/${currentComp}/${id}.json`);
     if(!r.ok) throw new Error('HTTP '+r.status);
-    renderScorecard(await r.json());
+    const scData = await r.json();
+    console.log('Scorecard data loaded, innings:', scData.innings?.length);
+    try {
+      renderScorecard(scData);
+    } catch(renderErr) {
+      console.error('renderScorecard crashed:', renderErr);
+      throw renderErr;
+    }
   }catch(e){
     document.getElementById('scorecard-wrap').innerHTML=
       `<div class="empty">⚠️ Scorecard not available<br>
@@ -272,7 +279,7 @@ function renderScorecard(sc){
         <tbody>
           ${(inn.batters||[]).map(b=>{
             const m=b.runs>=100?'hundred':b.runs>=50?'fifty':'';
-            return `<tr><td><span class="plink" style="cursor:pointer" onclick="window.location.href='player.html?name='+encodeURIComponent('${b.name}')">${b.name}</span></td><td>${b.dismissal||'not out'}</td><td class="runs-cell ${m}">${b.runs}</td><td>${b.balls}</td><td>${b.fours}</td><td>${b.sixes}</td><td>${b.sr}</td></tr>`;
+            return `<tr><td><span class="plink" style="cursor:pointer" data-player="${b.name.replace(/"/g,'&quot;')}" onclick="goPlayer(this.dataset.player)">${b.name}</span></td><td>${b.dismissal||'not out'}</td><td class="runs-cell ${m}">${b.runs}</td><td>${b.balls}</td><td>${b.sixes}</td><td>${b.sr}</td></tr>`;
           }).join('')}
           <tr class="extras-row"><td colspan="2">Extras</td><td colspan="5" style="text-align:left;padding-left:14px">${inn.extras_total||0} (w ${inn.extras?.wides||0}, nb ${inn.extras?.noballs||0}, b ${inn.extras?.byes||0}, lb ${inn.extras?.legbyes||0})</td></tr>
           <tr class="total-row"><td colspan="2">Total</td><td colspan="5" style="text-align:left;padding-left:14px;color:var(--blue)">${inn.total_runs}/${inn.total_wickets}${overs}</td></tr>
@@ -281,7 +288,7 @@ function renderScorecard(sc){
       ${(inn.fall_of_wickets||[]).length?`<div class="fow-wrap"><div class="fow-title">Fall of Wickets</div><div class="fow-list">${inn.fall_of_wickets.map(f=>`<div class="fow-item"><span style="color:var(--muted);font-size:10px">${f.wicket}wkt </span><span style="color:var(--blue);font-weight:600">${f.runs}</span><span style="color:var(--muted)"> (${f.player})</span></div>`).join('')}</div></div>`:''}
       <div class="card"><div class="card-title">Bowling — ${inn.bowling_team}</div>
         <table><thead><tr><th>Bowler</th><th></th><th>O</th><th>M</th><th>R</th><th>W</th><th>Econ</th></tr></thead>
-        <tbody>${(inn.bowlers||[]).map(b=>`<tr><td><span class="plink" style="cursor:pointer" onclick="window.location.href='player.html?name='+encodeURIComponent('${b.name}')">${b.name}</span></td><td></td><td>${b.overs}</td><td>${b.maidens||0}</td><td>${b.runs}</td><td style="color:var(--blue);font-weight:600">${b.wickets}</td><td>${b.economy}</td></tr>`).join('')}</tbody>
+        <tbody>${(inn.bowlers||[]).map(b=>`<tr><td><span class="plink" style="cursor:pointer" data-player="${b.name.replace(/"/g,'&quot;')}" onclick="goPlayer(this.dataset.player)">${b.name}</span></td><td></td><td>${b.overs}</td><td>${b.maidens||0}</td><td>${b.runs}</td><td style="color:var(--blue);font-weight:600">${b.wickets}</td><td>${b.economy}</td></tr>`).join('')}</tbody>
         </table>
       </div>
     </div>`;
@@ -346,6 +353,10 @@ function drawCharts(sc){
       charts.push(new Chart(bndCtx,{type:'bar',data:{labels:top.map(b=>b.name.split(' ').pop()),datasets:[{label:'4s (runs)',data:top.map(b=>b.fours*4),backgroundColor:'#2E5A8F',borderRadius:2},{label:'6s (runs)',data:top.map(b=>b.sixes*6),backgroundColor:'#E85D04',borderRadius:2}]},options:{...bOpts,plugins:{...bOpts.plugins,legend:{display:true,position:'top',labels:{font:{size:10},boxWidth:10}}},scales:{x:{stacked:true,grid:{display:false},ticks:{font:{size:10}}},y:{stacked:true,grid:{color:'#E2E6EA'},ticks:{font:{size:10}}}}}}));
     }
   });
+}
+
+function goPlayer(name){
+  window.location.href='player.html?name='+encodeURIComponent(name);
 }
 
 function ord(n){const s=['th','st','nd','rd'],v=n%100;return n+(s[(v-20)%10]||s[v]||s[0]);}
