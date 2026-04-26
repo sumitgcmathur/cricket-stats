@@ -367,7 +367,6 @@ function renderBatting(){
     if(msCtx&&ipl){
       charts.push(new Chart(msCtx,{type:'bar',data:{labels:['Fifties','Hundreds','Matches'],datasets:[{data:[ipl.fifties||0,ipl.hundreds||0,ipl.matches],backgroundColor:['#DAA520','#C0392B','#2E5A8F'],borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:11}}},y:{grid:{color:'#E2E6EA'},ticks:{font:{size:11}}}}}}));
     }
-  } catch(e){ console.error('Chart error:', e); }
   },100);
 }
 
