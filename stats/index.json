@@ -1,12 +1,12 @@
 {
-  "last_updated": "26 Apr 2026, 18:00",
+  "last_updated": "27 Apr 2026, 08:42",
   "competitions": [
     {
       "code": "ipl",
       "name": "Indian Premier League",
       "format": "T20",
       "type": "league",
-      "total_matches": 1202,
+      "total_matches": 1207,
       "seasons": [
         "2007/08",
         "2009",

@@ -148,9 +148,6 @@ footer a{color:var(--blue);text-decoration:none;}
 <script>
 const COMPS=[
   {code:'ipl',name:'IPL',format:'T20'},
-  {code:'t20is',name:'T20Is',format:'T20'},
-  {code:'odis',name:'ODIs',format:'ODI'},
-  {code:'tests',name:'Tests',format:'Test'},
 ];
 const COLORS=['#1E3A5F','#E85D04','#2D9648','#7B2FBE','#D4A017','#1A7A9A','#C0392B','#4A4A8A'];
 
@@ -182,7 +179,19 @@ async function boot(){
   }
 
   renderHero();
-  renderBatting();
+  // Show most relevant tab first
+  const hasBatting = COMPS.some(comp => getPlayerBatting(comp.code));
+  const hasBowling = COMPS.some(comp => getPlayerBowling(comp.code));
+  if(!hasBatting && hasBowling){
+    // Pure bowler - show bowling tab first
+    document.querySelectorAll('.ptab').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+    document.querySelector('.ptab:nth-child(2)').classList.add('active');
+    document.getElementById('tab-bowling').classList.add('active');
+    renderBowling();
+  } else {
+    renderBatting();
+  }
   renderBowling();
   renderOverview();
 }
@@ -210,35 +219,42 @@ async function loadPhoto(name){
   // Show initials first as placeholder
   showInitials();
 
+  // Build name variants to try
+  const parts = name.trim().split(' ');
   const attempts = [
     name.replace(/ /g,'_'),
-    name.split(' ').pop().replace(/ /g,'_'),
-    name.replace(/ /g,'_') + '_(cricketer)',
-    name.replace(/ /g,'_') + '_cricketer',
+    parts[parts.length-1]+'_'+parts[0],  // surname_firstname
+    name.replace(/ /g,'_')+'_(cricketer)',
+    name.replace(/ /g,'_')+'_(Indian_cricketer)',
+    parts[parts.length-1],  // just surname
   ];
   for(const query of attempts){
     try{
-      const url = 'https://en.wikipedia.org/api/rest_v1/page/summary/'+encodeURIComponent(query);
+      // Use action API with origin=* for CORS support
+      const url = 'https://en.wikipedia.org/w/api.php?action=query&titles='+
+        encodeURIComponent(query.replace(/_/g,' '))+
+        '&prop=pageimages&format=json&pithumbsize=300&origin=*';
       const r = await fetch(url);
       if(!r.ok) continue;
       const d = await r.json();
-      if(d.thumbnail?.source){
+      const pages = d.query?.pages;
+      if(!pages) continue;
+      const page = Object.values(pages)[0];
+      if(page.missing !== undefined) continue; // page not found
+      if(page.thumbnail?.source){
         const img = document.getElementById('player-photo');
         img.onload = () => {
-          img.style.display = 'block';
-          document.getElementById('player-initials').style.display = 'none';
-          console.log('Photo loaded for', name);
+          img.style.display='block';
+          document.getElementById('player-initials').style.display='none';
         };
-        img.onerror = () => {
-          img.style.display = 'none';
-          console.warn('Photo failed to load:', d.thumbnail.source);
-        };
-        img.src = d.thumbnail.source;
+        img.onerror = () => { img.style.display='none'; };
+        img.src = page.thumbnail.source;
+        console.log('Photo loaded for', name, 'via', query);
         return;
       }
     }catch(e){ continue; }
   }
-  console.log('No Wikipedia photo found for', name);
+  console.log('No photo found for', name);
 }
 
 function getPlayerBatting(code){

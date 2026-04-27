@@ -686,12 +686,26 @@ footer {
 
 footer a { color: var(--blue); text-decoration: none; }
 
-@media (max-width: 640px) {
-  .kpi-strip { grid-template-columns: repeat(2, 1fr); }
+@media (max-width: 768px) {
+  .kpi-strip { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .hero-strip { padding: 20px 16px 28px; }
+  .hero h1 { font-size: 36px; }
+  .hero-sub { font-size: 12px; }
+  .main { padding: 12px; }
+  .header-inner { height: 48px; }
+  .logo { font-size: 20px; margin-right: 16px; }
+  .nav-btn { padding: 0 10px; font-size: 12px; }
+  .toolbar-inner { gap: 8px; flex-wrap: wrap; height: auto; padding: 8px 0; }
+  .filter-label { display: none; }
+  .season-select, .year-input { font-size: 12px; padding: 4px 8px; }
+  .pill { font-size: 11px; padding: 3px 10px; }
   td:nth-child(n+6) { display: none; }
   th:nth-child(n+6) { display: none; }
-  .hero-strip { padding: 24px 16px; }
-  .main { padding: 16px; }
+  .stat-cards { grid-template-columns: repeat(2, 1fr); }
+  .section-title { font-size: 10px; }
+  .comp-grid { grid-template-columns: 1fr; }
+  .player-hero-inner { flex-direction: column; gap: 12px; }
+  .player-kpis { gap: 16px; }
 }
 </style>
 </head>
@@ -1120,6 +1134,7 @@ function renderBatting(d, target) {
     {k:'runs',    l:'Runs', hi:true},
     {k:'avg',     l:'Avg'},
     {k:'sr',      l:'SR'},
+    {k:'perf_index',l:'PI ⓘ'},
     {k:'fours',   l:'4s'},
     {k:'sixes',   l:'6s'},
     {k:'fifties', l:'50s'},
@@ -1134,6 +1149,7 @@ function renderBowling(d, target) {
     {k:'wickets',  l:'Wkts', hi:true},
     {k:'avg',      l:'Avg'},
     {k:'economy',  l:'Econ'},
+    {k:'bowl_index',l:'BI ⓘ'},
     {k:'overs',    l:'Overs'},
     {k:'runs',     l:'Runs'},
   ];

@@ -51,7 +51,7 @@ def download_zip(code):
 
 
 # ── SCORECARD BUILDER ────────────────────────────────────────────────────────
-def build_scorecard(match_id, rows):
+def build_scorecard(match_id, rows, match_winner="", match_win_margin=""):
     """Build a full match scorecard from ball-by-ball rows."""
     if not rows:
         return None
@@ -68,14 +68,8 @@ def build_scorecard(match_id, rows):
         if t and t not in team_order:
             team_order.append(t)
 
-    winner     = ""
-    win_margin = ""
-    for row in rows:
-        w = row.get("winner", "")
-        if w:
-            winner = w
-            win_margin = row.get("won_by", "") or ""
-            break
+    winner     = match_winner
+    win_margin = match_win_margin
 
     innings_data = defaultdict(lambda: {
         "batting_team": "",
@@ -323,17 +317,22 @@ def parse_zip(zip_bytes, comp):
                 if season:
                     seasons.add(season)
 
-                # Read winner from info file
+                # Read winner and margin from info file
                 match_winner_from_info = ""
+                match_margin_from_info = ""
                 info_key = fname.replace(".csv","").split("/")[-1]
                 if info_key in info_files:
                     try:
                         with zf.open(info_files[info_key]) as inf:
                             for line in io.TextIOWrapper(inf, encoding="utf-8"):
                                 parts = line.strip().split(",")
-                                if len(parts) >= 3 and parts[0] == "info" and parts[1] == "winner":
-                                    match_winner_from_info = ",".join(parts[2:]).strip()
-                                    break
+                                if len(parts) >= 3 and parts[0] == "info":
+                                    if parts[1] == "winner":
+                                        match_winner_from_info = ",".join(parts[2:]).strip()
+                                    elif parts[1] == "outcome" and "won by" in ",".join(parts[2:]).lower():
+                                        match_margin_from_info = ",".join(parts[2:]).strip()
+                                    elif parts[1] == "by":
+                                        match_margin_from_info = ",".join(parts[2:]).strip()
                     except:
                         pass
 
@@ -412,7 +411,7 @@ def parse_zip(zip_bytes, comp):
                                 batters[batter]["by_season"][season]["fifties"] += 1
 
                 # Build and save scorecard
-                sc = build_scorecard(match_id, rows)
+                sc = build_scorecard(match_id, rows, match_winner_from_info, match_margin_from_info)
                 if sc:
                     sc_path = os.path.join(matches_dir, f"{match_id}.json")
                     with open(sc_path, "w", encoding="utf-8") as sf:
@@ -459,9 +458,12 @@ def build_output(batters, bowlers, teams, seasons, total_matches, comp, team_sea
                 "fours": ss["fours"], "sixes": ss["sixes"],
                 "fifties": ss["fifties"], "hundreds": ss["hundreds"],
             }
+        # Performance index: avg * (SR/100) - rewards both consistency and aggression
+        perf_index = round(avg * (sr/100), 1) if sr > 0 else 0
         batting_list.append({"name":name,"matches":m,"runs":s["runs"],"balls":s["balls"],
             "avg":avg,"sr":sr,"fours":s["fours"],"sixes":s["sixes"],
             "fifties":s["fifties"],"hundreds":s["hundreds"],
+            "perf_index":perf_index,
             "by_season":by_season})
     batting_list.sort(key=lambda x: x["runs"], reverse=True)
 
@@ -472,8 +474,10 @@ def build_output(batters, bowlers, teams, seasons, total_matches, comp, team_sea
         overs   = round(s["balls"]//6 + (s["balls"]%6)/10, 1)
         economy = round(s["runs"]/s["balls"]*6, 2) if s["balls"] else 0
         avg     = round(s["runs"]/s["wickets"], 2) if s["wickets"] else None
+        # Bowling index: wickets per match / economy - rewards wicket taking economy
+        bowl_index = round((s["wickets"]/m) * (6/economy), 2) if economy > 0 and m > 0 else 0
         bowling_list.append({"name":name,"matches":m,"wickets":s["wickets"],"runs":s["runs"],
-            "overs":overs,"economy":economy,"avg":avg})
+            "overs":overs,"economy":economy,"avg":avg,"bowl_index":bowl_index})
     bowling_list.sort(key=lambda x: x["wickets"], reverse=True)
 
     sixes_list = sorted(
