@@ -80,6 +80,20 @@ td:nth-child(2){text-align:left;color:var(--muted);font-size:12px;}
 .wkts-cell{color:var(--blue);font-weight:600;}
 .plink{color:var(--blue-mid);cursor:pointer;font-weight:500;}
 .plink:hover{text-decoration:underline;}
+.expand-btn{background:none;border:1px solid var(--border);color:var(--muted);width:22px;height:22px;border-radius:4px;cursor:pointer;font-size:12px;display:inline-flex;align-items:center;justify-content:center;transition:all 0.15s;margin-left:6px;flex-shrink:0;}
+.expand-btn:hover{border-color:var(--blue-mid);color:var(--blue);}
+.expand-btn.open{background:var(--blue);border-color:var(--blue);color:#fff;}
+.expand-row{background:var(--surface2);}
+.expand-row td{padding:0!important;}
+.expand-content{padding:16px;border-top:1px solid var(--border);}
+.expand-chart-wrap{position:relative;height:180px;margin-top:8px;}
+.expand-title{font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.phase-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px;}
+.phase-card{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:10px 12px;}
+.phase-card .ph-label{font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;}
+.phase-card .ph-val{font-size:18px;font-weight:600;color:var(--blue);font-family:'Bebas Neue',sans-serif;}
+.phase-card .ph-sub{font-size:11px;color:var(--muted);}
+.plink:hover{text-decoration:underline;}
 /* FOW */
 .fow-wrap{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-bottom:12px;}
 .fow-label{font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
@@ -279,13 +293,28 @@ function buildScorecard(sv,sc){
     const btbody=document.createElement('tbody');
     (inn.batters||[]).forEach(b=>{
       const tr=document.createElement('tr');
-      const nc=document.createElement('td');
+      const nc=document.createElement('td');nc.style.display='flex';nc.style.alignItems='center';nc.style.gap='4px';
       const ns=document.createElement('a');ns.className='plink';ns.textContent=b.name;ns.href='player.html?name='+encodeURIComponent(b.name);
-      nc.appendChild(ns);tr.appendChild(nc);
+      const expBtn=document.createElement('button');expBtn.className='expand-btn';expBtn.textContent='▸';expBtn.title='Ball-by-ball progression';
+      nc.appendChild(ns);nc.appendChild(expBtn);tr.appendChild(nc);
       const dc=document.createElement('td');dc.textContent=b.dismissal||'not out';dc.style.fontSize='12px';tr.appendChild(dc);
       const rc=document.createElement('td');rc.className='runs-cell'+(b.runs>=100?' hundred':b.runs>=50?' fifty':'');rc.textContent=b.runs;tr.appendChild(rc);
       [b.balls,b.fours,b.sixes,b.sr].forEach(v=>{const td=document.createElement('td');td.textContent=v??'—';tr.appendChild(td);});
-      btbody.appendChild(tr);
+      // Expand row for ball-by-ball chart
+      const expRow=document.createElement('tr');expRow.className='expand-row';expRow.style.display='none';
+      const expTd=document.createElement('td');expTd.colSpan=7;
+      const expDiv=document.createElement('div');expDiv.className='expand-content';
+      const batBalls=inn.batter_balls?.[b.name]||[];
+      expDiv.innerHTML=buildBatterExpand(b.name, batBalls);
+      expTd.appendChild(expDiv);expRow.appendChild(expTd);
+      expBtn.addEventListener('click',()=>{
+        const open=expRow.style.display!=='none';
+        expRow.style.display=open?'none':'';
+        expBtn.textContent=open?'▸':'▾';
+        expBtn.classList.toggle('open',!open);
+        if(!open) setTimeout(()=>drawBatterChart(b.name, batBalls, expDiv),50);
+      });
+      btbody.appendChild(tr);btbody.appendChild(expRow);
     });
     // Extras
     const er=document.createElement('tr');er.className='ext-row';
@@ -327,7 +356,24 @@ function buildScorecard(sv,sc){
       [b.overs,b.maidens||0,b.runs].forEach(v=>{const td=document.createElement('td');td.textContent=v??'—';tr.appendChild(td);});
       const wtd=document.createElement('td');wtd.className='wkts-cell';wtd.textContent=b.wickets;tr.appendChild(wtd);
       const etd=document.createElement('td');etd.textContent=b.economy;tr.appendChild(etd);
-      bwbody.appendChild(tr);
+      // Expand row for bowler ball-by-ball
+      const bowlBalls=inn.bowler_balls?.[b.name]||[];
+      const bwExpRow=document.createElement('tr');bwExpRow.className='expand-row';bwExpRow.style.display='none';
+      const bwExpTd=document.createElement('td');bwExpTd.colSpan=7;
+      const bwExpDiv=document.createElement('div');bwExpDiv.className='expand-content';
+      bwExpDiv.innerHTML=buildBowlerExpand(b.name,bowlBalls);
+      bwExpTd.appendChild(bwExpDiv);bwExpRow.appendChild(bwExpTd);
+      // Add expand button to first cell
+      const bwExpBtn=document.createElement('button');bwExpBtn.className='expand-btn';bwExpBtn.textContent='▸';bwExpBtn.title='Ball-by-ball analysis';
+      tr.cells[0].appendChild(bwExpBtn);
+      bwExpBtn.addEventListener('click',()=>{
+        const open=bwExpRow.style.display!=='none';
+        bwExpRow.style.display=open?'none':'';
+        bwExpBtn.textContent=open?'▸':'▾';
+        bwExpBtn.classList.toggle('open',!open);
+        if(!open) setTimeout(()=>drawBowlerChart(b.name,bowlBalls,bwExpDiv),50);
+      });
+      bwbody.appendChild(tr);bwbody.appendChild(bwExpRow);
     });
     bwtbl.appendChild(bwbody);bwc.appendChild(bwtbl);block.appendChild(bwc);
 
@@ -404,6 +450,96 @@ function drawCharts(sc){
       if(top.length)charts.push(new Chart(bnc,{type:'bar',data:{labels:top.map(b=>b.name.split(' ').pop()),datasets:[{label:'4s',data:top.map(b=>b.fours*4),backgroundColor:'#2E5A8F',borderRadius:2},{label:'6s',data:top.map(b=>b.sixes*6),backgroundColor:'#E85D04',borderRadius:2}]},options:{...bo,plugins:{legend:{display:true,position:'top',labels:{font:{size:10},boxWidth:10}}},scales:{x:{stacked:true,grid:{display:false},ticks:{font:{size:10}}},y:{stacked:true,grid:{color:'#E2E6EA'},ticks:{font:{size:10}}}}}}));
     }
   });
+}
+
+function buildBatterExpand(name, balls){
+  if(!balls.length) return '<div style="color:var(--muted);font-size:12px;padding:8px">No ball-by-ball data available</div>';
+  // Phase breakdown
+  const pp=balls.slice(0,36), mid=balls.slice(36,96), death=balls.slice(96);
+  const phaseStats = (arr) => ({
+    runs: arr.reduce((s,r)=>s+r,0),
+    balls: arr.length,
+    sr: arr.length ? +((arr.reduce((s,r)=>s+r,0)/arr.length)*100).toFixed(1) : 0,
+    fours: arr.filter(r=>r===4).length,
+    sixes: arr.filter(r=>r===6).length,
+  });
+  const ppS=phaseStats(pp), midS=phaseStats(mid), deathS=phaseStats(death);
+  return `<div class="expand-title">📊 ${name} — Ball-by-Ball Progression</div>
+    <div class="expand-chart-wrap"><canvas id="bc-${name.replace(/[^a-zA-Z]/g,'_')}"></canvas></div>
+    <div class="phase-grid" style="margin-top:12px">
+      <div class="phase-card"><div class="ph-label">Powerplay (1-6)</div><div class="ph-val">${ppS.runs}/${ppS.balls}</div><div class="ph-sub">SR ${ppS.sr} · ${ppS.fours}×4 · ${ppS.sixes}×6</div></div>
+      <div class="phase-card"><div class="ph-label">Middle (7-16)</div><div class="ph-val">${midS.runs}/${midS.balls}</div><div class="ph-sub">SR ${midS.sr} · ${midS.fours}×4 · ${midS.sixes}×6</div></div>
+      <div class="phase-card"><div class="ph-label">Death (17-20)</div><div class="ph-val">${deathS.runs}/${deathS.balls}</div><div class="ph-sub">SR ${deathS.sr} · ${deathS.fours}×4 · ${deathS.sixes}×6</div></div>
+    </div>`;
+}
+
+function drawBatterChart(name, balls, container){
+  if(!balls.length) return;
+  const canvasId='bc-'+name.replace(/[^a-zA-Z]/g,'_');
+  const ctx=container.querySelector('#'+canvasId)?.getContext('2d');
+  if(!ctx) return;
+  // Cumulative runs
+  let cum=0;
+  const data=balls.map(r=>{cum+=r;return cum;});
+  const colors=balls.map(r=>r===6?'#E85D04':r===4?'#2E5A8F':r===0?'#E2E6EA':'#2D9648');
+  const ch=new Chart(ctx,{type:'bar',data:{
+    labels:balls.map((_,i)=>i+1),
+    datasets:[
+      {type:'line',label:'Cumulative Runs',data,borderColor:'#1E3A5F',backgroundColor:'transparent',tension:0.3,pointRadius:0,borderWidth:2,yAxisID:'y'},
+      {type:'bar',label:'Runs per Ball',data:balls,backgroundColor:colors,borderRadius:2,yAxisID:'y2'},
+    ]
+  },options:{responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:true,position:'top',labels:{font:{size:10},boxWidth:10}}},
+    scales:{
+      x:{grid:{display:false},ticks:{font:{size:9},maxTicksLimit:20}},
+      y:{position:'left',grid:{color:'#E2E6EA'},ticks:{font:{size:9}},title:{display:true,text:'Cumulative',font:{size:9}}},
+      y2:{position:'right',grid:{display:false},ticks:{font:{size:9}},title:{display:true,text:'Per Ball',font:{size:9}},max:7},
+    }
+  }});
+  charts.push(ch);
+}
+
+function buildBowlerExpand(name, balls){
+  if(!balls.length) return '<div style="color:var(--muted);font-size:12px;padding:8px">No ball-by-ball data available</div>';
+  const pp=balls.slice(0,36), mid=balls.slice(36,96), death=balls.slice(96);
+  const phaseStats=(arr)=>({
+    runs:arr.reduce((s,b)=>s+b.r,0), balls:arr.filter(b=>!b.wide&&!b.nb).length,
+    wkts:arr.reduce((s,b)=>s+b.w,0),
+    econ:arr.filter(b=>!b.wide&&!b.nb).length?+((arr.reduce((s,b)=>s+b.r,0)/arr.filter(b=>!b.wide&&!b.nb).length*6).toFixed(1)):0
+  });
+  const ppS=phaseStats(pp),midS=phaseStats(mid),deathS=phaseStats(death);
+  return `<div class="expand-title">🎳 ${name} — Ball-by-Ball Analysis</div>
+    <div class="expand-chart-wrap"><canvas id="bwc-${name.replace(/[^a-zA-Z]/g,'_')}"></canvas></div>
+    <div class="phase-grid" style="margin-top:12px">
+      <div class="phase-card"><div class="ph-label">Powerplay (1-6)</div><div class="ph-val">${ppS.wkts}W/${ppS.runs}R</div><div class="ph-sub">${ppS.balls} balls · Econ ${ppS.econ}</div></div>
+      <div class="phase-card"><div class="ph-label">Middle (7-16)</div><div class="ph-val">${midS.wkts}W/${midS.runs}R</div><div class="ph-sub">${midS.balls} balls · Econ ${midS.econ}</div></div>
+      <div class="phase-card"><div class="ph-label">Death (17-20)</div><div class="ph-val">${deathS.wkts}W/${deathS.runs}R</div><div class="ph-sub">${deathS.balls} balls · Econ ${deathS.econ}</div></div>
+    </div>`;
+}
+
+function drawBowlerChart(name, balls, container){
+  if(!balls.length) return;
+  const canvasId='bwc-'+name.replace(/[^a-zA-Z]/g,'_');
+  const ctx=container.querySelector('#'+canvasId)?.getContext('2d');
+  if(!ctx) return;
+  const legal=balls.filter(b=>!b.wide&&!b.nb);
+  let cumRuns=0;
+  const colors=legal.map(b=>b.w?'#C0392B':b.r===0?'#2D9648':b.r>=6?'#E85D04':'#6B7A8D');
+  const ch=new Chart(ctx,{type:'bar',data:{
+    labels:legal.map((_,i)=>i+1),
+    datasets:[
+      {type:'line',label:'Cumulative Runs',data:legal.map(b=>{cumRuns+=b.r;return cumRuns;}),borderColor:'#E85D04',backgroundColor:'transparent',tension:0.3,pointRadius:0,borderWidth:2,yAxisID:'y'},
+      {type:'bar',label:'Runs (red=wkt)',data:legal.map(b=>b.r+(b.w?0.5:0)),backgroundColor:colors,borderRadius:2,yAxisID:'y2'},
+    ]
+  },options:{responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:true,position:'top',labels:{font:{size:10},boxWidth:10}}},
+    scales:{
+      x:{grid:{display:false},ticks:{font:{size:9},maxTicksLimit:20}},
+      y:{position:'left',grid:{color:'#E2E6EA'},ticks:{font:{size:9}}},
+      y2:{position:'right',grid:{display:false},ticks:{font:{size:9}},max:8},
+    }
+  }});
+  charts.push(ch);
 }
 
 function goPlayer(name){window.location.href='player.html?name='+encodeURIComponent(name);}

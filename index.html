@@ -350,7 +350,7 @@ thead th {
   letter-spacing: 1px;
   text-transform: uppercase;
   color: var(--muted);
-  padding: 10px 14px;
+  padding: 10px 18px;
   text-align: right;
   background: var(--surface2);
   border-bottom: 1px solid var(--border);
@@ -756,6 +756,7 @@ footer a { color: var(--blue); text-decoration: none; }
       <button class="pill" onclick="showStatTab('bowling', this)">Bowling</button>
       <button class="pill" onclick="showStatTab('sixes', this)">Sixes</button>
       <button class="pill" onclick="showStatTab('teams', this)">Teams</button>
+      <button class="pill" onclick="showStatTab('mvp', this)">🏅 MVP</button>
     </div>
   </div>
 </div>
@@ -1023,7 +1024,87 @@ async function renderStatTab(rawData) {
     else if (currentStatTab === 'bowling') renderBowling(d, 'ipl-content');
     else if (currentStatTab === 'sixes')   renderSixes(d, 'ipl-content');
     else if (currentStatTab === 'teams')   renderTeams(d, 'ipl-content');
+    else if (currentStatTab === 'mvp')     renderMVP(d, 'ipl-content');
   }, 50);
+}
+
+function renderMVP(d, target) {
+  const data = (activeSeason !== 'all' || yearFrom || yearTo) ? filterBySeason(d) : d;
+  const batters = (data.batting || []).filter(p => p.matches >= 5 && p.perf_index > 0);
+  const bowlers = (data.bowling || []).filter(p => p.matches >= 5 && p.bowl_index > 0);
+
+  // Normalize scores 0-100
+  const maxPI = Math.max(...batters.map(b => b.perf_index), 1);
+  const maxBI = Math.max(...bowlers.map(b => b.bowl_index), 1);
+
+  // Combine: players who appear in both get a combined score
+  const allNames = [...new Set([...batters.map(b=>b.name), ...bowlers.map(b=>b.name)])];
+  const mvpList = allNames.map(name => {
+    const bat = batters.find(b => b.name === name);
+    const bowl = bowlers.find(b => b.name === name);
+    const batScore = bat ? (bat.perf_index / maxPI) * 60 : 0;
+    const bowlScore = bowl ? (bowl.bowl_index / maxBI) * 60 : 0;
+    const mvpScore = Math.round(batScore + bowlScore);
+    return {
+      name,
+      matches: bat?.matches || bowl?.matches || 0,
+      runs: bat?.runs || 0,
+      avg: bat?.avg || '—',
+      sr: bat?.sr || '—',
+      perf_index: bat?.perf_index || '—',
+      wickets: bowl?.wickets || 0,
+      economy: bowl?.economy || '—',
+      bowl_index: bowl?.bowl_index || '—',
+      mvp_score: mvpScore,
+      role: bat && bowl ? 'All-rounder' : bat ? 'Batter' : 'Bowler',
+    };
+  }).filter(p => p.mvp_score > 0)
+    .sort((a,b) => b.mvp_score - a.mvp_score)
+    .slice(0, 50);
+
+  const cols = [
+    {k:'role',      l:'Role'},
+    {k:'matches',   l:'Mat'},
+    {k:'runs',      l:'Runs'},
+    {k:'avg',       l:'Avg'},
+    {k:'sr',        l:'SR'},
+    {k:'perf_index',l:'Bat PI'},
+    {k:'wickets',   l:'Wkts'},
+    {k:'economy',   l:'Econ'},
+    {k:'bowl_index',l:'Bowl BI'},
+    {k:'mvp_score', l:'MVP Score', hi:true},
+  ];
+
+  const sorted = mvpList;
+  const thCols = cols.map(col =>
+    `<th style="padding:10px 16px">${col.l}</th>`
+  ).join('');
+
+  const rows = sorted.map((p, i) => {
+    const roleColor = p.role === 'All-rounder' ? 'var(--green)' : p.role === 'Batter' ? 'var(--blue)' : 'var(--gold)';
+    return `<tr>
+      <td style="padding:10px 16px"><a href="player.html?name=${encodeURIComponent(p.name)}" class="pname" style="text-decoration:none;color:var(--text);font-weight:500"><span class="rank ${i<3?'top3':''}">${i+1}</span> ${p.name}</a></td>
+      ${cols.map(col => {
+        if(col.k === 'role') return `<td style="padding:10px 16px"><span style="font-size:10px;padding:2px 8px;border-radius:3px;background:${roleColor}20;color:${roleColor};font-weight:600">${p.role}</span></td>`;
+        return `<td class="${col.hi?'hi':''}" style="padding:10px 16px;text-align:right">${p[col.k]??'—'}</td>`;
+      }).join('')}
+    </tr>`;
+  }).join('');
+
+  document.getElementById(target).innerHTML = `
+    <div style="background:var(--gold-bg);border:1px solid #E8C96A;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:var(--gold)">
+      🏅 <strong>MVP Score</strong> = Batting Performance Index (avg×SR) + Bowling Impact Index (wickets/match ÷ economy), each normalised to 60 points. Higher = more valuable player.
+    </div>
+    <div class="tbl-wrap animate">
+      <div class="tbl-toolbar">
+        <input class="search-input" placeholder="Filter players..." oninput="filterRows(this,'mvp-body')">
+        <span class="tbl-count">${sorted.length} players</span>
+      </div>
+      <table>
+        <thead><tr><th style="padding:10px 16px">Player</th>${thCols}</tr></thead>
+        <tbody id="mvp-body">${rows}</tbody>
+      </table>
+    </div>`;
 }
 
 function showStatTab(tab, btn) {

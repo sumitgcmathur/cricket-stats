@@ -138,6 +138,15 @@ def build_scorecard(match_id, rows, match_winner="", match_win_margin=""):
             if not wides and not noballs:
                 bl["balls"] += 1
             over_runs[inn][str(over_num)] += runs_bat + wides + noballs
+            # Ball-by-ball for bowler chart
+            if bowler not in d["bowler_balls"]:
+                d["bowler_balls"][bowler] = []
+            d["bowler_balls"][bowler].append({
+                "r": runs_bat + (extras if not wides and not noballs else 0),
+                "w": 1 if (wicket_t and wicket_t not in ("run out","retired hurt","obstructing the field")) else 0,
+                "wide": 1 if wides else 0,
+                "nb": 1 if noballs else 0
+            })
 
         # Wicket
         if wicket_t and player_out:
@@ -232,6 +241,8 @@ def build_scorecard(match_id, rows, match_winner="", match_win_margin=""):
             "bowlers":        bowlers_out,
             "fall_of_wickets": d["fall_of_wickets"],
             "over_by_over":   inn_over_by_over,
+            "batter_balls":   d["batter_balls"],
+            "bowler_balls":   d["bowler_balls"],
         }
 
     innings_list = [serialise_innings(k, v) for k, v in sorted(innings_data.items())]
