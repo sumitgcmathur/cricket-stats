@@ -987,7 +987,32 @@ function filterBySeason(data) {
     .filter(Boolean)
     .sort((a,b) => b.wins - a.wins);
 
-  return { ...data, batting: filteredBatting, bowling: data.bowling, sixes: filteredSixes, teams: filteredTeams };
+  // Filter bowling using by_season data
+  const filteredBowling = data.bowling
+    .map(p => {
+      if (!p.by_season || !Object.keys(p.by_season).length) return null;
+      const matchingSeasons = Object.entries(p.by_season).filter(([s]) => seasonMatches(s));
+      if (!matchingSeasons.length) return null;
+      const agg = matchingSeasons.reduce((acc, [, s]) => {
+        acc.matches += s.matches || 0;
+        acc.wickets += s.wickets || 0;
+        acc.runs    += s.runs    || 0;
+        acc.balls   += s.balls   || 0;
+        return acc;
+      }, {matches:0, wickets:0, runs:0, balls:0});
+      if (!agg.balls) return null;
+      const economy = +(agg.runs / agg.balls * 6).toFixed(2);
+      const avg = agg.wickets ? +(agg.runs / agg.wickets).toFixed(2) : null;
+      const overs = Math.floor(agg.balls/6) + (agg.balls%6)/10;
+      const bowl_index = economy > 0 && agg.matches > 0
+        ? +((agg.wickets / agg.matches) * (6 / economy)).toFixed(2) : 0;
+      return { ...p, matches: agg.matches, wickets: agg.wickets, runs: agg.runs,
+        balls: agg.balls, overs: +overs.toFixed(1), economy, avg, bowl_index };
+    })
+    .filter(Boolean)
+    .sort((a,b) => b.wickets - a.wickets);
+
+  return { ...data, batting: filteredBatting, bowling: filteredBowling, sixes: filteredSixes, teams: filteredTeams };
 }
 
 function aggregateSeasonData() {} // kept for compatibility
@@ -1033,79 +1058,73 @@ function renderMVP(d, target) {
   const batters = (data.batting || []).filter(p => p.matches >= 5 && p.perf_index > 0);
   const bowlers = (data.bowling || []).filter(p => p.matches >= 5 && p.bowl_index > 0);
 
-  // Normalize scores 0-100
-  const maxPI = Math.max(...batters.map(b => b.perf_index), 1);
-  const maxBI = Math.max(...bowlers.map(b => b.bowl_index), 1);
+  // Batting MVP: ranked by perf_index (avg × SR/100)
+  const topBatters = [...batters].sort((a,b) => b.perf_index - a.perf_index).slice(0, 20);
+  // Bowling MVP: ranked by bowl_index (wickets/match ÷ economy)
+  const topBowlers = [...bowlers].sort((a,b) => b.bowl_index - a.bowl_index).slice(0, 20);
 
-  // Combine: players who appear in both get a combined score
-  const allNames = [...new Set([...batters.map(b=>b.name), ...bowlers.map(b=>b.name)])];
-  const mvpList = allNames.map(name => {
-    const bat = batters.find(b => b.name === name);
-    const bowl = bowlers.find(b => b.name === name);
-    const batScore = bat ? (bat.perf_index / maxPI) * 60 : 0;
-    const bowlScore = bowl ? (bowl.bowl_index / maxBI) * 60 : 0;
-    const mvpScore = Math.round(batScore + bowlScore);
-    return {
-      name,
-      matches: bat?.matches || bowl?.matches || 0,
-      runs: bat?.runs || 0,
-      avg: bat?.avg || '—',
-      sr: bat?.sr || '—',
-      perf_index: bat?.perf_index || '—',
-      wickets: bowl?.wickets || 0,
-      economy: bowl?.economy || '—',
-      bowl_index: bowl?.bowl_index || '—',
-      mvp_score: mvpScore,
-      role: bat && bowl ? 'All-rounder' : bat ? 'Batter' : 'Bowler',
-    };
-  }).filter(p => p.mvp_score > 0)
-    .sort((a,b) => b.mvp_score - a.mvp_score)
-    .slice(0, 50);
+  const batRows = topBatters.map((p, i) => `<tr>
+    <td style="padding:10px 18px"><span class="rank ${i<3?'top3':''}">${i+1}</span>
+      <a href="player.html?name=${encodeURIComponent(p.name)}" class="pname" style="text-decoration:none;color:var(--text);font-weight:500">${p.name}</a></td>
+    <td style="padding:10px 18px;text-align:right">${p.matches}</td>
+    <td style="padding:10px 18px;text-align:right">${p.runs?.toLocaleString()}</td>
+    <td style="padding:10px 18px;text-align:right">${p.avg}</td>
+    <td style="padding:10px 18px;text-align:right">${p.sr}</td>
+    <td style="padding:10px 18px;text-align:right">${p.fifties||0}</td>
+    <td style="padding:10px 18px;text-align:right">${p.hundreds||0}</td>
+    <td style="padding:10px 18px;text-align:right;color:var(--blue);font-weight:600">${p.perf_index}</td>
+  </tr>`).join('');
 
-  const cols = [
-    {k:'role',      l:'Role'},
-    {k:'matches',   l:'Mat'},
-    {k:'runs',      l:'Runs'},
-    {k:'avg',       l:'Avg'},
-    {k:'sr',        l:'SR'},
-    {k:'perf_index',l:'Bat PI'},
-    {k:'wickets',   l:'Wkts'},
-    {k:'economy',   l:'Econ'},
-    {k:'bowl_index',l:'Bowl BI'},
-    {k:'mvp_score', l:'MVP Score', hi:true},
-  ];
-
-  const sorted = mvpList;
-  const thCols = cols.map(col =>
-    `<th style="padding:10px 16px">${col.l}</th>`
-  ).join('');
-
-  const rows = sorted.map((p, i) => {
-    const roleColor = p.role === 'All-rounder' ? 'var(--green)' : p.role === 'Batter' ? 'var(--blue)' : 'var(--gold)';
-    return `<tr>
-      <td style="padding:10px 16px"><a href="player.html?name=${encodeURIComponent(p.name)}" class="pname" style="text-decoration:none;color:var(--text);font-weight:500"><span class="rank ${i<3?'top3':''}">${i+1}</span> ${p.name}</a></td>
-      ${cols.map(col => {
-        if(col.k === 'role') return `<td style="padding:10px 16px"><span style="font-size:10px;padding:2px 8px;border-radius:3px;background:${roleColor}20;color:${roleColor};font-weight:600">${p.role}</span></td>`;
-        return `<td class="${col.hi?'hi':''}" style="padding:10px 16px;text-align:right">${p[col.k]??'—'}</td>`;
-      }).join('')}
-    </tr>`;
-  }).join('');
+  const bowlRows = topBowlers.map((p, i) => `<tr>
+    <td style="padding:10px 18px"><span class="rank ${i<3?'top3':''}">${i+1}</span>
+      <a href="player.html?name=${encodeURIComponent(p.name)}" class="pname" style="text-decoration:none;color:var(--text);font-weight:500">${p.name}</a></td>
+    <td style="padding:10px 18px;text-align:right">${p.matches}</td>
+    <td style="padding:10px 18px;text-align:right">${p.wickets}</td>
+    <td style="padding:10px 18px;text-align:right">${p.avg||'—'}</td>
+    <td style="padding:10px 18px;text-align:right">${p.economy}</td>
+    <td style="padding:10px 18px;text-align:right">${p.overs}</td>
+    <td style="padding:10px 18px;text-align:right;color:var(--blue);font-weight:600">${p.bowl_index}</td>
+  </tr>`).join('');
 
   document.getElementById(target).innerHTML = `
-    <div style="background:var(--gold-bg);border:1px solid #E8C96A;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:var(--gold)">
-      🏅 <strong>MVP Score</strong> = Batting Performance Index (avg×SR) + Bowling Impact Index (wickets/match ÷ economy), each normalised to 60 points. Higher = more valuable player.
+    <div style="background:var(--gold-bg);border:1px solid #E8C96A;border-radius:8px;padding:12px 16px;margin-bottom:20px;font-size:12px;color:var(--gold)">
+      🏅 <strong>Performance Index (PI)</strong> = Avg × (SR ÷ 100). Rewards batters who score quickly AND consistently. &nbsp;|&nbsp;
+      🎳 <strong>Bowling Index (BI)</strong> = (Wickets ÷ Matches) × (6 ÷ Economy). Rewards wicket-takers who are economical.
     </div>
-    <div class="tbl-wrap animate">
-      <div class="tbl-toolbar">
-        <input class="search-input" placeholder="Filter players..." oninput="filterRows(this,'mvp-body')">
-        <span class="tbl-count">${sorted.length} players</span>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+      <div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:2px;color:var(--blue);margin-bottom:12px">🏏 Batting MVP</div>
+        <div class="tbl-wrap animate">
+          <table>
+            <thead><tr>
+              <th style="padding:10px 18px;text-align:left">Player</th>
+              <th style="padding:10px 18px">Mat</th><th style="padding:10px 18px">Runs</th>
+              <th style="padding:10px 18px">Avg</th><th style="padding:10px 18px">SR</th>
+              <th style="padding:10px 18px">50s</th><th style="padding:10px 18px">100s</th>
+              <th style="padding:10px 18px">PI ↑</th>
+            </tr></thead>
+            <tbody>${batRows}</tbody>
+          </table>
+        </div>
       </div>
-      <table>
-        <thead><tr><th style="padding:10px 16px">Player</th>${thCols}</tr></thead>
-        <tbody id="mvp-body">${rows}</tbody>
-      </table>
+      <div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:2px;color:var(--blue);margin-bottom:12px">🎳 Bowling MVP</div>
+        <div class="tbl-wrap animate">
+          <table>
+            <thead><tr>
+              <th style="padding:10px 18px;text-align:left">Player</th>
+              <th style="padding:10px 18px">Mat</th><th style="padding:10px 18px">Wkts</th>
+              <th style="padding:10px 18px">Avg</th><th style="padding:10px 18px">Econ</th>
+              <th style="padding:10px 18px">Overs</th>
+              <th style="padding:10px 18px">BI ↑</th>
+            </tr></thead>
+            <tbody>${bowlRows}</tbody>
+          </table>
+        </div>
+      </div>
     </div>`;
 }
+
 
 function showStatTab(tab, btn) {
   currentStatTab = tab;

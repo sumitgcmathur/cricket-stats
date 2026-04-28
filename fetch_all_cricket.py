@@ -130,6 +130,10 @@ def build_scorecard(match_id, rows, match_winner="", match_win_margin=""):
             b["balls"] += 1
             if runs_bat == 4: b["fours"] += 1
             if runs_bat == 6: b["sixes"] += 1
+            # Ball-by-ball for chart
+            if batter not in d["batter_balls"]:
+                d["batter_balls"][batter] = []
+            d["batter_balls"][batter].append(runs_bat)
 
         # Bowler stats
         if bowler:
@@ -138,6 +142,35 @@ def build_scorecard(match_id, rows, match_winner="", match_win_margin=""):
             if not wides and not noballs:
                 bl["balls"] += 1
             over_runs[inn][str(over_num)] += runs_bat + wides + noballs
+            # Ball-by-ball for bowler chart
+            if bowler not in d["bowler_balls"]:
+                d["bowler_balls"][bowler] = []
+            is_wkt = 1 if (wicket_t and wicket_t not in ("run out","retired hurt","obstructing the field")) else 0
+            d["bowler_balls"][bowler].append({"r":runs_bat,"w":is_wkt,"wide":1 if wides else 0,"nb":1 if noballs else 0})
+            # Per-season bowling tracking
+            if season:
+                if season not in bowlers[bowler]["by_season"]:
+                    bowlers[bowler]["by_season"][season] = {"runs":0,"balls":0,"wickets":0,"matches":set()}
+                bs = bowlers[bowler]["by_season"][season]
+                bs["runs"] += runs_bat + wides + noballs
+                if not wides and not noballs:
+                    bs["balls"] += 1
+                bs["matches"].add(match_id)
+            # Phase tracking for bowler
+            try:
+                over_n = int(str(over_num))
+            except: over_n = 0
+            phase = "powerplay" if over_n < 6 else "death" if over_n >= 15 else "middle"
+            if "phase_stats" not in bowlers[bowler]:
+                bowlers[bowler]["phase_stats"] = {
+                    "powerplay":{"r":0,"b":0,"w":0},
+                    "middle":{"r":0,"b":0,"w":0},
+                    "death":{"r":0,"b":0,"w":0}
+                }
+            ps = bowlers[bowler]["phase_stats"][phase]
+            ps["r"] += runs_bat + wides + noballs
+            if not wides and not noballs:
+                ps["b"] += 1
             # Ball-by-ball for bowler chart
             if bowler not in d["bowler_balls"]:
                 d["bowler_balls"][bowler] = []
@@ -297,7 +330,7 @@ def parse_zip(zip_bytes, comp):
     code    = comp["code"]
 
     batters  = defaultdict(lambda: {"runs":0,"balls":0,"fours":0,"sixes":0,"fifties":0,"hundreds":0,"matches":set(),"dismissals":0,"by_season":{}})
-    bowlers  = defaultdict(lambda: {"runs":0,"balls":0,"wickets":0,"matches":set()})
+    bowlers  = defaultdict(lambda: {"runs":0,"balls":0,"wickets":0,"matches":set(),"by_season":{}})
     teams    = defaultdict(lambda: {"wins":0,"matches":set(),"by_season":{}})
     team_won_matches = defaultdict(set)  # track per-match wins separately
     team_season_matches = defaultdict(lambda: defaultdict(set))  # team->season->match_ids
@@ -328,22 +361,26 @@ def parse_zip(zip_bytes, comp):
                 if season:
                     seasons.add(season)
 
-                # Read winner and margin from info file
+                # Read winner, margin and player styles from info file
                 match_winner_from_info = ""
                 match_margin_from_info = ""
+                match_bowling_styles = {}   # player -> pace/spin
+                match_batting_hands = {}    # player -> left/right
                 info_key = fname.replace(".csv","").split("/")[-1]
                 if info_key in info_files:
                     try:
                         with zf.open(info_files[info_key]) as inf:
                             for line in io.TextIOWrapper(inf, encoding="utf-8"):
-                                parts = line.strip().split(",")
+                                parts = [p.strip() for p in line.strip().split(",")]
                                 if len(parts) >= 3 and parts[0] == "info":
                                     if parts[1] == "winner":
                                         match_winner_from_info = ",".join(parts[2:]).strip()
-                                    elif parts[1] == "outcome" and "won by" in ",".join(parts[2:]).lower():
-                                        match_margin_from_info = ",".join(parts[2:]).strip()
                                     elif parts[1] == "by":
                                         match_margin_from_info = ",".join(parts[2:]).strip()
+                                    elif parts[1] == "bowl_out":
+                                        pass
+                                    elif len(parts) >= 4 and parts[1] == "registry":
+                                        pass
                     except:
                         pass
 
@@ -384,6 +421,15 @@ def parse_zip(zip_bytes, comp):
                         if runs_bat == 4: b["fours"] += 1
                         if runs_bat == 6: b["sixes"] += 1
                         inn_runs[innings][batter] += runs_bat
+                        # Phase tracking
+                        try:
+                            over_n = int(str(over_num))
+                        except: over_n = 0
+                        phase = "powerplay" if over_n < 6 else "death" if over_n >= 15 else "middle"
+                        if "phase_stats" not in b:
+                            b["phase_stats"] = {"powerplay":{"r":0,"b":0},"middle":{"r":0,"b":0},"death":{"r":0,"b":0}}
+                        b["phase_stats"][phase]["r"] += runs_bat
+                        b["phase_stats"][phase]["b"] += 1
                         # Per-season tracking
                         if season:
                             if season not in b["by_season"]:
@@ -401,6 +447,12 @@ def parse_zip(zip_bytes, comp):
                         batters[player_out]["dismissals"] += 1
                         if season and season in batters[player_out]["by_season"]:
                             batters[player_out]["by_season"][season]["dismissals"] += 1
+                        # Track wickets per season and phase for bowling filter
+                        if bowler and wicket_t not in ("run out","retired hurt","obstructing the field"):
+                            if season and season in bowlers[bowler]["by_season"]:
+                                bowlers[bowler]["by_season"][season]["wickets"] =                                     bowlers[bowler]["by_season"][season].get("wickets",0) + 1
+                            if "phase_stats" in bowlers[bowler]:
+                                bowlers[bowler]["phase_stats"][phase]["w"] += 1
 
                     if bowler:
                         bl = bowlers[bowler]
@@ -471,10 +523,17 @@ def build_output(batters, bowlers, teams, seasons, total_matches, comp, team_sea
             }
         # Performance index: avg * (SR/100) - rewards both consistency and aggression
         perf_index = round(avg * (sr/100), 1) if sr > 0 else 0
+        # Phase stats for batter
+        raw_ps = s.get("phase_stats", {})
+        phase_stats = {}
+        for ph, ps in raw_ps.items():
+            sr_ph = round(ps["r"]/ps["b"]*100, 1) if ps["b"] else 0
+            phase_stats[ph] = {"runs":ps["r"],"balls":ps["b"],"sr":sr_ph}
         batting_list.append({"name":name,"matches":m,"runs":s["runs"],"balls":s["balls"],
             "avg":avg,"sr":sr,"fours":s["fours"],"sixes":s["sixes"],
             "fifties":s["fifties"],"hundreds":s["hundreds"],
             "perf_index":perf_index,
+            "phase_stats":phase_stats,
             "by_season":by_season})
     batting_list.sort(key=lambda x: x["runs"], reverse=True)
 
@@ -487,8 +546,29 @@ def build_output(batters, bowlers, teams, seasons, total_matches, comp, team_sea
         avg     = round(s["runs"]/s["wickets"], 2) if s["wickets"] else None
         # Bowling index: wickets per match / economy - rewards wicket taking economy
         bowl_index = round((s["wickets"]/m) * (6/economy), 2) if economy > 0 and m > 0 else 0
+        # Build by_season for bowling
+        bowl_by_season = {}
+        for ssn, ss in s.get("by_season",{}).items():
+            sm = len(ss["matches"]) if isinstance(ss["matches"], set) else ss.get("matches",0)
+            if sm < 1: continue
+            sw = ss.get("wickets",0)
+            sb = ss.get("balls",0)
+            sr = ss.get("runs",0)
+            secon = round(sr/sb*6, 2) if sb else 0
+            savg = round(sr/sw, 2) if sw else None
+            sbi = round((sw/sm)*(6/secon), 2) if secon > 0 and sm > 0 else 0
+            bowl_by_season[ssn] = {"matches":sm,"wickets":sw,"runs":sr,"balls":sb,
+                                   "economy":secon,"avg":savg,"bowl_index":sbi}
+        # Phase stats for bowler
+        raw_bps = s.get("phase_stats",{})
+        bowl_phase_stats = {}
+        for ph, ps in raw_bps.items():
+            econ_ph = round(ps["r"]/ps["b"]*6,2) if ps["b"] else 0
+            bowl_phase_stats[ph] = {"runs":ps["r"],"balls":ps["b"],"wickets":ps["w"],"economy":econ_ph}
         bowling_list.append({"name":name,"matches":m,"wickets":s["wickets"],"runs":s["runs"],
-            "overs":overs,"economy":economy,"avg":avg,"bowl_index":bowl_index})
+            "overs":overs,"economy":economy,"avg":avg,"bowl_index":bowl_index,
+            "phase_stats":bowl_phase_stats,
+            "by_season":bowl_by_season})
     bowling_list.sort(key=lambda x: x["wickets"], reverse=True)
 
     sixes_list = sorted(
