@@ -77,6 +77,8 @@ def build_scorecard(match_id, rows, match_winner="", match_win_margin="", match_
     innings_data = defaultdict(lambda: {
         "batting_team": "",
         "bowling_team": "",
+        "batter_balls": {},
+        "bowler_balls": {},
         "batters": defaultdict(lambda: {
             "runs": 0, "balls": 0, "fours": 0, "sixes": 0,
             "dismissal": "", "bowler": "", "order": 999
@@ -150,35 +152,12 @@ def build_scorecard(match_id, rows, match_winner="", match_win_margin="", match_
                 d["bowler_balls"][bowler] = []
             is_wkt = 1 if (wicket_t and wicket_t not in ("run out","retired hurt","obstructing the field")) else 0
             d["bowler_balls"][bowler].append({"r":runs_bat,"w":is_wkt,"wide":1 if wides else 0,"nb":1 if noballs else 0})
-            # Per-season bowling tracking
-            if season:
-                if season not in bowlers[bowler]["by_season"]:
-                    bowlers[bowler]["by_season"][season] = {"runs":0,"balls":0,"wickets":0,"matches":set()}
-                bs = bowlers[bowler]["by_season"][season]
-                bs["runs"] += runs_bat + wides + noballs
-                if not wides and not noballs:
-                    bs["balls"] += 1
-                bs["matches"].add(match_id)
-            # Phase tracking for bowler
-            try:
-                over_n = int(str(over_num))
-            except: over_n = 0
-            phase = "powerplay" if over_n < 6 else "death" if over_n >= 15 else "middle"
-            if "phase_stats" not in bowlers[bowler]:
-                bowlers[bowler]["phase_stats"] = {
-                    "powerplay":{"r":0,"b":0,"w":0},
-                    "middle":{"r":0,"b":0,"w":0},
-                    "death":{"r":0,"b":0,"w":0}
-                }
-            ps = bowlers[bowler]["phase_stats"][phase]
-            ps["r"] += runs_bat + wides + noballs
-            if not wides and not noballs:
-                ps["b"] += 1
+
             # Ball-by-ball for bowler chart
             if bowler not in d["bowler_balls"]:
                 d["bowler_balls"][bowler] = []
             d["bowler_balls"][bowler].append({
-                "r": runs_bat + (extras if not wides and not noballs else 0),
+                "r": runs_bat + (byes + legbyes if not wides and not noballs else 0),
                 "w": 1 if (wicket_t and wicket_t not in ("run out","retired hurt","obstructing the field")) else 0,
                 "wide": 1 if wides else 0,
                 "nb": 1 if noballs else 0
