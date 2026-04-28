@@ -51,7 +51,7 @@ def download_zip(code):
 
 
 # ── SCORECARD BUILDER ────────────────────────────────────────────────────────
-def build_scorecard(match_id, rows, match_winner="", match_win_margin=""):
+def build_scorecard(match_id, rows, match_winner="", match_win_margin="", match_outcome="", match_number="", match_stage=""):
     """Build a full match scorecard from ball-by-ball rows."""
     if not rows:
         return None
@@ -70,6 +70,9 @@ def build_scorecard(match_id, rows, match_winner="", match_win_margin=""):
 
     winner     = match_winner
     win_margin = match_win_margin
+    outcome    = match_outcome   # no result, tie, super over etc
+    match_num  = match_number
+    stage      = match_stage     # qualifier, eliminator, final etc
 
     innings_data = defaultdict(lambda: {
         "batting_team": "",
@@ -285,15 +288,18 @@ def build_scorecard(match_id, rows, match_winner="", match_win_margin=""):
     scores = [f"{i['total_runs']}/{i['total_wickets']} ({i['overs']} ov)" for i in innings_list]
 
     return {
-        "match_id":   match_id,
-        "season":     season,
-        "date":       date,
-        "venue":      venue,
-        "teams":      teams[:2] if len(teams) >= 2 else teams,
-        "scores":     scores[:2] if len(scores) >= 2 else scores,
-        "winner":     winner,
-        "win_margin": win_margin,
-        "innings":    innings_list,
+        "match_id":    match_id,
+        "season":      season,
+        "date":        date,
+        "venue":       venue,
+        "teams":       teams[:2] if len(teams) >= 2 else teams,
+        "scores":      scores[:2] if len(scores) >= 2 else scores,
+        "winner":      winner,
+        "win_margin":  win_margin,
+        "outcome":     outcome,
+        "match_number": match_num,
+        "stage":       stage,
+        "innings":     innings_list,
     }
 
 
@@ -364,8 +370,12 @@ def parse_zip(zip_bytes, comp):
                 # Read winner, margin and player styles from info file
                 match_winner_from_info = ""
                 match_margin_from_info = ""
-                match_bowling_styles = {}   # player -> pace/spin
-                match_batting_hands = {}    # player -> left/right
+                match_outcome_from_info = ""
+                match_number_from_info = ""
+                match_stage_from_info = ""
+                match_event_from_info = ""
+                match_bowling_styles = {}
+                match_batting_hands = {}
                 info_key = fname.replace(".csv","").split("/")[-1]
                 if info_key in info_files:
                     try:
@@ -377,9 +387,18 @@ def parse_zip(zip_bytes, comp):
                                         match_winner_from_info = ",".join(parts[2:]).strip()
                                     elif parts[1] == "by":
                                         match_margin_from_info = ",".join(parts[2:]).strip()
-                                    elif parts[1] == "bowl_out":
-                                        pass
-                                    elif len(parts) >= 4 and parts[1] == "registry":
+                                    elif parts[1] == "outcome":
+                                        outcome_val = ",".join(parts[2:]).strip()
+                                        if not match_winner_from_info:
+                                            match_outcome_from_info = outcome_val
+                                    elif parts[1] == "event" and len(parts) >= 4:
+                                        if parts[2] == "match_number":
+                                            match_number_from_info = parts[3].strip()
+                                        elif parts[2] == "stage":
+                                            match_stage_from_info = parts[3].strip()
+                                        elif parts[2] == "name":
+                                            match_event_from_info = ",".join(parts[3:]).strip()
+                                    elif parts[1] == "supersub" or parts[1] == "super_series":
                                         pass
                     except:
                         pass
@@ -474,20 +493,23 @@ def parse_zip(zip_bytes, comp):
                                 batters[batter]["by_season"][season]["fifties"] += 1
 
                 # Build and save scorecard
-                sc = build_scorecard(match_id, rows, match_winner_from_info, match_margin_from_info)
+                sc = build_scorecard(match_id, rows, match_winner_from_info, match_margin_from_info, match_outcome_from_info, match_number_from_info, match_stage_from_info)
                 if sc:
                     sc_path = os.path.join(matches_dir, f"{match_id}.json")
                     with open(sc_path, "w", encoding="utf-8") as sf:
                         json.dump(sc, sf, ensure_ascii=False, separators=(",",":"))
                     # Add to match index (lightweight)
                     match_index.append({
-                        "id":     match_id,
-                        "season": sc["season"],
-                        "date":   sc["date"],
-                        "teams":  sc["teams"],
-                        "scores": sc["scores"],
-                        "winner": sc["winner"],
-                        "venue":  sc["venue"],
+                        "id":      match_id,
+                        "season":  sc["season"],
+                        "date":    sc["date"],
+                        "teams":   sc["teams"],
+                        "scores":  sc["scores"],
+                        "winner":  sc["winner"],
+                        "outcome": sc["outcome"],
+                        "match_number": sc["match_number"],
+                        "stage":   sc["stage"],
+                        "venue":   sc["venue"],
                     })
 
     # Save match index
@@ -516,6 +538,7 @@ def build_output(batters, bowlers, teams, seasons, total_matches, comp, team_sea
             sd = ss.get("dismissals",0)
             by_season[ssn] = {
                 "matches": sm, "runs": ss["runs"], "balls": ss["balls"],
+                "dismissals": sd,
                 "avg": round(ss["runs"]/sd,2) if sd else ss["runs"],
                 "sr":  round(ss["runs"]/ss["balls"]*100,2) if ss["balls"] else 0,
                 "fours": ss["fours"], "sixes": ss["sixes"],

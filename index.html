@@ -1059,8 +1059,15 @@ function renderMVP(d, target) {
   const bowlers = (data.bowling || []).filter(p => p.matches >= 5 && p.bowl_index > 0);
 
   // Batting MVP: ranked by perf_index (avg × SR/100)
+  // Recompute perf_index from current (possibly filtered) avg and sr
+  batters.forEach(p => { p.perf_index = p.sr > 0 ? +(p.avg * (p.sr/100)).toFixed(1) : 0; });
   const topBatters = [...batters].sort((a,b) => b.perf_index - a.perf_index).slice(0, 20);
   // Bowling MVP: ranked by bowl_index (wickets/match ÷ economy)
+  // Recompute bowl_index from filtered data
+  bowlers.forEach(p => {
+    p.bowl_index = p.economy > 0 && p.matches > 0
+      ? +((p.wickets / p.matches) * (6 / p.economy)).toFixed(2) : 0;
+  });
   const topBowlers = [...bowlers].sort((a,b) => b.bowl_index - a.bowl_index).slice(0, 20);
 
   const batRows = topBatters.map((p, i) => `<tr>

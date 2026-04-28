@@ -128,6 +128,7 @@ footer a{color:var(--blue);text-decoration:none;}
     <button class="ptab active" onclick="showTab('batting',this)">Batting</button>
     <button class="ptab" onclick="showTab('bowling',this)">Bowling</button>
     <button class="ptab" onclick="showTab('overview',this)">By Competition</button>
+    <button class="ptab" onclick="showTab('matchups',this)">⚔️ Matchups</button>
   </div>
 </div>
 
@@ -140,6 +141,9 @@ footer a{color:var(--blue);text-decoration:none;}
   </div>
   <div id="tab-overview" class="tab-panel">
     <div id="overview-content"><div class="no-data">Loading...</div></div>
+  </div>
+  <div id="tab-matchups" class="tab-panel">
+    <div id="matchups-content"><div class="no-data">Loading...</div></div>
   </div>
 </div>
 
@@ -309,12 +313,12 @@ function showTab(name,btn){
   document.getElementById('tab-'+name).classList.add('active');
   if(!playerName) return;
   killCharts();
-  // Small delay so DOM is visible before drawing charts
   setTimeout(()=>{
     try {
       if(name==='batting') renderBatting();
       else if(name==='bowling') renderBowling();
       else if(name==='overview') renderOverview();
+      else if(name==='matchups') renderMatchups();
     } catch(e) { console.error('Tab render error:', e); }
   }, 50);
 }
@@ -514,6 +518,116 @@ function renderOverview(){
       },options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:'top',labels:{font:{size:10},boxWidth:10}},tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${c.raw}%`}}},scales:{x:{grid:{display:false},ticks:{font:{size:11}}},y:{grid:{color:'#E2E6EA'},ticks:{font:{size:11},callback:v=>v+'%'}}}}}));
     }
   },100);
+}
+
+function renderMatchups(){
+  const ipl = allData['ipl'];
+  if(!ipl){ document.getElementById('matchups-content').innerHTML='<div class="no-data">IPL data not loaded</div>'; return; }
+
+  const batPlayer = ipl.batting?.find(p=>p.name===playerName);
+  const bowlPlayer = ipl.bowling?.find(p=>p.name===playerName);
+
+  let html = '';
+
+  // BATTER matchups: phase breakdown
+  if(batPlayer?.phase_stats && Object.keys(batPlayer.phase_stats).length){
+    const ps = batPlayer.phase_stats;
+    const phases = [
+      {key:'powerplay', label:'Powerplay (Ov 1-6)', color:'#2E5A8F'},
+      {key:'middle',    label:'Middle (Ov 7-15)',   color:'#DAA520'},
+      {key:'death',     label:'Death (Ov 16-20)',   color:'#C0392B'},
+    ];
+    html += `
+      <div class="section-title" style="margin-top:0">🏏 Batting by Innings Phase</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:28px">
+        ${phases.map(ph=>{
+          const s=ps[ph.key]||{runs:0,balls:0,sr:0};
+          return `<div class="stat-card" style="border-top:3px solid ${ph.color}">
+            <div class="sc-label">${ph.label}</div>
+            <div class="sc-val" style="color:${ph.color}">${s.runs}</div>
+            <div class="sc-sub">${s.balls} balls · SR ${s.sr||'—'}</div>
+          </div>`;
+        }).join('')}
+      </div>
+      <div class="chart-card" style="margin-bottom:28px">
+        <h3>Strike Rate by Phase</h3>
+        <div class="chart-wrap-sm"><canvas id="mu-bat-phase"></canvas></div>
+      </div>`;
+  }
+
+  // BOWLER matchups: phase breakdown
+  if(bowlPlayer?.phase_stats && Object.keys(bowlPlayer.phase_stats).length){
+    const ps = bowlPlayer.phase_stats;
+    const phases = [
+      {key:'powerplay', label:'Powerplay (Ov 1-6)', color:'#2E5A8F'},
+      {key:'middle',    label:'Middle (Ov 7-15)',   color:'#DAA520'},
+      {key:'death',     label:'Death (Ov 16-20)',   color:'#C0392B'},
+    ];
+    html += `
+      <div class="section-title">🎳 Bowling by Innings Phase</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:28px">
+        ${phases.map(ph=>{
+          const s=ps[ph.key]||{runs:0,balls:0,wickets:0,economy:0};
+          const ov=(Math.floor(s.balls/6)+(s.balls%6)/10).toFixed(1);
+          return `<div class="stat-card" style="border-top:3px solid ${ph.color}">
+            <div class="sc-label">${ph.label}</div>
+            <div class="sc-val" style="color:${ph.color}">${s.wickets}W</div>
+            <div class="sc-sub">${ov} ov · Econ ${s.economy||'—'} · ${s.runs}R</div>
+          </div>`;
+        }).join('')}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:28px">
+        <div class="chart-card">
+          <h3>Economy by Phase</h3>
+          <div class="chart-wrap-sm"><canvas id="mu-bowl-econ"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>Wickets by Phase</h3>
+          <div class="chart-wrap-sm"><canvas id="mu-bowl-wkts"></canvas></div>
+        </div>
+      </div>`;
+  }
+
+  if(!html) html='<div class="no-data">No matchup data available for this player.<br><small>Re-run fetch_all_cricket.py to generate phase data.</small></div>';
+
+  document.getElementById('matchups-content').innerHTML=html;
+  setTimeout(()=>drawMatchupCharts(batPlayer,bowlPlayer),100);
+}
+
+function drawMatchupCharts(bat, bowl){
+  const phases=['Powerplay','Middle','Death'];
+  const phKeys=['powerplay','middle','death'];
+  const colors=['#2E5A8F','#DAA520','#C0392B'];
+
+  if(bat?.phase_stats){
+    const ctx=document.getElementById('mu-bat-phase')?.getContext('2d');
+    if(ctx){
+      charts.push(new Chart(ctx,{type:'bar',data:{
+        labels:phases,
+        datasets:[{label:'Strike Rate',data:phKeys.map(k=>bat.phase_stats[k]?.sr||0),backgroundColor:colors,borderRadius:6}]
+      },options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+        scales:{x:{grid:{display:false},ticks:{font:{size:11}}},y:{grid:{color:'#E2E6EA'},ticks:{font:{size:11}},title:{display:true,text:'SR',font:{size:10}}}}}}));
+    }
+  }
+
+  if(bowl?.phase_stats){
+    const econCtx=document.getElementById('mu-bowl-econ')?.getContext('2d');
+    if(econCtx){
+      charts.push(new Chart(econCtx,{type:'bar',data:{
+        labels:phases,
+        datasets:[{label:'Economy',data:phKeys.map(k=>bowl.phase_stats[k]?.economy||0),backgroundColor:colors,borderRadius:6}]
+      },options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+        scales:{x:{grid:{display:false},ticks:{font:{size:11}}},y:{grid:{color:'#E2E6EA'},ticks:{font:{size:11}}}}}}));
+    }
+    const wktsCtx=document.getElementById('mu-bowl-wkts')?.getContext('2d');
+    if(wktsCtx){
+      charts.push(new Chart(wktsCtx,{type:'bar',data:{
+        labels:phases,
+        datasets:[{label:'Wickets',data:phKeys.map(k=>bowl.phase_stats[k]?.wickets||0),backgroundColor:colors,borderRadius:6}]
+      },options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+        scales:{x:{grid:{display:false},ticks:{font:{size:11}}},y:{grid:{color:'#E2E6EA'},ticks:{font:{size:11}}}}}}));
+    }
+  }
 }
 
 function killCharts(){charts.forEach(c=>{try{c.destroy();}catch(e){}});charts=[];}
