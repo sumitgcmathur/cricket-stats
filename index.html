@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>IPL & Cricket Stats</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Bebas+Neue&display=swap" rel="stylesheet">
@@ -965,11 +966,12 @@ function filterBySeason(data) {
   const filteredSixes = data.sixes
     .map(p => {
       if (!p.by_season) return null;
-      const total = Object.entries(p.by_season)
-        .filter(([s]) => seasonMatches(s))
-        .reduce((sum, [, v]) => sum + (v || 0), 0);
-      if (!total) return null;
-      return { ...p, sixes: total };
+      const matching = Object.entries(p.by_season).filter(([s]) => seasonMatches(s));
+      if (!matching.length) return null;
+      const totalSixes   = matching.reduce((sum,[,v]) => sum + (v?.sixes || v || 0), 0);
+      const totalMatches = matching.reduce((sum,[,v]) => sum + (v?.matches || 0), 0);
+      if (!totalSixes) return null;
+      return { ...p, sixes: totalSixes, matches: totalMatches || p.matches };
     })
     .filter(Boolean)
     .sort((a,b) => b.sixes - a.sixes);
@@ -994,13 +996,17 @@ function filterBySeason(data) {
       const matchingSeasons = Object.entries(p.by_season).filter(([s]) => seasonMatches(s));
       if (!matchingSeasons.length) return null;
       const agg = matchingSeasons.reduce((acc, [, s]) => {
-        acc.matches += s.matches || 0;
+        // matches might be number or serialized set (empty object {}) - handle both
+        const sm = typeof s.matches === 'number' ? s.matches : 0;
+        acc.matches += sm;
         acc.wickets += s.wickets || 0;
         acc.runs    += s.runs    || 0;
         acc.balls   += s.balls   || 0;
         return acc;
       }, {matches:0, wickets:0, runs:0, balls:0});
       if (!agg.balls) return null;
+      // If matches is 0 (old data with set), estimate from overs
+      if (!agg.matches) agg.matches = Math.ceil(agg.balls / 24); // ~4 overs per match
       const economy = +(agg.runs / agg.balls * 6).toFixed(2);
       const avg = agg.wickets ? +(agg.runs / agg.wickets).toFixed(2) : null;
       const overs = Math.floor(agg.balls/6) + (agg.balls%6)/10;
@@ -1235,7 +1241,7 @@ function showIntPicker() {
 }
 
 // ── RENDER TABLES ─────────────────────────────────────────────────────────────
-function renderBatting(d, target) {
+function renderBatting(d, target, expanded, filterQ) {
   const cols = [
     {k:'matches', l:'Mat'},
     {k:'runs',    l:'Runs', hi:true},
@@ -1250,7 +1256,7 @@ function renderBatting(d, target) {
   renderTable(target, 'bat', d.batting || [], cols, 'runs');
 }
 
-function renderBowling(d, target) {
+function renderBowling(d, target, expanded, filterQ) {
   const cols = [
     {k:'matches',  l:'Mat'},
     {k:'wickets',  l:'Wkts', hi:true},
@@ -1267,10 +1273,11 @@ function renderTable(target, type, rows, cols, defaultSort) {
   const key = currentSort[type]?.key || defaultSort;
   const dir = currentSort[type]?.dir || -1;
 
-  const sorted = [...rows].sort((a, b) => {
+  let sorted = [...rows].sort((a, b) => {
     const av = a[key] ?? -999, bv = b[key] ?? -999;
     return (av < bv ? -1 : av > bv ? 1 : 0) * dir;
   });
+  if (filterQ) sorted = sorted.filter(r => r.name.toLowerCase().includes(filterQ.toLowerCase()));
 
   const thCols = cols.map(c =>
     `<th class="${key===c.k?'sorted':''}" onclick="sortTbl('${target}','${type}','${c.k}',${key===c.k?dir*-1:-1},'${target}')">${c.l}${key===c.k?(dir===-1?'↓':'↑'):''}</th>`
@@ -1304,11 +1311,27 @@ function sortTbl(target, type, key, dir, renderTarget) {
   else if (target === 'int-content') renderIntStats(loadedData[currentIntComp]);
 }
 
-function filterRows(input, tbodyId) {
-  const q = input.value.toLowerCase();
-  document.querySelectorAll('#' + tbodyId + ' tr').forEach(row => {
-    row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
-  });
+function filterRows(input, tbodyId, type, target) {
+  const q = input.value.toLowerCase().trim();
+  if (!q) {
+    document.querySelectorAll('#' + tbodyId + ' tr').forEach(row => row.style.display = '');
+    return;
+  }
+  // If searching, show ALL matching players from full sorted data
+  if (type && target && currentSort[type]) {
+    expandTable(type, target, q);
+  } else {
+    document.querySelectorAll('#' + tbodyId + ' tr').forEach(row => {
+      row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
+    });
+  }
+}
+
+function expandTable(type, target, filterQ) {
+  const d = loadedData['ipl'];
+  if (!d) return;
+  if (type === 'batting')  renderBatting(d, target, true, filterQ);
+  else if (type === 'bowling') renderBowling(d, target, true, filterQ);
 }
 
 function renderSixes(d, target) {
@@ -1344,6 +1367,7 @@ function renderTeams(d, target) {
       <td><div class="win-bar"><div class="win-bar-bg"><div class="win-bar-fill" style="width:${(t.wins/maxWins*100).toFixed(0)}%"></div></div></div></td>
     </tr>`).join('');
 
+  const top5 = sorted.slice(0,5);
   document.getElementById(target).innerHTML = `
     <div class="card animate">
       <div class="tbl-toolbar"><span class="tbl-count">${sorted.length} teams</span></div>
@@ -1351,7 +1375,38 @@ function renderTeams(d, target) {
         <thead><tr><th>Team</th>${thCols}<th></th></tr></thead>
         <tbody>${trs}</tbody>
       </table>
+    </div>
+    <div style="margin-top:24px">
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:2px;color:var(--blue);margin-bottom:14px">⚔️ Team Win % Comparison</div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px;box-shadow:var(--shadow)">
+        <div style="position:relative;height:240px"><canvas id="chart-team-compare"></canvas></div>
+      </div>
     </div>`;
+  // Draw team comparison chart
+  setTimeout(()=>{
+    const ctx = document.getElementById('chart-team-compare')?.getContext('2d');
+    if(!ctx) return;
+    const colors = ['#1E3A5F','#E85D04','#2D9648','#7B2FBE','#D4A017','#1A7A9A','#C0392B','#4A4A8A'];
+    new Chart(ctx,{type:'bar',data:{
+      labels: sorted.map(t=>t.team.replace('Super','').replace('Kings','').replace('Indians','').replace('Royals','').replace('Warriors','').trim()),
+      datasets:[{
+        label:'Win %',
+        data: sorted.map(t=>t.win_pct),
+        backgroundColor: sorted.map((_,i)=>colors[i%colors.length]),
+        borderRadius:4,
+      }]
+    },options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{
+        legend:{display:false},
+        tooltip:{callbacks:{label:ctx=>' '+ctx.raw+'% ('+sorted[ctx.dataIndex].wins+' wins)'}}
+      },
+      scales:{
+        x:{grid:{display:false},ticks:{font:{size:10},maxRotation:45}},
+        y:{grid:{color:'#E2E6EA'},ticks:{font:{size:10},callback:v=>v+'%'},max:70,title:{display:true,text:'Win %',font:{size:10}}}
+      }
+    }});
+  },100);
 }
 
 // ── PLAYER SEARCH ─────────────────────────────────────────────────────────────
