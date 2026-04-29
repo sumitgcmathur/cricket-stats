@@ -1253,7 +1253,7 @@ function renderBatting(d, target, expanded, filterQ) {
     {k:'fifties', l:'50s'},
     {k:'hundreds',l:'100s'},
   ];
-  renderTable(target, 'bat', d.batting || [], cols, 'runs');
+  renderTable(target, 'bat', d.batting || [], cols, 'runs', filterQ);
 }
 
 function renderBowling(d, target, expanded, filterQ) {
@@ -1266,10 +1266,10 @@ function renderBowling(d, target, expanded, filterQ) {
     {k:'overs',    l:'Overs'},
     {k:'runs',     l:'Runs'},
   ];
-  renderTable(target, 'bowl', d.bowling || [], cols, 'wickets');
+  renderTable(target, 'bowl', d.bowling || [], cols, 'wickets', filterQ);
 }
 
-function renderTable(target, type, rows, cols, defaultSort) {
+function renderTable(target, type, rows, cols, defaultSort, filterQ) {
   const key = currentSort[type]?.key || defaultSort;
   const dir = currentSort[type]?.dir || -1;
 
