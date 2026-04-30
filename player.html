@@ -630,7 +630,7 @@ function renderMatchups(){
   }
 
   // Batter vs pace/spin chart
-  if(bat?.vs_type){
+  if(batPlayer?.vs_type){
     const ctx=document.getElementById('mu-vs-type')?.getContext('2d');
     if(ctx){
       const types=['pace','spin'];
@@ -638,8 +638,8 @@ function renderMatchups(){
       charts.push(new Chart(ctx,{type:'bar',data:{
         labels:['vs Pace','vs Spin'],
         datasets:[
-          {label:'Runs',data:types.map(t=>bat.vs_type[t]?.runs||0),backgroundColor:cols.map(c=>c+'99'),borderRadius:4,yAxisID:'y'},
-          {label:'Strike Rate',data:types.map(t=>bat.vs_type[t]?.sr||0),backgroundColor:cols,borderRadius:4,yAxisID:'y2',type:'line',pointRadius:6,borderWidth:2},
+          {label:'Runs',data:types.map(t=>batPlayer.vs_type[t]?.runs||0),backgroundColor:cols.map(c=>c+'99'),borderRadius:4,yAxisID:'y'},
+          {label:'Strike Rate',data:types.map(t=>batPlayer.vs_type[t]?.sr||0),backgroundColor:cols,borderRadius:4,yAxisID:'y2',type:'line',pointRadius:6,borderWidth:2},
         ]
       },options:{responsive:true,maintainAspectRatio:false,
         plugins:{legend:{display:true,position:'top',labels:{font:{size:10},boxWidth:10}}},
