@@ -555,27 +555,47 @@ function renderMatchups(){
     </div>`;
   }
 
-  // Batter vs bowler type (pace/spin) — NOTE: spin data currently unavailable due to bowling_style lookup limitation in Cricsheet CSV2 format
-  if(batPlayer?.vs_type && batPlayer.vs_type.pace?.balls > 0){
+  // Batter vs bowler type (pace/spin)
+  if(batPlayer?.vs_type && Object.keys(batPlayer.vs_type).length){
     const vt = batPlayer.vs_type;
     html += `<div class="section-title">⚔️ Batting vs Bowler Type</div>
-    <div style="background:#FFF3CD;border:1px solid #FFD166;border-radius:8px;padding:10px 14px;font-size:12px;color:#856404;margin-bottom:12px">
-      ⚠️ Spin data is currently unavailable — bowling style detection from Cricsheet needs a separate people.csv lookup. Only pace totals are shown (which equal career totals).
-    </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
       ${['pace','spin'].map(type => {
         const s = vt[type]||{runs:0,balls:0,sr:0};
         const col = type==='pace'?'#C0392B':'#7B2FBE';
-        return `<div class="stat-card" style="border-top:3px solid ${col};${type==='spin'?'opacity:0.4':''}">
-          <div class="sc-label">${type==='pace'?'🏃 vs Pace':'🌀 vs Spin (unavailable)'}</div>
-          <div class="sc-val" style="color:${col}">${s.runs||'—'}</div>
-          <div class="sc-sub">${s.balls||0} balls · SR ${s.sr||'—'}</div>
+        return `<div class="stat-card" style="border-top:3px solid ${col}">
+          <div class="sc-label">${type==='pace'?'🏃 vs Pace':'🌀 vs Spin'}</div>
+          <div class="sc-val" style="color:${col}">${s.runs}</div>
+          <div class="sc-sub">${s.balls} balls · SR ${s.sr}</div>
         </div>`;
       }).join('')}
+    </div>
+    <div class="chart-card" style="margin-bottom:28px">
+      <h3>Strike Rate vs Pace vs Spin</h3>
+      <div class="chart-wrap-sm"><canvas id="mu-vs-type"></canvas></div>
     </div>`;
   }
 
-  // vs Bowler Type — REMOVED (duplicate of above, spin data not available yet)
+  // vs Bowler Type
+  if(batPlayer?.vs_type && (batPlayer.vs_type.pace?.balls > 0 || batPlayer.vs_type.spin?.balls > 0)){
+    const vt = batPlayer.vs_type;
+    html += `<div class="section-title">⚔️ vs Bowler Type (Pace vs Spin)</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
+      <div class="stat-card" style="border-top:3px solid #1E3A5F">
+        <div class="sc-label">vs Pace</div>
+        <div class="sc-val">${vt.pace?.runs||0}</div>
+        <div class="sc-sub">${vt.pace?.balls||0} balls · SR ${vt.pace?.sr||0}</div>
+      </div>
+      <div class="stat-card" style="border-top:3px solid #7B2FBE">
+        <div class="sc-label">vs Spin</div>
+        <div class="sc-val">${vt.spin?.runs||0}</div>
+        <div class="sc-sub">${vt.spin?.balls||0} balls · SR ${vt.spin?.sr||0}</div>
+      </div>
+    </div>
+    <div class="chart-card" style="margin-bottom:24px">
+      <h3>Strike Rate vs Pace vs Spin</h3>
+      <div class="chart-wrap-sm"><canvas id="mu-bat-type"></canvas></div>
+    </div>`;
   }
 
   // Season-by-season batting trend
@@ -610,7 +630,7 @@ function renderMatchups(){
   }
 
   // Batter vs pace/spin chart
-  if(batPlayer?.vs_type){
+  if(bat?.vs_type){
     const ctx=document.getElementById('mu-vs-type')?.getContext('2d');
     if(ctx){
       const types=['pace','spin'];
@@ -618,8 +638,8 @@ function renderMatchups(){
       charts.push(new Chart(ctx,{type:'bar',data:{
         labels:['vs Pace','vs Spin'],
         datasets:[
-          {label:'Runs',data:types.map(t=>batPlayer.vs_type[t]?.runs||0),backgroundColor:cols.map(c=>c+'99'),borderRadius:4,yAxisID:'y'},
-          {label:'Strike Rate',data:types.map(t=>batPlayer.vs_type[t]?.sr||0),backgroundColor:cols,borderRadius:4,yAxisID:'y2',type:'line',pointRadius:6,borderWidth:2},
+          {label:'Runs',data:types.map(t=>bat.vs_type[t]?.runs||0),backgroundColor:cols.map(c=>c+'99'),borderRadius:4,yAxisID:'y'},
+          {label:'Strike Rate',data:types.map(t=>bat.vs_type[t]?.sr||0),backgroundColor:cols,borderRadius:4,yAxisID:'y2',type:'line',pointRadius:6,borderWidth:2},
         ]
       },options:{responsive:true,maintainAspectRatio:false,
         plugins:{legend:{display:true,position:'top',labels:{font:{size:10},boxWidth:10}}},
