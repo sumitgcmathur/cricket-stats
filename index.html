@@ -758,6 +758,10 @@ footer a { color: var(--blue); text-decoration: none; }
       <button class="pill" onclick="showStatTab('sixes', this)">Sixes</button>
       <button class="pill" onclick="showStatTab('teams', this)">Teams</button>
       <button class="pill" onclick="showStatTab('mvp', this)">🏅 MVP</button>
+      <button class="pill" onclick="showStatTab('h2h', this)">⚔️ H2H</button>
+      <button class="pill" onclick="showStatTab('venues', this)">🏟️ Venues</button>
+      <button class="pill" onclick="showStatTab('seasons', this)">🏆 Seasons</button>
+      <button class="pill" onclick="showStatTab('milestones', this)">🎯 Milestones</button>
     </div>
   </div>
 </div>
@@ -901,9 +905,18 @@ function onYearRange() {
 function updateSeasonBanner() {
   const banner = document.getElementById('season-banner');
   const bannerText = document.getElementById('banner-season');
+  const SEASON_CHAMPS = {
+    '2007/08':'🏆 Rajasthan Royals','2009':'🏆 Deccan Chargers','2009/10':'🏆 Chennai Super Kings',
+    '2011':'🏆 Chennai Super Kings','2012':'🏆 Kolkata Knight Riders','2013':'🏆 Mumbai Indians',
+    '2014':'🏆 Kolkata Knight Riders','2015':'🏆 Mumbai Indians','2016':'🏆 Sunrisers Hyderabad',
+    '2017':'🏆 Mumbai Indians','2018':'🏆 Chennai Super Kings','2019':'🏆 Mumbai Indians',
+    '2020/21':'🏆 Mumbai Indians','2021':'🏆 Chennai Super Kings','2022':'🏆 Gujarat Titans',
+    '2023':'🏆 Chennai Super Kings','2024':'🏆 Kolkata Knight Riders','2025':'🏆 Royal Challengers Bengaluru',
+  };
   if (activeSeason !== 'all') {
     banner.style.display = 'flex';
-    bannerText.textContent = activeSeason;
+    const champ = SEASON_CHAMPS[activeSeason] || '';
+    bannerText.innerHTML = activeSeason + (champ ? ` &nbsp;·&nbsp; <span style="color:#DAA520">${champ}</span>` : '');
   } else if (yearFrom || yearTo) {
     banner.style.display = 'flex';
     bannerText.textContent = (yearFrom || '2008') + ' – ' + (yearTo || '2026');
@@ -1056,6 +1069,10 @@ async function renderStatTab(rawData) {
     else if (currentStatTab === 'sixes')   renderSixes(d, 'ipl-content');
     else if (currentStatTab === 'teams')   renderTeams(d, 'ipl-content');
     else if (currentStatTab === 'mvp')     renderMVP(d, 'ipl-content');
+    else if (currentStatTab === 'h2h')     renderH2H('ipl-content');
+    else if (currentStatTab === 'venues')  renderVenues('ipl-content');
+    else if (currentStatTab === 'seasons') renderSeasons('ipl-content');
+    else if (currentStatTab === 'milestones') renderMilestones(d, 'ipl-content');
   }, 50);
 }
 
@@ -1348,9 +1365,29 @@ function renderSixes(d, target) {
 }
 
 function renderTeams(d, target) {
+  // Normalize renamed franchises into single entries
+  const TEAM_ALIASES = {
+    'Delhi Daredevils': 'Delhi Capitals',
+    'Kings XI Punjab': 'Punjab Kings',
+    'Royal Challengers Bangalore': 'Royal Challengers Bengaluru',
+    'Rising Pune Supergiant': 'Rising Pune Supergiants',
+  };
+  const mergedMap = {};
+  for (const t of (d.teams||[])) {
+    const canonical = TEAM_ALIASES[t.team] || t.team;
+    if (!mergedMap[canonical]) {
+      mergedMap[canonical] = {...t, team: canonical};
+    } else {
+      mergedMap[canonical].matches += t.matches;
+      mergedMap[canonical].wins += t.wins;
+      mergedMap[canonical].win_pct = mergedMap[canonical].matches
+        ? +(mergedMap[canonical].wins/mergedMap[canonical].matches*100).toFixed(1) : 0;
+    }
+  }
+  const mergedTeams = Object.values(mergedMap);
   const key = currentSort['teams']?.key || 'wins';
   const dir = currentSort['teams']?.dir || -1;
-  const sorted = [...(d.teams||[])].sort((a,b) => ((a[key]??-1)<(b[key]??-1)?-1:1)*dir);
+  const sorted = [...mergedTeams].sort((a,b) => ((a[key]??-1)<(b[key]??-1)?-1:1)*dir);
   const maxWins = Math.max(...(d.teams||[]).map(t => t.wins), 1);
 
   const cols = [{k:'matches',l:'Matches'},{k:'wins',l:'Wins',hi:true},{k:'win_pct',l:'Win %'}];
@@ -1457,6 +1494,496 @@ function searchPlayer(query) {
           </div>`).join('')}
       </div>
     </div>`).join('');
+}
+
+// ══════════════════════════════════════════════════════════
+// ⚔️  HEAD-TO-HEAD (Batter vs Bowler)
+// ══════════════════════════════════════════════════════════
+let h2hData = null;
+
+async function loadH2H() {
+  if (h2hData) return h2hData;
+  const res = await fetch('stats/ipl_h2h.json');
+  h2hData = await res.json();
+  return h2hData;
+}
+
+async function renderH2H(target) {
+  document.getElementById(target).innerHTML = `
+    <div class="card animate" style="padding:24px">
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px;color:var(--blue);margin-bottom:6px">⚔️ Head-to-Head: Batter vs Bowler</div>
+      <div style="color:var(--muted);font-size:13px;margin-bottom:20px">IPL all-time matchup data from 1,200+ matches. Based on dismissal-level scorecard data.</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 24px;gap:10px;align-items:end;margin-bottom:20px">
+        <div>
+          <label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">BATTER</label>
+          <input id="h2h-batter" type="text" placeholder="e.g. V Kohli" style="width:100%;padding:10px 14px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;font-family:inherit;outline:none" oninput="h2hAutocomplete('batter',this.value)" onfocus="h2hAutocomplete('batter',this.value)">
+          <div id="h2h-batter-suggest" style="position:absolute;background:white;border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow-md);z-index:100;max-height:200px;overflow-y:auto;width:280px;display:none"></div>
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px">BOWLER</label>
+          <input id="h2h-bowler" type="text" placeholder="e.g. JJ Bumrah" style="width:100%;padding:10px 14px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;font-family:inherit;outline:none" oninput="h2hAutocomplete('bowler',this.value)" onfocus="h2hAutocomplete('bowler',this.value)">
+          <div id="h2h-bowler-suggest" style="position:absolute;background:white;border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow-md);z-index:100;max-height:200px;overflow-y:auto;width:280px;display:none"></div>
+        </div>
+        <button onclick="runH2H()" style="padding:10px 20px;background:var(--blue);color:white;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;font-size:14px">Go</button>
+      </div>
+      <div id="h2h-result"></div>
+
+      <div style="margin-top:32px;border-top:1px solid var(--border);padding-top:24px">
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:2px;color:var(--blue);margin-bottom:12px">🎳 Most Feared Bowlers — who dismissed most IPL batters</div>
+        <div id="h2h-top-bowlers" style="color:var(--muted)">Loading…</div>
+      </div>
+      <div style="margin-top:24px">
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:2px;color:var(--blue);margin-bottom:12px">🏏 Most Dismissed Batters — fell most times in IPL</div>
+        <div id="h2h-top-batters" style="color:var(--muted)">Loading…</div>
+      </div>
+    </div>`;
+
+  const data = await loadH2H();
+
+  // Top bowlers by total dismissals
+  const bowlerTotals = {};
+  for (const [batter, bowlers] of Object.entries(data)) {
+    for (const [bowler, stats] of Object.entries(bowlers)) {
+      if (!bowlerTotals[bowler]) bowlerTotals[bowler] = {dismissals:0, runs:0, balls:0};
+      bowlerTotals[bowler].dismissals += stats.dismissed || 0;
+      bowlerTotals[bowler].runs += stats.runs || 0;
+      bowlerTotals[bowler].balls += stats.balls || 0;
+    }
+  }
+  const topBowlers = Object.entries(bowlerTotals).sort((a,b)=>b[1].dismissals-a[1].dismissals).slice(0,10);
+  document.getElementById('h2h-top-bowlers').innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:10px">${
+    topBowlers.map(([name,s],i)=>`
+      <div style="background:var(--blue-light);border:1px solid #C5D9F2;border-radius:10px;padding:14px 18px;min-width:160px;cursor:pointer" onclick="document.getElementById('h2h-bowler').value='${name}';runH2H()">
+        <div style="font-size:11px;color:var(--muted);font-weight:600">#${i+1}</div>
+        <div style="font-weight:600;margin:2px 0">${name}</div>
+        <div style="color:var(--blue);font-size:22px;font-weight:700;font-family:'Bebas Neue',sans-serif">${s.dismissals} <span style="font-size:13px;font-family:inherit;font-weight:400">wkts</span></div>
+        <div style="font-size:11px;color:var(--muted)">${s.runs} runs off ${s.balls} balls</div>
+      </div>`).join('')}
+  </div>`;
+
+  // Top dismissed batters
+  const batterTotals = {};
+  for (const [batter, bowlers] of Object.entries(data)) {
+    const totalDismissals = Object.values(bowlers).reduce((s,v)=>s+(v.dismissed||0),0);
+    const totalBalls = Object.values(bowlers).reduce((s,v)=>s+(v.balls||0),0);
+    const totalRuns = Object.values(bowlers).reduce((s,v)=>s+(v.runs||0),0);
+    batterTotals[batter] = {dismissals:totalDismissals, balls:totalBalls, runs:totalRuns};
+  }
+  const topBatters = Object.entries(batterTotals).sort((a,b)=>b[1].dismissals-a[1].dismissals).slice(0,10);
+  document.getElementById('h2h-top-batters').innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:10px">${
+    topBatters.map(([name,s],i)=>`
+      <div style="background:var(--gold-bg);border:1px solid #E8C96A;border-radius:10px;padding:14px 18px;min-width:160px;cursor:pointer" onclick="document.getElementById('h2h-batter').value='${name}';runH2H()">
+        <div style="font-size:11px;color:var(--muted);font-weight:600">#${i+1}</div>
+        <div style="font-weight:600;margin:2px 0">${name}</div>
+        <div style="color:var(--gold);font-size:22px;font-weight:700;font-family:'Bebas Neue',sans-serif">${s.dismissals} <span style="font-size:13px;font-family:inherit;font-weight:400">times out</span></div>
+        <div style="font-size:11px;color:var(--muted)">${s.runs} runs, ${s.balls} balls</div>
+      </div>`).join('')}
+  </div>`;
+}
+
+function h2hAutocomplete(field, query) {
+  if (!h2hData || query.length < 2) {
+    document.getElementById(`h2h-${field}-suggest`).style.display='none';
+    return;
+  }
+  const q = query.toLowerCase();
+  let names = [];
+  if (field === 'batter') {
+    names = Object.keys(h2hData).filter(n=>n.toLowerCase().includes(q)).slice(0,8);
+  } else {
+    const bowlerSet = new Set();
+    for (const bowlers of Object.values(h2hData)) Object.keys(bowlers).forEach(b=>bowlerSet.add(b));
+    names = [...bowlerSet].filter(n=>n.toLowerCase().includes(q)).slice(0,8);
+  }
+  const el = document.getElementById(`h2h-${field}-suggest`);
+  if (!names.length) { el.style.display='none'; return; }
+  el.style.display='block';
+  el.innerHTML = names.map(n=>`<div style="padding:8px 14px;cursor:pointer;font-size:13px" onmousedown="document.getElementById('h2h-${field}').value='${n}';document.getElementById('h2h-${field}-suggest').style.display='none';runH2H()" onmouseover="this.style.background='#F0F4FF'" onmouseout="this.style.background=''">${n}</div>`).join('');
+}
+
+async function runH2H() {
+  const batter = document.getElementById('h2h-batter').value.trim();
+  const bowler = document.getElementById('h2h-bowler').value.trim();
+  const resultEl = document.getElementById('h2h-result');
+  ['h2h-batter-suggest','h2h-bowler-suggest'].forEach(id=>document.getElementById(id).style.display='none');
+
+  const data = await loadH2H();
+
+  if (batter && bowler) {
+    // Specific matchup
+    const stats = data[batter]?.[bowler];
+    if (!stats) {
+      resultEl.innerHTML = `<div style="padding:20px;background:var(--surface2);border-radius:10px;color:var(--muted)">No data found for <strong>${batter}</strong> vs <strong>${bowler}</strong>. They may not have faced each other or had fewer than 5 balls.</div>`;
+      return;
+    }
+    const sr = stats.balls ? ((stats.runs/stats.balls)*100).toFixed(1) : '—';
+    const dotPct = stats.balls ? ((1-(stats.runs>0?1:0)/stats.balls)*100).toFixed(0) : '—'; // approx
+    resultEl.innerHTML = `
+      <div style="background:linear-gradient(135deg,var(--blue) 0%,var(--blue-mid) 100%);border-radius:14px;padding:24px;color:white;margin-bottom:16px">
+        <div style="font-size:13px;opacity:0.8;margin-bottom:8px">IPL MATCHUP</div>
+        <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:1px">${batter}</div>
+          <div style="font-size:20px;opacity:0.6">vs</div>
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:1px">${bowler}</div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:20px;flex-wrap:wrap">
+          <div style="background:rgba(255,255,255,0.12);border-radius:10px;padding:16px;text-align:center">
+            <div style="font-size:32px;font-weight:700;font-family:'Bebas Neue',sans-serif">${stats.runs}</div>
+            <div style="font-size:11px;opacity:0.7;margin-top:2px">RUNS</div>
+          </div>
+          <div style="background:rgba(255,255,255,0.12);border-radius:10px;padding:16px;text-align:center">
+            <div style="font-size:32px;font-weight:700;font-family:'Bebas Neue',sans-serif">${stats.balls}</div>
+            <div style="font-size:11px;opacity:0.7;margin-top:2px">BALLS</div>
+          </div>
+          <div style="background:rgba(255,255,255,0.12);border-radius:10px;padding:16px;text-align:center">
+            <div style="font-size:32px;font-weight:700;font-family:'Bebas Neue',sans-serif">${sr}</div>
+            <div style="font-size:11px;opacity:0.7;margin-top:2px">STRIKE RATE</div>
+          </div>
+          <div style="background:rgba(255,255,255,0.12);border-radius:10px;padding:16px;text-align:center">
+            <div style="font-size:32px;font-weight:700;font-family:'Bebas Neue',sans-serif;color:${stats.dismissed>2?'#FF6B6B':stats.dismissed>0?'#FFD93D':'#6BFF9E'}">${stats.dismissed}</div>
+            <div style="font-size:11px;opacity:0.7;margin-top:2px">DISMISSED</div>
+          </div>
+        </div>
+        <div style="margin-top:14px;font-size:12px;opacity:0.65">
+          ${stats.dismissed ? `🎳 ${bowler} has dismissed ${batter} ${stats.dismissed} time${stats.dismissed>1?'s':''} in IPL` : `✅ ${bowler} has never dismissed ${batter} in IPL`}
+        </div>
+      </div>`;
+  } else if (batter) {
+    // Show all bowlers who faced this batter
+    const bowlers = data[batter];
+    if (!bowlers) { resultEl.innerHTML=`<div style="padding:16px;color:var(--muted)">No data for "${batter}"</div>`; return; }
+    const sorted = Object.entries(bowlers).sort((a,b)=>b[1].dismissed-a[1].dismissed).slice(0,15);
+    resultEl.innerHTML = `
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:2px;color:var(--blue);margin-bottom:12px">Bowlers who dismissed ${batter} most</div>
+      <div class="tbl-wrap animate"><table>
+        <thead><tr><th>#</th><th>Bowler</th><th>Dismissals</th><th>Runs conceded</th><th>Balls</th><th>SR (batter)</th></tr></thead>
+        <tbody>${sorted.map(([name,s],i)=>`<tr>
+          <td><span class="rank ${i<3?'top3':''}">${i+1}</span></td>
+          <td class="pname" style="cursor:pointer" onclick="document.getElementById('h2h-bowler').value='${name}';runH2H()">${name}</td>
+          <td style="color:var(--red);font-weight:600">${s.dismissed}</td>
+          <td>${s.runs}</td><td>${s.balls}</td>
+          <td>${s.balls?((s.runs/s.balls)*100).toFixed(1):'—'}</td>
+        </tr>`).join('')}</tbody>
+      </table></div>`;
+  } else if (bowler) {
+    // Show all batters this bowler dismissed
+    const victims = {};
+    for (const [bat,bwlrs] of Object.entries(data)) {
+      if (bwlrs[bowler]) victims[bat] = bwlrs[bowler];
+    }
+    if (!Object.keys(victims).length) { resultEl.innerHTML=`<div style="padding:16px;color:var(--muted)">No data for "${bowler}"</div>`; return; }
+    const sorted = Object.entries(victims).sort((a,b)=>b[1].dismissed-a[1].dismissed).slice(0,15);
+    resultEl.innerHTML = `
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:2px;color:var(--blue);margin-bottom:12px">Batters ${bowler} dismissed most</div>
+      <div class="tbl-wrap animate"><table>
+        <thead><tr><th>#</th><th>Batter</th><th>Dismissed</th><th>Runs scored</th><th>Balls</th><th>SR</th></tr></thead>
+        <tbody>${sorted.map(([name,s],i)=>`<tr>
+          <td><span class="rank ${i<3?'top3':''}">${i+1}</span></td>
+          <td class="pname" style="cursor:pointer" onclick="document.getElementById('h2h-batter').value='${name}';runH2H()">${name}</td>
+          <td style="color:var(--red);font-weight:600">${s.dismissed}</td>
+          <td>${s.runs}</td><td>${s.balls}</td>
+          <td>${s.balls?((s.runs/s.balls)*100).toFixed(1):'—'}</td>
+        </tr>`).join('')}</tbody>
+      </table></div>`;
+  } else {
+    resultEl.innerHTML = `<div style="padding:16px;color:var(--muted)">Enter a batter, a bowler, or both to see the matchup.</div>`;
+  }
+}
+
+// ══════════════════════════════════════════════════════════
+// 🏟️  VENUES
+// ══════════════════════════════════════════════════════════
+let venueData = null;
+
+async function loadVenues() {
+  if (venueData) return venueData;
+  const res = await fetch('stats/ipl_venues.json');
+  venueData = await res.json();
+  return venueData;
+}
+
+async function renderVenues(target) {
+  document.getElementById(target).innerHTML = `<div class="loading"><div class="spinner"></div>Loading venue data…</div>`;
+  const venues = await loadVenues();
+
+  const rows = venues.map((v,i) => {
+    const chaseAdv = v.avg_second > v.avg_first ? '✅ Chasing favoured' : '🏏 Batting first favoured';
+    const diff = Math.abs(v.avg_second - v.avg_first).toFixed(0);
+    return `<tr>
+      <td><span class="rank ${i<3?'top3':''}">${i+1}</span></td>
+      <td class="pname">${v.venue}</td>
+      <td>${v.matches}</td>
+      <td style="color:var(--blue);font-weight:600">${v.avg_first}</td>
+      <td>${v.avg_second}</td>
+      <td style="font-size:12px;color:${v.avg_second > v.avg_first?'var(--green)':'var(--red)'}">${chaseAdv} <span style="color:var(--muted)">(±${diff})</span></td>
+    </tr>`;
+  }).join('');
+
+  // Find high-scoring and low-scoring grounds
+  const highScoring = [...venues].sort((a,b)=>b.avg_first-a.avg_first).slice(0,5);
+  const lowScoring  = [...venues].sort((a,b)=>a.avg_first-b.avg_first).slice(0,5);
+
+  document.getElementById(target).innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px">
+      <div style="background:linear-gradient(135deg,#1A7A4A,#2D9648);border-radius:12px;padding:18px;color:white">
+        <div style="font-size:11px;opacity:0.8;margin-bottom:6px;letter-spacing:1px">🏆 HIGHEST-SCORING GROUNDS</div>
+        ${highScoring.map(v=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.15)">
+          <div style="font-size:13px">${v.venue.split(',')[0]}</div>
+          <div style="font-weight:700;font-family:'Bebas Neue',sans-serif;font-size:18px">${v.avg_first}</div>
+        </div>`).join('')}
+      </div>
+      <div style="background:linear-gradient(135deg,#7B2FBE,#9B4FDE);border-radius:12px;padding:18px;color:white">
+        <div style="font-size:11px;opacity:0.8;margin-bottom:6px;letter-spacing:1px">🌧️ LOWEST-SCORING GROUNDS</div>
+        ${lowScoring.map(v=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.15)">
+          <div style="font-size:13px">${v.venue.split(',')[0]}</div>
+          <div style="font-weight:700;font-family:'Bebas Neue',sans-serif;font-size:18px">${v.avg_first}</div>
+        </div>`).join('')}
+      </div>
+    </div>
+
+    <div class="card animate">
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:2px;color:var(--blue);margin-bottom:14px">🏟️ All IPL Venues — Batting & Chasing Averages</div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr>
+            <th>#</th><th>Venue</th><th>Matches</th>
+            <th>Avg 1st Inn</th><th>Avg 2nd Inn</th><th>Verdict</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>
+
+    <div style="margin-top:24px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px">
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:2px;color:var(--blue);margin-bottom:14px">📊 Avg First Innings Score by Venue (Top 10)</div>
+      <div style="position:relative;height:280px"><canvas id="chart-venues"></canvas></div>
+    </div>`;
+
+  setTimeout(()=>{
+    const ctx = document.getElementById('chart-venues')?.getContext('2d');
+    if(!ctx) return;
+    const top10 = [...venues].sort((a,b)=>b.avg_first-a.avg_first).slice(0,10);
+    new Chart(ctx,{type:'bar',data:{
+      labels:top10.map(v=>v.venue.split(',')[0].replace(' Stadium','').replace(' Ground','')),
+      datasets:[
+        {label:'Avg 1st Inn',data:top10.map(v=>v.avg_first),backgroundColor:'rgba(30,58,95,0.85)',borderRadius:5},
+        {label:'Avg 2nd Inn',data:top10.map(v=>v.avg_second),backgroundColor:'rgba(26,122,74,0.7)',borderRadius:5},
+      ]
+    },options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'top',labels:{font:{size:11}}},tooltip:{mode:'index'}},
+      scales:{
+        x:{grid:{display:false},ticks:{font:{size:10},maxRotation:40}},
+        y:{grid:{color:'#E2E6EA'},ticks:{font:{size:10}},min:120,title:{display:true,text:'Avg Runs',font:{size:10}}}
+      }
+    }});
+  },100);
+}
+
+// ══════════════════════════════════════════════════════════
+// 🏆  SEASON RECORDS
+// ══════════════════════════════════════════════════════════
+let seasonRecords = null;
+
+async function loadSeasonRecords() {
+  if (seasonRecords) return seasonRecords;
+  const res = await fetch('stats/ipl_seasons.json');
+  seasonRecords = await res.json();
+  return seasonRecords;
+}
+
+async function renderSeasons(target) {
+  document.getElementById(target).innerHTML = `<div class="loading"><div class="spinner"></div>Loading season records…</div>`;
+  const records = await loadSeasonRecords();
+
+  const TEAM_COLORS = {
+    'Rajasthan Royals':'#2D4A9E','Deccan Chargers':'#FFA500','Chennai Super Kings':'#FFCC00',
+    'Kolkata Knight Riders':'#3A1D6E','Mumbai Indians':'#006CB7','Sunrisers Hyderabad':'#FF6200',
+    'Gujarat Titans':'#1C4C8C','Royal Challengers Bengaluru':'#CC0000','Royal Challengers Bangalore':'#CC0000',
+    'Punjab Kings':'#ED1C24','Kings XI Punjab':'#ED1C24','Delhi Capitals':'#0066B2','Delhi Daredevils':'#0066B2',
+    'Lucknow Super Giants':'#00B4D8','Rising Pune Supergiant':'#6C1E7F','Pune Warriors':'#3F48CC',
+  };
+
+  // Title tally
+  const tally = {};
+  for (const s of Object.values(records)) {
+    tally[s.champion] = (tally[s.champion]||0) + 1;
+  }
+  const tallyEl = Object.entries(tally).sort((a,b)=>b[1]-a[1]).map(([team,n])=>{
+    const col = TEAM_COLORS[team]||'#1E3A5F';
+    return `<div style="background:${col};color:white;border-radius:10px;padding:12px 18px;min-width:120px;text-align:center">
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:28px">${n}</div>
+      <div style="font-size:11px;opacity:0.9">${team.replace(' Super Kings','').replace(' Indians','').replace(' Royals','').replace(' Knight Riders','')}</div>
+    </div>`;
+  }).join('');
+
+  const seasonOrder = ['2007/08','2009','2009/10','2011','2012','2013','2014','2015','2016','2017','2018','2019','2020/21','2021','2022','2023','2024','2025'];
+  const cards = seasonOrder.map(season => {
+    const r = records[season];
+    if (!r) return '';
+    const col = TEAM_COLORS[r.champion]||'#1E3A5F';
+    const yr = season.includes('/')?season:'IPL '+season;
+    return `<div style="border:2px solid ${col}20;border-radius:14px;overflow:hidden;background:var(--surface);box-shadow:var(--shadow)">
+      <div style="background:${col};padding:12px 16px;color:white;display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-size:11px;opacity:0.8">${yr}</div>
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:1px">🏆 ${r.champion}</div>
+        </div>
+      </div>
+      <div style="padding:14px 16px;display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div style="background:var(--gold-bg);border:1px solid #E8C96A;border-radius:8px;padding:10px">
+          <div style="font-size:10px;color:var(--gold);font-weight:700;letter-spacing:0.5px">🟠 ORANGE CAP</div>
+          <div style="font-weight:600;font-size:13px;margin-top:3px">${r.orange_cap}</div>
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--gold)">${r.orange_runs} runs</div>
+        </div>
+        <div style="background:var(--blue-light);border:1px solid #C5D9F2;border-radius:8px;padding:10px">
+          <div style="font-size:10px;color:var(--blue);font-weight:700;letter-spacing:0.5px">🟣 PURPLE CAP</div>
+          <div style="font-weight:600;font-size:13px;margin-top:3px">${r.purple_cap}</div>
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--blue)">${r.purple_wkts} wkts</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  document.getElementById(target).innerHTML = `
+    <div style="margin-bottom:24px">
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px;color:var(--blue);margin-bottom:12px">🏆 IPL Title Tally</div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px">${tallyEl}</div>
+    </div>
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px;color:var(--blue);margin-bottom:14px">📅 Season-by-Season Records</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px">${cards}</div>`;
+}
+
+// ══════════════════════════════════════════════════════════
+// 🎯  MILESTONES & RECORDS
+// ══════════════════════════════════════════════════════════
+function renderMilestones(d, target) {
+  const batting = d.batting || [];
+  const bowling = d.bowling || [];
+
+  // Near milestones — runs approaching 1000, 2000, ..., 9000
+  const runMilestones = [500,1000,2000,3000,4000,5000,6000,7000,8000,9000,10000];
+  const wicketMilestones = [25,50,100,150,200,250];
+
+  const nearRuns = [];
+  for (const p of batting) {
+    for (const m of runMilestones) {
+      const gap = m - p.runs;
+      if (gap > 0 && gap <= 150) nearRuns.push({name:p.name, runs:p.runs, milestone:m, gap, matches:p.matches});
+    }
+  }
+  nearRuns.sort((a,b)=>a.gap-b.gap);
+
+  const nearWickets = [];
+  for (const p of bowling) {
+    for (const m of wicketMilestones) {
+      const gap = m - p.wickets;
+      if (gap > 0 && gap <= 15) nearWickets.push({name:p.name, wickets:p.wickets, milestone:m, gap, matches:p.matches});
+    }
+  }
+  nearWickets.sort((a,b)=>a.gap-b.gap);
+
+  // All-time records cards
+  const allTimeRecords = [
+    {label:'Most IPL Runs', player: batting[0]?.name, value: batting[0]?.runs?.toLocaleString(), unit:'runs', icon:'🏏'},
+    {label:'Highest Avg (min 30 matches)', player: [...batting].filter(p=>p.matches>=30).sort((a,b)=>b.avg-a.avg)[0]?.name,
+     value: [...batting].filter(p=>p.matches>=30).sort((a,b)=>b.avg-a.avg)[0]?.avg, unit:'avg', icon:'📈'},
+    {label:'Best Strike Rate (min 30 matches)', player: [...batting].filter(p=>p.matches>=30).sort((a,b)=>b.sr-a.sr)[0]?.name,
+     value: [...batting].filter(p=>p.matches>=30).sort((a,b)=>b.sr-a.sr)[0]?.sr, unit:'SR', icon:'⚡'},
+    {label:'Most IPL Wickets', player: bowling[0]?.name, value: bowling[0]?.wickets, unit:'wkts', icon:'🎳'},
+    {label:'Best Economy (min 30 matches)', player: [...bowling].filter(p=>p.matches>=30).sort((a,b)=>a.economy-b.economy)[0]?.name,
+     value: [...bowling].filter(p=>p.matches>=30).sort((a,b)=>a.economy-b.economy)[0]?.economy, unit:'eco', icon:'🔒'},
+    {label:'Most Sixes', player: (d.sixes||[])[0]?.name, value: (d.sixes||[])[0]?.sixes, unit:'sixes', icon:'💥'},
+  ];
+
+  // Season bests
+  const seasonBests = {
+    mostRuns: {name:'', runs:0, season:''},
+    bestAvg: {name:'', avg:0, season:''},
+    mostWickets: {name:'', wickets:0, season:''},
+  };
+  for (const p of batting) {
+    for (const [season, s] of Object.entries(p.by_season||{})) {
+      if ((s.runs||0) > seasonBests.mostRuns.runs) seasonBests.mostRuns = {name:p.name, runs:s.runs, season};
+      if (s.dismissals >= 8 && (s.runs/s.dismissals) > seasonBests.bestAvg.avg)
+        seasonBests.bestAvg = {name:p.name, avg:+(s.runs/s.dismissals).toFixed(2), season};
+    }
+  }
+  for (const p of bowling) {
+    for (const [season, s] of Object.entries(p.by_season||{})) {
+      if ((s.wickets||0) > seasonBests.mostWickets.wickets) seasonBests.mostWickets = {name:p.name, wickets:s.wickets, season};
+    }
+  }
+
+  document.getElementById(target).innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;margin-bottom:28px">
+      ${allTimeRecords.map(r=>`
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;box-shadow:var(--shadow)">
+          <div style="font-size:20px;margin-bottom:6px">${r.icon}</div>
+          <div style="font-size:11px;color:var(--muted);font-weight:600;letter-spacing:0.5px;margin-bottom:4px">${r.label.toUpperCase()}</div>
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:26px;color:var(--blue)">${r.value} <span style="font-size:14px">${r.unit}</span></div>
+          <div style="font-size:13px;font-weight:500;color:var(--text)">${r.player||'—'}</div>
+        </div>`).join('')}
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:28px">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px">
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:2px;color:var(--blue);margin-bottom:12px">📊 Single-Season Batting Records</div>
+        <div style="display:grid;gap:10px">
+          <div style="background:var(--gold-bg);border:1px solid #E8C96A;border-radius:8px;padding:12px">
+            <div style="font-size:11px;color:var(--gold);font-weight:700">MOST RUNS IN A SEASON</div>
+            <div style="font-family:'Bebas Neue',sans-serif;font-size:24px;color:var(--text)">${seasonBests.mostRuns.runs} <span style="font-size:14px">runs</span></div>
+            <div style="font-size:13px;font-weight:500">${seasonBests.mostRuns.name} <span style="color:var(--muted)">(${seasonBests.mostRuns.season})</span></div>
+          </div>
+          <div style="background:var(--blue-light);border:1px solid #C5D9F2;border-radius:8px;padding:12px">
+            <div style="font-size:11px;color:var(--blue);font-weight:700">BEST SEASON AVERAGE (min 8 dismissals)</div>
+            <div style="font-family:'Bebas Neue',sans-serif;font-size:24px;color:var(--text)">${seasonBests.bestAvg.avg}</div>
+            <div style="font-size:13px;font-weight:500">${seasonBests.bestAvg.name} <span style="color:var(--muted)">(${seasonBests.bestAvg.season})</span></div>
+          </div>
+        </div>
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px">
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:2px;color:var(--blue);margin-bottom:12px">📊 Single-Season Bowling Records</div>
+        <div style="background:var(--blue-light);border:1px solid #C5D9F2;border-radius:8px;padding:12px">
+          <div style="font-size:11px;color:var(--blue);font-weight:700">MOST WICKETS IN A SEASON</div>
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:24px;color:var(--text)">${seasonBests.mostWickets.wickets} <span style="font-size:14px">wkts</span></div>
+          <div style="font-size:13px;font-weight:500">${seasonBests.mostWickets.name} <span style="color:var(--muted)">(${seasonBests.mostWickets.season})</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px">
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:2px;color:var(--gold);margin-bottom:12px">🎯 Batters Near Run Milestones (within 150 runs)</div>
+        ${nearRuns.slice(0,12).map(p=>`
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+            <div>
+              <div style="font-weight:500;font-size:13px">${p.name}</div>
+              <div style="font-size:11px;color:var(--muted)">${p.runs.toLocaleString()} runs · ${p.matches} matches</div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-size:12px;color:var(--gold);font-weight:600">→ ${p.milestone.toLocaleString()}</div>
+              <div style="font-size:11px;color:var(--muted)">needs ${p.gap} more</div>
+            </div>
+          </div>`).join('')}
+        ${nearRuns.length===0?'<div style="color:var(--muted);font-size:13px">No players within 150 runs of a milestone in this filter.</div>':''}
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px">
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:2px;color:var(--blue);margin-bottom:12px">🎯 Bowlers Near Wicket Milestones (within 15)</div>
+        ${nearWickets.slice(0,12).map(p=>`
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+            <div>
+              <div style="font-weight:500;font-size:13px">${p.name}</div>
+              <div style="font-size:11px;color:var(--muted)">${p.wickets} wkts · ${p.matches} matches</div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-size:12px;color:var(--blue);font-weight:600">→ ${p.milestone} wkts</div>
+              <div style="font-size:11px;color:var(--muted)">needs ${p.gap} more</div>
+            </div>
+          </div>`).join('')}
+        ${nearWickets.length===0?'<div style="color:var(--muted);font-size:13px">No bowlers within 15 wickets of a milestone in this filter.</div>':''}
+      </div>
+    </div>`;
 }
 
 boot();

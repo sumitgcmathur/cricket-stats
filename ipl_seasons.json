@@ -1,0 +1,128 @@
+{
+  "2007/08": {
+    "champion": "Rajasthan Royals",
+    "orange_cap": "SE Marsh",
+    "orange_runs": 616,
+    "purple_cap": "Sohail Tanvir",
+    "purple_wkts": 22
+  },
+  "2009": {
+    "champion": "Deccan Chargers",
+    "orange_cap": "ML Hayden",
+    "orange_runs": 572,
+    "purple_cap": "RP Singh",
+    "purple_wkts": 23
+  },
+  "2009/10": {
+    "champion": "Chennai Super Kings",
+    "orange_cap": "SR Tendulkar",
+    "orange_runs": 618,
+    "purple_cap": "PP Ojha",
+    "purple_wkts": 21
+  },
+  "2011": {
+    "champion": "Chennai Super Kings",
+    "orange_cap": "CH Gayle",
+    "orange_runs": 608,
+    "purple_cap": "SL Malinga",
+    "purple_wkts": 28
+  },
+  "2012": {
+    "champion": "Kolkata Knight Riders",
+    "orange_cap": "CH Gayle",
+    "orange_runs": 733,
+    "purple_cap": "MM Patel",
+    "purple_wkts": 25
+  },
+  "2013": {
+    "champion": "Mumbai Indians",
+    "orange_cap": "MEK Hussey",
+    "orange_runs": 733,
+    "purple_cap": "DJ Bravo",
+    "purple_wkts": 32
+  },
+  "2014": {
+    "champion": "Kolkata Knight Riders",
+    "orange_cap": "RG Sharma",
+    "orange_runs": 626,
+    "purple_cap": "MM Sharma",
+    "purple_wkts": 23
+  },
+  "2015": {
+    "champion": "Mumbai Indians",
+    "orange_cap": "DA Warner",
+    "orange_runs": 562,
+    "purple_cap": "DJ Bravo",
+    "purple_wkts": 26
+  },
+  "2016": {
+    "champion": "Sunrisers Hyderabad",
+    "orange_cap": "V Kohli",
+    "orange_runs": 973,
+    "purple_cap": "B Kumar",
+    "purple_wkts": 23
+  },
+  "2017": {
+    "champion": "Mumbai Indians",
+    "orange_cap": "DA Warner",
+    "orange_runs": 641,
+    "purple_cap": "B Kumar",
+    "purple_wkts": 26
+  },
+  "2018": {
+    "champion": "Chennai Super Kings",
+    "orange_cap": "KS Williamson",
+    "orange_runs": 735,
+    "purple_cap": "AJ Tye",
+    "purple_wkts": 24
+  },
+  "2019": {
+    "champion": "Mumbai Indians",
+    "orange_cap": "DA Warner",
+    "orange_runs": 692,
+    "purple_cap": "Imran Tahir",
+    "purple_wkts": 26
+  },
+  "2020/21": {
+    "champion": "Mumbai Indians",
+    "orange_cap": "KL Rahul",
+    "orange_runs": 670,
+    "purple_cap": "KC Rabada",
+    "purple_wkts": 30
+  },
+  "2021": {
+    "champion": "Chennai Super Kings",
+    "orange_cap": "RD Gaikwad",
+    "orange_runs": 635,
+    "purple_cap": "HV Patel",
+    "purple_wkts": 32
+  },
+  "2022": {
+    "champion": "Gujarat Titans",
+    "orange_cap": "JC Buttler",
+    "orange_runs": 863,
+    "purple_cap": "YS Chahal",
+    "purple_wkts": 27
+  },
+  "2023": {
+    "champion": "Chennai Super Kings",
+    "orange_cap": "SV Samson",
+    "orange_runs": 690,
+    "purple_cap": "MJ Henry",
+    "purple_wkts": 20
+  },
+  "2024": {
+    "champion": "Kolkata Knight Riders",
+    "orange_cap": "V Kohli",
+    "orange_runs": 741,
+    "purple_cap": "HV Patel",
+    "purple_wkts": 24
+  },
+  "2025": {
+    "champion": "Royal Challengers Bengaluru",
+    "orange_cap": "B Sai Sudharsan",
+    "orange_runs": 759,
+    "purple_cap": "M Prasidh Krishna",
+    "purple_wkts": 25
+  }
+}

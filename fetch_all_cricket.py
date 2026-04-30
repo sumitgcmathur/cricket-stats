@@ -355,6 +355,11 @@ def parse_zip(zip_bytes, comp):
                 match_event_from_info = ""
                 match_bowling_styles = {}
                 match_batting_hands = {}
+                # NOTE: bowling_style is read from the match info CSV.
+                # In Cricsheet CSV2 format, the info rows look like:
+                #   info,bowling_style,Player Name,Style Name
+                # If not found for a player, they default to 'pace' — causing spin to show 0.
+                # TODO: Load people.csv from Cricsheet separately for a complete style lookup.
                 info_key = fname.replace(".csv","").split("/")[-1]
                 if info_key in info_files:
                     try:
