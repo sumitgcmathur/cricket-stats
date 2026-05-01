@@ -582,7 +582,7 @@ def build_output(batters, bowlers, teams, seasons, total_matches, comp, team_sea
     bowling_list = []
     for name, s in bowlers.items():
         m = len(s["matches"])
-        if m < 1 or s["balls"] < 6: continue  # min 1 match, min 1 over bowled
+        if m < 1 or s["balls"] < 1: continue  # show anyone who bowled
         overs   = round(s["balls"]//6 + (s["balls"]%6)/10, 1)
         economy = round(s["runs"]/s["balls"]*6, 2) if s["balls"] else 0
         avg     = round(s["runs"]/s["wickets"], 2) if s["wickets"] else None

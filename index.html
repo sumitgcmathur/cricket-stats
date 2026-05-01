@@ -690,23 +690,30 @@ footer a { color: var(--blue); text-decoration: none; }
 @media (max-width: 768px) {
   .kpi-strip { grid-template-columns: repeat(2, 1fr); gap: 8px; }
   .hero-strip { padding: 20px 16px 28px; }
-  .hero h1 { font-size: 36px; }
+  .hero h1 { font-size: 32px; letter-spacing: 2px; }
   .hero-sub { font-size: 12px; }
   .main { padding: 12px; }
-  .header-inner { height: 48px; }
-  .logo { font-size: 20px; margin-right: 16px; }
-  .nav-btn { padding: 0 10px; font-size: 12px; }
-  .toolbar-inner { gap: 8px; flex-wrap: wrap; height: auto; padding: 8px 0; }
+  .header-inner { height: 48px; gap: 4px; }
+  .logo { font-size: 18px; margin-right: 8px; flex-shrink: 0; }
+  .nav { gap: 0; }
+  .nav-btn { padding: 0 8px; font-size: 11px; height: 48px; }
+  .header-meta { display: none; }
+  .toolbar { padding: 8px 12px; }
+  .toolbar-inner { gap: 6px; flex-wrap: wrap; height: auto; padding: 4px 0; }
   .filter-label { display: none; }
-  .season-select, .year-input { font-size: 12px; padding: 4px 8px; }
-  .pill { font-size: 11px; padding: 3px 10px; }
+  .season-select, .year-input { font-size: 12px; padding: 4px 6px; max-width: 90px; }
+  .year-range-label { display: none; }
+  .toolbar-sep { display: none; }
+  .pill { font-size: 10px; padding: 3px 8px; }
+  .pill-group { gap: 2px; }
   td:nth-child(n+6) { display: none; }
   th:nth-child(n+6) { display: none; }
   .stat-cards { grid-template-columns: repeat(2, 1fr); }
   .section-title { font-size: 10px; }
   .comp-grid { grid-template-columns: 1fr; }
   .player-hero-inner { flex-direction: column; gap: 12px; }
-  .player-kpis { gap: 16px; }
+  .player-kpis { gap: 12px; flex-wrap: wrap; }
+  .kpi-card .k-val { font-size: 22px; }
 }
 </style>
 </head>
@@ -1269,7 +1276,7 @@ function renderBowling(d, target, expanded, filterQ) {
   renderTable(target, 'bowl', d.bowling || [], cols, 'wickets');
 }
 
-function renderTable(target, type, rows, cols, defaultSort) {
+function renderTable(target, type, rows, cols, defaultSort, filterQ) {
   const key = currentSort[type]?.key || defaultSort;
   const dir = currentSort[type]?.dir || -1;
 
@@ -1279,20 +1286,39 @@ function renderTable(target, type, rows, cols, defaultSort) {
   });
   if (filterQ) sorted = sorted.filter(r => r.name.toLowerCase().includes(filterQ.toLowerCase()));
 
-  const thCols = cols.map(c =>
-    `<th class="${key===c.k?'sorted':''}" onclick="sortTbl('${target}','${type}','${c.k}',${key===c.k?dir*-1:-1},'${target}')">${c.l}${key===c.k?(dir===-1?'↓':'↑'):''}</th>`
+  const thCols = cols.map(col =>
+    `<th class="${key===col.k?'sorted':''}" onclick="sortTbl('${target}','${type}','${col.k}',${key===col.k?dir*-1:-1},'${target}')">${col.l}${key===col.k?(dir===-1?'↓':'↑'):''}</th>`
   ).join('');
 
-  const trs = sorted.slice(0, 50).map((r, i) => `
-    <tr>
-      <td><span class="rank ${i<3?'top3':''}">${i+1}</span> <a href="player.html?name=${encodeURIComponent(r.name)}" class="pname" style="text-decoration:none;color:var(--text);font-weight:500">${r.name}</a></td>
-      ${cols.map(c => `<td class="${c.hi?'hi':''}">${r[c.k] ?? '—'}</td>`).join('')}
-    </tr>`).join('');
+  const PAGE = 50;
+  const showAll = !!filterQ || sorted.length <= PAGE;
+  const visRows = showAll ? sorted : sorted.slice(0, PAGE);
+
+  const trs = visRows.map((r, i) => {
+    const rank = showAll ? i+1 : sorted.indexOf(r)+1;
+    return `<tr>
+      <td><span class="rank ${rank<=3?'top3':''}">${rank}</span> <a href="player.html?name=${encodeURIComponent(r.name)}" class="pname" style="text-decoration:none;color:var(--text);font-weight:500">${r.name}</a></td>
+      ${cols.map(col => `<td class="${col.hi?'hi':''}">${r[col.k] ?? '—'}</td>`).join('')}
+    </tr>`;
+  }).join('');
+
+  const showMoreBtn = !showAll
+    ? `<div style="text-align:center;padding:12px;border-top:1px solid var(--border)">
+        <button onclick="renderTable('${target}','${type}',currentTableRows['${type}'],currentTableCols['${type}'],'${defaultSort}','_all')"
+          style="background:var(--blue);color:#fff;border:none;padding:7px 20px;border-radius:6px;cursor:pointer;font-size:13px">
+          Show all ${sorted.length} players
+        </button></div>` : '';
+
+  // Store rows/cols for show-all button
+  if(!currentTableRows) window.currentTableRows = {};
+  if(!currentTableCols) window.currentTableCols = {};
+  currentTableRows[type] = rows;
+  currentTableCols[type] = cols;
 
   document.getElementById(target).innerHTML = `
     <div class="card animate">
       <div class="tbl-toolbar">
-        <input class="search-input" placeholder="Filter players..." oninput="filterRows(this,'tbl-body-${type}-${target}')">
+        <input class="search-input" placeholder="Search all ${sorted.length} players..." oninput="searchTable(this,'${target}','${type}',${JSON.stringify(rows).length > 100000 ? "'too-large'" : 'null'},'${defaultSort}')">
         <span class="tbl-count">${sorted.length} players</span>
       </div>
       <table>
@@ -1302,7 +1328,16 @@ function renderTable(target, type, rows, cols, defaultSort) {
         </tr></thead>
         <tbody id="tbl-body-${type}-${target}">${trs}</tbody>
       </table>
+      ${showMoreBtn}
     </div>`;
+}
+
+function searchTable(input, target, type, _, defaultSort) {
+  const q = input.value.trim();
+  const rows = currentTableRows[type];
+  const cols = currentTableCols[type];
+  if (!rows || !cols) return;
+  renderTable(target, type, rows, cols, defaultSort, q || null);
 }
 
 function sortTbl(target, type, key, dir, renderTarget) {

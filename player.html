@@ -12,7 +12,7 @@
 *{margin:0;padding:0;box-sizing:border-box;}
 body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-size:14px;line-height:1.5;}
 .header{background:var(--blue);padding:0 24px;position:sticky;top:0;z-index:200;box-shadow:0 2px 8px rgba(0,0,0,0.15);}
-.header-inner{max-width:1200px;margin:0 auto;display:flex;align-items:center;height:56px;gap:16px;}
+.header-inner{max-width:1200px;margin:0 auto;display:flex;align-items:center;height:56px;gap:8px;overflow:hidden;}
 .logo{font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:3px;color:#fff;text-decoration:none;flex-shrink:0;}
 .logo span{color:var(--gold-light);}
 .breadcrumb{display:flex;align-items:center;gap:8px;font-size:13px;color:rgba(255,255,255,0.6);}
@@ -525,8 +525,10 @@ function renderMatchups(){
   const ipl = allData['ipl'];
   if(!ipl){ document.getElementById('matchups-content').innerHTML='<div class="no-data">IPL data not loaded</div>'; return; }
 
-  const batPlayer = ipl.batting?.find(p=>p.name===playerName);
-  const bowlPlayer = ipl.bowling?.find(p=>p.name===playerName);
+  const batP = ipl.batting?.find(p=>p.name===playerName);
+  const bowlP = ipl.bowling?.find(p=>p.name===playerName);
+  const batPlayer = batP;
+  const bowlPlayer = bowlP;
   const phases = [
     {key:'powerplay', label:'Powerplay', sub:'Overs 1-6',  color:'#2E5A8F'},
     {key:'middle',    label:'Middle',    sub:'Overs 7-15', color:'#DAA520'},
@@ -665,10 +667,10 @@ function renderMatchups(){
     <small>Run <code>python fetch_all_cricket.py --comp ipl</code> to generate phase data</small></div>`;
 
   document.getElementById('matchups-content').innerHTML=html;
-  setTimeout(()=>drawMatchupCharts(batPlayer,bowlPlayer),100);
+  setTimeout(()=>drawMatchupCharts(batP,bowlP),100);
 }
 
-function drawMatchupCharts(bat, bowl){
+function drawMatchupCharts(batArg, bowlArg){
   const phases=['Powerplay','Middle','Death'];
   const phKeys=['powerplay','middle','death'];
   const colors=['#2E5A8F','#DAA520','#C0392B'];
@@ -676,39 +678,39 @@ function drawMatchupCharts(bat, bowl){
     scales:{x:{grid:{display:false},ticks:{font:{size:11}}},y:{grid:{color:'#E2E6EA'},ticks:{font:{size:11}}}}};
 
   // Batting phase charts
-  if(bat?.phase_stats){
+  if(batArg?.phase_stats){
     const runsCtx=document.getElementById('mu-bat-runs')?.getContext('2d');
     if(runsCtx) charts.push(new Chart(runsCtx,{type:'bar',data:{labels:phases,
-      datasets:[{data:phKeys.map(k=>bat.phase_stats[k]?.runs||0),backgroundColor:colors,borderRadius:6}]},options:bopts}));
+      datasets:[{data:phKeys.map(k=>batArg.phase_stats[k]?.runs||0),backgroundColor:colors,borderRadius:6}]},options:bopts}));
     const srCtx=document.getElementById('mu-bat-sr')?.getContext('2d');
     if(srCtx) charts.push(new Chart(srCtx,{type:'bar',data:{labels:phases,
-      datasets:[{data:phKeys.map(k=>bat.phase_stats[k]?.sr||0),backgroundColor:colors,borderRadius:6}]},options:bopts}));
+      datasets:[{data:phKeys.map(k=>batArg.phase_stats[k]?.sr||0),backgroundColor:colors,borderRadius:6}]},options:bopts}));
   }
 
   // vs bowler type
-  if(bat?.vs_type){
+  if(batArg?.vs_type){
     const typeCtx=document.getElementById('mu-bat-type')?.getContext('2d');
     if(typeCtx){
       charts.push(new Chart(typeCtx,{type:'bar',data:{
         labels:['vs Pace','vs Spin'],
         datasets:[
-          {label:'Strike Rate',data:[bat.vs_type.pace?.sr||0, bat.vs_type.spin?.sr||0],
+          {label:'Strike Rate',data:[batArg.vs_type.pace?.sr||0, batArg.vs_type.spin?.sr||0],
            backgroundColor:['#1E3A5F','#7B2FBE'],borderRadius:8},
         ]
       },options:{...bopts,plugins:{...bopts.plugins,
-        annotation:{annotations:{line1:{type:'line',yMin:bat.sr,yMax:bat.sr,borderColor:'#DAA520',borderWidth:2,borderDash:[5,3],
-          label:{display:true,content:'Career SR: '+bat.sr,position:'end',font:{size:10}}}}}}}}));
+        annotation:{annotations:{line1:{type:'line',yMin:batArg.sr,yMax:batArg.sr,borderColor:'#DAA520',borderWidth:2,borderDash:[5,3],
+          label:{display:true,content:'Career SR: '+batArg.sr,position:'end',font:{size:10}}}}}}}}));
     }
   }
 
   // Batting season trend
-  if(bat?.by_season){
+  if(batArg?.by_season){
     const ctx=document.getElementById('mu-bat-season')?.getContext('2d');
     if(ctx){
-      const seasons=Object.keys(bat.by_season).sort();
+      const seasons=Object.keys(batArg.by_season).sort();
       charts.push(new Chart(ctx,{type:'bar',data:{labels:seasons,datasets:[
-        {type:'bar',label:'Runs',data:seasons.map(s=>bat.by_season[s]?.runs||0),backgroundColor:'rgba(30,58,95,0.7)',borderRadius:3,yAxisID:'y'},
-        {type:'line',label:'SR',data:seasons.map(s=>bat.by_season[s]?.sr||0),borderColor:'#DAA520',backgroundColor:'transparent',tension:0.3,pointRadius:3,borderWidth:2,yAxisID:'y2'},
+        {type:'bar',label:'Runs',data:seasons.map(s=>batArg.by_season[s]?.runs||0),backgroundColor:'rgba(30,58,95,0.7)',borderRadius:3,yAxisID:'y'},
+        {type:'line',label:'SR',data:seasons.map(s=>batArg.by_season[s]?.sr||0),borderColor:'#DAA520',backgroundColor:'transparent',tension:0.3,pointRadius:3,borderWidth:2,yAxisID:'y2'},
       ]},options:{responsive:true,maintainAspectRatio:false,
         plugins:{legend:{display:true,position:'top',labels:{font:{size:10},boxWidth:10}}},
         scales:{x:{grid:{display:false},ticks:{font:{size:10}}},
@@ -718,23 +720,23 @@ function drawMatchupCharts(bat, bowl){
   }
 
   // Bowling phase charts
-  if(bowl?.phase_stats){
+  if(bowlArg?.phase_stats){
     const econCtx=document.getElementById('mu-bowl-econ')?.getContext('2d');
     if(econCtx) charts.push(new Chart(econCtx,{type:'bar',data:{labels:phases,
-      datasets:[{data:phKeys.map(k=>bowl.phase_stats[k]?.economy||0),backgroundColor:colors,borderRadius:6}]},options:bopts}));
+      datasets:[{data:phKeys.map(k=>bowlArg.phase_stats[k]?.economy||0),backgroundColor:colors,borderRadius:6}]},options:bopts}));
     const wktsCtx=document.getElementById('mu-bowl-wkts')?.getContext('2d');
     if(wktsCtx) charts.push(new Chart(wktsCtx,{type:'bar',data:{labels:phases,
-      datasets:[{data:phKeys.map(k=>bowl.phase_stats[k]?.wickets||0),backgroundColor:colors,borderRadius:6}]},options:bopts}));
+      datasets:[{data:phKeys.map(k=>bowlArg.phase_stats[k]?.wickets||0),backgroundColor:colors,borderRadius:6}]},options:bopts}));
   }
 
   // Bowling season trend
-  if(bowl?.by_season){
+  if(bowlArg?.by_season){
     const ctx=document.getElementById('mu-bowl-season')?.getContext('2d');
     if(ctx){
-      const seasons=Object.keys(bowl.by_season).sort();
+      const seasons=Object.keys(bowlArg.by_season).sort();
       charts.push(new Chart(ctx,{type:'bar',data:{labels:seasons,datasets:[
-        {type:'bar',label:'Wickets',data:seasons.map(s=>bowl.by_season[s]?.wickets||0),backgroundColor:'rgba(192,57,43,0.7)',borderRadius:3,yAxisID:'y'},
-        {type:'line',label:'Economy',data:seasons.map(s=>bowl.by_season[s]?.economy||0),borderColor:'#2D9648',backgroundColor:'transparent',tension:0.3,pointRadius:3,borderWidth:2,yAxisID:'y2'},
+        {type:'bar',label:'Wickets',data:seasons.map(s=>bowlArg.by_season[s]?.wickets||0),backgroundColor:'rgba(192,57,43,0.7)',borderRadius:3,yAxisID:'y'},
+        {type:'line',label:'Economy',data:seasons.map(s=>bowlArg.by_season[s]?.economy||0),borderColor:'#2D9648',backgroundColor:'transparent',tension:0.3,pointRadius:3,borderWidth:2,yAxisID:'y2'},
       ]},options:{responsive:true,maintainAspectRatio:false,
         plugins:{legend:{display:true,position:'top',labels:{font:{size:10},boxWidth:10}}},
         scales:{x:{grid:{display:false},ticks:{font:{size:10}}},
