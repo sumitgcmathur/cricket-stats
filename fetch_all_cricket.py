@@ -389,13 +389,18 @@ def parse_zip(zip_bytes, comp):
                                         outcome_val = ",".join(parts[2:]).strip()
                                         if not match_winner_from_info:
                                             match_outcome_from_info = outcome_val
-                                    elif parts[1] == "event" and len(parts) >= 4:
-                                        if parts[2] == "match_number":
-                                            match_number_from_info = parts[3].strip()
-                                        elif parts[2] == "stage":
-                                            match_stage_from_info = parts[3].strip()
-                                        elif parts[2] == "name":
-                                            match_event_from_info = ",".join(parts[3:]).strip()
+                                    elif parts[1] == "event":
+                                        # e.g. info,event,Indian Premier League
+                                        match_event_from_info = ",".join(parts[2:]).strip()
+                                    elif parts[1] == "match_number":
+                                        # e.g. info,match_number,57
+                                        match_number_from_info = ",".join(parts[2:]).strip()
+                                    elif parts[1] == "stage":
+                                        # Seen in some competitions
+                                        match_stage_from_info = ",".join(parts[2:]).strip()
+                                    elif parts[1] == "eliminator":
+                                        # IPL CSV2 commonly exposes playoff marker this way
+                                        match_stage_from_info = "Eliminator"
                                     elif parts[1] == "player_of_match" and len(parts) >= 3:
                                         pass  # could track this
                                     elif parts[1] == "bowling_style" and len(parts) >= 4:
