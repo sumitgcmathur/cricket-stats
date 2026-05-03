@@ -206,9 +206,14 @@ function renderList(){
     const scores=document.createElement('div');scores.className='match-scores';scores.textContent=s1+(s2?' | '+s2:'');
     const meta=document.createElement('div');meta.className='match-meta';
 
-    // Stage badge (Final, Qualifier, Eliminator etc)
-    if(m.stage){const b=document.createElement('span');b.style.cssText='background:#7B2FBE20;color:#7B2FBE;font-size:10px;font-weight:600;padding:2px 8px;border-radius:3px';b.textContent=formatStage(m.stage);meta.appendChild(b);}
-    if(m.match_number){const s=document.createElement('span');s.textContent='Match '+m.match_number;meta.appendChild(s);}
+    // Stage + match number combined label
+    const stageLabel = m.stage ? formatStage(m.stage) : (m.match_number ? 'Group Stage' : '');
+    const matchLabel = stageLabel + (m.match_number ? ' · Match '+m.match_number : '');
+    if(matchLabel.trim()){
+      const b=document.createElement('span');
+      b.style.cssText='background:#7B2FBE20;color:#7B2FBE;font-size:10px;font-weight:600;padding:2px 8px;border-radius:3px;white-space:nowrap';
+      b.textContent=matchLabel;meta.appendChild(b);
+    }
     if(m.winner){const b=document.createElement('span');b.className='badge-green';b.textContent='🏆 '+m.winner+' won';meta.appendChild(b);}
     else if(m.outcome){const b=document.createElement('span');b.style.cssText='background:var(--surface2);color:var(--muted);font-size:11px;padding:3px 10px;border-radius:4px';b.textContent=formatOutcome(m.outcome);meta.appendChild(b);}
     if(m.season){const b=document.createElement('span');b.className='badge-gold';b.textContent=m.season;meta.appendChild(b);}
@@ -265,8 +270,8 @@ function buildScorecard(sv,sc){
   let resultText = 'Result unavailable';
   if(sc.winner) resultText = sc.winner + ' won' + (sc.win_margin?' · '+sc.win_margin:'');
   else if(sc.outcome) resultText = formatOutcome(sc.outcome);
-  const stageLabel = sc.stage ? formatStage(sc.stage) : '';
-  const matchLabel = sc.match_number ? 'Match '+sc.match_number : '';
+  const stageLabel = sc.stage ? formatStage(sc.stage) : (sc.match_number ? 'Group Stage' : '');
+  const matchLabel = sc.match_number ? stageLabel+' · Match '+sc.match_number : stageLabel;
   hero.innerHTML='<div class="sc-teams">'+t1+'<span class="vs">VS</span>'+t2+'</div>'+
     (stageLabel||matchLabel?'<div style="margin-bottom:8px"><span style="background:rgba(255,255,255,0.15);color:rgba(255,255,255,0.9);font-size:11px;font-weight:600;padding:3px 10px;border-radius:3px;letter-spacing:1px">'+(stageLabel||matchLabel)+'</span>'+(stageLabel&&matchLabel?' <span style="color:rgba(255,255,255,0.5);font-size:11px">'+matchLabel+'</span>':'')+'</div>':'') +
     '<div class="sc-result">'+resultText+'</div>'+
@@ -559,14 +564,15 @@ function drawBowlerChart(name, balls, container){
 
 function formatStage(stage){
   if(!stage) return '';
-  const map = {
-    'Final':'🏆 Final', 'final':'🏆 Final',
-    'Qualifier 1':'Q1','Qualifier 2':'Q2',
-    'Eliminator':'Eliminator','qualifier 1':'Q1','qualifier 2':'Q2',
-    'eliminator':'Eliminator','Semi-Final':'Semi-Final',
-    'Champion':'🏆 Final'
-  };
-  return map[stage] || stage;
+  const s = stage.trim().toLowerCase();
+  if(s.includes('final') && !s.includes('qualifier') && !s.includes('semi')) return '🏆 Final';
+  if(s.includes('qualifier 1') || s === 'q1') return 'Qualifier 1';
+  if(s.includes('qualifier 2') || s === 'q2') return 'Qualifier 2';
+  if(s.includes('eliminator')) return 'Eliminator';
+  if(s.includes('semi')) return 'Semi-Final';
+  if(s.includes('group') || s.includes('league') || s.includes('stage')) return 'Group Stage';
+  if(s === 'champion') return '🏆 Final';
+  return stage;
 }
 
 function formatOutcome(outcome){

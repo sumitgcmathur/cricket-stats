@@ -316,6 +316,15 @@ def parse_zip(zip_bytes, comp):
 
     batters  = defaultdict(lambda: {"runs":0,"balls":0,"fours":0,"sixes":0,"fifties":0,"hundreds":0,"matches":set(),"dismissals":0,"by_season":{}})
     bowlers  = defaultdict(lambda: {"runs":0,"balls":0,"wickets":0,"matches":set(),"by_season":{}})
+    # Normalise historical team name variants to current names
+    TEAM_ALIASES = {
+        "Delhi Daredevils": "Delhi Capitals",
+        "Deccan Chargers": "Sunrisers Hyderabad",
+        "Rising Pune Supergiants": "Rising Pune Supergiant",
+        "Pune Warriors": "Pune Warriors India",
+        "Kochi Tuskers Kerala": "Kochi Tuskers Kerala",
+    }
+
     teams    = defaultdict(lambda: {"wins":0,"matches":set(),"by_season":{}})
     team_won_matches = defaultdict(set)  # track per-match wins separately
     team_season_matches = defaultdict(lambda: defaultdict(set))  # team->season->match_ids
@@ -388,6 +397,7 @@ def parse_zip(zip_bytes, comp):
                         pass
 
                 # Track winner from info file
+                match_winner_from_info = TEAM_ALIASES.get(match_winner_from_info, match_winner_from_info)
                 if match_winner_from_info and match_id not in team_won_matches[match_winner_from_info]:
                     team_won_matches[match_winner_from_info].add(match_id)
                     teams[match_winner_from_info]["wins"] += 1
@@ -401,8 +411,8 @@ def parse_zip(zip_bytes, comp):
                 for row in rows:
                     batter     = row.get("striker","").strip()
                     bowler     = row.get("bowler","").strip()
-                    bat_team   = row.get("batting_team","").strip()
-                    bowl_team  = row.get("bowling_team","").strip()
+                    bat_team   = TEAM_ALIASES.get(row.get("batting_team","").strip(), row.get("batting_team","").strip())
+                    bowl_team  = TEAM_ALIASES.get(row.get("bowling_team","").strip(), row.get("bowling_team","").strip())
                     runs_bat   = int(row.get("runs_off_bat",0) or 0)
                     extras     = int(row.get("extras",0) or 0)
                     wicket_t   = row.get("wicket_type","").strip()
@@ -430,6 +440,10 @@ def parse_zip(zip_bytes, comp):
                         if runs_bat == 4: b["fours"] += 1
                         if runs_bat == 6: b["sixes"] += 1
                         inn_runs[innings][batter] += runs_bat
+                        # MVP points: 4s=2.5, 6s=3.5
+                        if "mvp_pts" not in b: b["mvp_pts"] = 0.0
+                        if runs_bat == 4: b["mvp_pts"] += 2.5
+                        elif runs_bat == 6: b["mvp_pts"] += 3.5
                         # Phase tracking (over_num already computed above)
                         if "phase_stats" not in b:
                             b["phase_stats"] = {"powerplay":{"r":0,"b":0},"middle":{"r":0,"b":0},"death":{"r":0,"b":0}}
@@ -473,6 +487,12 @@ def parse_zip(zip_bytes, comp):
                         bl["matches"].add(match_id)
                         if wicket_t and wicket_t not in ("run out","retired hurt","obstructing the field"):
                             bl["wickets"] += 1
+                        # MVP points: wickets=3.5, dot balls=1
+                        if "mvp_pts" not in bl: bl["mvp_pts"] = 0.0
+                        if wicket_t and wicket_t not in ("run out","retired hurt","obstructing the field"):
+                            bl["mvp_pts"] += 3.5
+                        elif not wides and not noballs and runs_bat == 0 and not extras:
+                            bl["mvp_pts"] += 1.0
                         # Phase and per-season tracking
                         if "phase_stats" not in bowlers[bowler]:
                             bowlers[bowler]["phase_stats"] = {
@@ -506,7 +526,11 @@ def parse_zip(zip_bytes, comp):
                                 batters[batter]["by_season"][season]["fifties"] += 1
 
                 # Build and save scorecard
-                sc = build_scorecard(match_id, rows, match_winner_from_info, match_margin_from_info, match_outcome_from_info, match_number_from_info, match_stage_from_info)
+                try:
+                    sc = build_scorecard(match_id, rows, match_winner_from_info, match_margin_from_info, match_outcome_from_info, match_number_from_info, match_stage_from_info)
+                except Exception as _sc_err:
+                    print(f"  ⚠️  Scorecard {match_id}: {_sc_err}")
+                    sc = None
                 if sc:
                     sc_path = os.path.join(matches_dir, f"{match_id}.json")
                     with open(sc_path, "w", encoding="utf-8") as sf:
@@ -574,6 +598,7 @@ def build_output(batters, bowlers, teams, seasons, total_matches, comp, team_sea
             "avg":avg,"sr":sr,"fours":s["fours"],"sixes":s["sixes"],
             "fifties":s["fifties"],"hundreds":s["hundreds"],
             "perf_index":perf_index,
+            "mvp_pts": round(s.get("mvp_pts",0), 1),
             "phase_stats":phase_stats,
             "vs_type":vs_type,
             "by_season":by_season})
@@ -609,6 +634,7 @@ def build_output(batters, bowlers, teams, seasons, total_matches, comp, team_sea
             bowl_phase_stats[ph] = {"runs":ps["r"],"balls":ps["b"],"wickets":ps["w"],"economy":econ_ph}
         bowling_list.append({"name":name,"matches":m,"wickets":s["wickets"],"runs":s["runs"],
             "overs":overs,"economy":economy,"avg":avg,"bowl_index":bowl_index,
+            "mvp_pts": round(s.get("mvp_pts",0), 1),
             "phase_stats":bowl_phase_stats,
             "by_season":bowl_by_season})
 
