@@ -327,7 +327,13 @@ function showTab(name,btn){
 // ── BATTING TAB ──────────────────────────────────────────────────────────────
 function renderBatting(){
   killCharts();
-  const rows=COMPS.map(c=>({comp:c,bat:getPlayerBatting(c.code)})).filter(x=>x.bat);
+  const rows=COMPS.map(c=>{
+    const bat=getPlayerBatting(c.code);
+    if(!bat) return null;
+    const bowl=getPlayerBowling(c.code);
+    const matches=Math.max(bat.matches||0, bowl?.matches||0);
+    return {comp:c,bat,bowl,matches};
+  }).filter(Boolean);
   if(!rows.length){document.getElementById('batting-content').innerHTML='<div class="no-data">No batting data found for this player</div>';return;}
 
   const ipl=getPlayerBatting('ipl');
@@ -338,7 +344,7 @@ function renderBatting(){
         <div class="stat-card">
           <div class="sc-label">${r.comp.name} Runs</div>
           <div class="sc-val">${r.bat.runs.toLocaleString()}</div>
-          <div class="sc-sub">${r.bat.matches} matches · avg ${r.bat.avg}</div>
+          <div class="sc-sub">${r.matches} matches · avg ${r.bat.avg}</div>
         </div>`).join('')}
     </div>
     <div class="charts-grid">
@@ -366,7 +372,7 @@ function renderBatting(){
     <table><thead><tr><th>Competition</th><th>Mat</th><th>Runs</th><th>Avg</th><th>SR</th><th>4s</th><th>6s</th><th>50s</th><th>100s</th></tr></thead>
     <tbody>${rows.map(r=>`<tr>
       <td>${r.comp.name} <span style="font-size:10px;color:var(--muted)">(${r.comp.format})</span></td>
-      <td>${r.bat.matches}</td><td class="hi">${r.bat.runs.toLocaleString()}</td>
+      <td>${r.matches}</td><td class="hi">${r.bat.runs.toLocaleString()}</td>
       <td>${r.bat.avg}</td><td>${r.bat.sr}</td>
       <td>${r.bat.fours||'—'}</td><td>${r.bat.sixes||'—'}</td>
       <td>${r.bat.fifties||'—'}</td><td>${r.bat.hundreds||'—'}</td>
@@ -421,7 +427,13 @@ function renderBatting(){
 
 // ── BOWLING TAB ───────────────────────────────────────────────────────────────
 function renderBowling(){
-  const rows=COMPS.map(c=>({comp:c,bowl:getPlayerBowling(c.code)})).filter(x=>x.bowl);
+  const rows=COMPS.map(c=>{
+    const bowl=getPlayerBowling(c.code);
+    if(!bowl) return null;
+    const bat=getPlayerBatting(c.code);
+    const matches=Math.max(bowl.matches||0, bat?.matches||0);
+    return {comp:c,bowl,bat,matches};
+  }).filter(Boolean);
   if(!rows.length){document.getElementById('bowling-content').innerHTML='<div class="no-data">No bowling data found for this player</div>';return;}
 
   let html=`
@@ -429,7 +441,7 @@ function renderBowling(){
       ${rows.map(r=>`<div class="stat-card">
         <div class="sc-label">${r.comp.name} Wickets</div>
         <div class="sc-val">${r.bowl.wickets}</div>
-        <div class="sc-sub">${r.bowl.matches} matches · econ ${r.bowl.economy}</div>
+        <div class="sc-sub">${r.matches} matches · econ ${r.bowl.economy}</div>
       </div>`).join('')}
     </div>
     <div class="charts-grid">
@@ -447,7 +459,7 @@ function renderBowling(){
     <table><thead><tr><th>Competition</th><th>Mat</th><th>Wkts</th><th>Avg</th><th>Econ</th><th>Overs</th><th>Runs</th></tr></thead>
     <tbody>${rows.map(r=>`<tr>
       <td>${r.comp.name} <span style="font-size:10px;color:var(--muted)">(${r.comp.format})</span></td>
-      <td>${r.bowl.matches}</td><td class="hi">${r.bowl.wickets}</td>
+      <td>${r.matches}</td><td class="hi">${r.bowl.wickets}</td>
       <td>${r.bowl.avg||'—'}</td><td>${r.bowl.economy}</td>
       <td>${r.bowl.overs}</td><td>${r.bowl.runs.toLocaleString()}</td>
     </tr>`).join('')}</tbody></table>
@@ -558,7 +570,7 @@ function renderMatchups(){
   }
 
   // Batter vs bowler type (pace/spin)
-  if(batPlayer?.vs_type && Object.keys(batPlayer.vs_type).length){
+  if(batPlayer?.vs_type && ((batPlayer.vs_type.pace?.balls||0) + (batPlayer.vs_type.spin?.balls||0) > 0)){
     const vt = batPlayer.vs_type;
     html += `<div class="section-title">⚔️ Batting vs Bowler Type</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
@@ -610,8 +622,8 @@ function renderMatchups(){
   }
 
   // Bowler vs batter handedness
-  if(bowlPlayer?.vs_hand && (bowlPlayer.vs_hand.left?.balls > 0 || bowlPlayer.vs_hand.right?.balls > 0)){
-    const vh = bowlPlayer.vs_hand;
+  if(bowlPlayer){
+    const vh = bowlPlayer.vs_hand || {};
     html += `<div class="section-title">🧭 Bowling vs Batter Handedness</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
       <div class="stat-card" style="border-top:3px solid #7B2FBE">
@@ -625,32 +637,13 @@ function renderMatchups(){
         <div class="sc-sub">${vh.right?.balls||0} balls · Econ ${vh.right?.economy||0} · ${vh.right?.runs||0}R</div>
       </div>
     </div>
+    ${((vh.left?.balls||0)+(vh.right?.balls||0)===0)?`<div style="font-size:12px;color:var(--muted);margin:-8px 0 12px">
+      Handedness split unavailable in current source data for this player.
+    </div>`:''}
     <div class="chart-card" style="margin-bottom:28px">
       <h3>Economy & Wickets vs Left/Right Batters</h3>
       <div class="chart-wrap-sm"><canvas id="mu-bowl-hand"></canvas></div>
     </div>`;
-  }
-
-  // Batter vs pace/spin chart
-  if(batPlayer?.vs_type){
-    const ctx=document.getElementById('mu-vs-type')?.getContext('2d');
-    if(ctx){
-      const types=['pace','spin'];
-      const cols=['#C0392B','#7B2FBE'];
-      charts.push(new Chart(ctx,{type:'bar',data:{
-        labels:['vs Pace','vs Spin'],
-        datasets:[
-          {label:'Runs',data:types.map(t=>batPlayer.vs_type[t]?.runs||0),backgroundColor:cols.map(c=>c+'99'),borderRadius:4,yAxisID:'y'},
-          {label:'Strike Rate',data:types.map(t=>batPlayer.vs_type[t]?.sr||0),backgroundColor:cols,borderRadius:4,yAxisID:'y2',type:'line',pointRadius:6,borderWidth:2},
-        ]
-      },options:{responsive:true,maintainAspectRatio:false,
-        plugins:{legend:{display:true,position:'top',labels:{font:{size:10},boxWidth:10}}},
-        scales:{
-          x:{grid:{display:false},ticks:{font:{size:12}}},
-          y:{grid:{color:'#E2E6EA'},ticks:{font:{size:10}},title:{display:true,text:'Runs',font:{size:9}}},
-          y2:{position:'right',grid:{display:false},ticks:{font:{size:10}},title:{display:true,text:'SR',font:{size:9}}}
-        }}}));
-    }
   }
 
   // Season-by-season bowling trend
@@ -685,6 +678,28 @@ function drawMatchupCharts(batArg, bowlArg){
     const srCtx=document.getElementById('mu-bat-sr')?.getContext('2d');
     if(srCtx) charts.push(new Chart(srCtx,{type:'bar',data:{labels:phases,
       datasets:[{data:phKeys.map(k=>batArg.phase_stats[k]?.sr||0),backgroundColor:colors,borderRadius:6}]},options:bopts}));
+  }
+
+  // vs bowler type (pace/spin)
+  if(batArg?.vs_type && ((batArg.vs_type.pace?.balls||0) + (batArg.vs_type.spin?.balls||0) > 0)){
+    const ctx=document.getElementById('mu-vs-type')?.getContext('2d');
+    if(ctx){
+      const types=['pace','spin'];
+      const cols=['#C0392B','#7B2FBE'];
+      charts.push(new Chart(ctx,{type:'bar',data:{
+        labels:['vs Pace','vs Spin'],
+        datasets:[
+          {label:'Runs',data:types.map(t=>batArg.vs_type[t]?.runs||0),backgroundColor:cols.map(c=>c+'99'),borderRadius:4,yAxisID:'y'},
+          {label:'Strike Rate',data:types.map(t=>batArg.vs_type[t]?.sr||0),backgroundColor:cols,borderRadius:4,yAxisID:'y2',type:'line',pointRadius:6,borderWidth:2},
+        ]
+      },options:{responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{display:true,position:'top',labels:{font:{size:10},boxWidth:10}}},
+        scales:{
+          x:{grid:{display:false},ticks:{font:{size:12}}},
+          y:{grid:{color:'#E2E6EA'},ticks:{font:{size:10}},title:{display:true,text:'Runs',font:{size:9}}},
+          y2:{position:'right',grid:{display:false},ticks:{font:{size:10}},title:{display:true,text:'SR',font:{size:9}}}
+        }}}));
+    }
   }
 
   // Batting season trend
