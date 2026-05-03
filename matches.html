@@ -207,12 +207,11 @@ function renderList(){
     const meta=document.createElement('div');meta.className='match-meta';
 
     // Stage + match number combined label
-    const stageLabel = m.stage ? formatStage(m.stage) : (m.match_number ? 'Group Stage' : '');
-    const matchLabel = stageLabel + (m.match_number ? ' · Match '+m.match_number : '');
-    if(matchLabel.trim()){
+    const stageInfo = getStageInfo(m.stage, m.match_number);
+    if(stageInfo.badge){
       const b=document.createElement('span');
       b.style.cssText='background:#7B2FBE20;color:#7B2FBE;font-size:10px;font-weight:600;padding:2px 8px;border-radius:3px;white-space:nowrap';
-      b.textContent=matchLabel;meta.appendChild(b);
+      b.textContent=stageInfo.badge;meta.appendChild(b);
     }
     if(m.winner){const b=document.createElement('span');b.className='badge-green';b.textContent='🏆 '+m.winner+' won';meta.appendChild(b);}
     else if(m.outcome){const b=document.createElement('span');b.style.cssText='background:var(--surface2);color:var(--muted);font-size:11px;padding:3px 10px;border-radius:4px';b.textContent=formatOutcome(m.outcome);meta.appendChild(b);}
@@ -270,14 +269,15 @@ function buildScorecard(sv,sc){
   let resultText = 'Result unavailable';
   if(sc.winner) resultText = sc.winner + ' won' + (sc.win_margin?' · '+sc.win_margin:'');
   else if(sc.outcome) resultText = formatOutcome(sc.outcome);
-  const stageLabel = sc.stage ? formatStage(sc.stage) : (sc.match_number ? 'Group Stage' : '');
-  const matchLabel = sc.match_number ? stageLabel+' · Match '+sc.match_number : stageLabel;
+  const stageInfo = getStageInfo(sc.stage, sc.match_number);
   hero.innerHTML='<div class="sc-teams">'+t1+'<span class="vs">VS</span>'+t2+'</div>'+
-    (stageLabel||matchLabel?'<div style="margin-bottom:8px"><span style="background:rgba(255,255,255,0.15);color:rgba(255,255,255,0.9);font-size:11px;font-weight:600;padding:3px 10px;border-radius:3px;letter-spacing:1px">'+(stageLabel||matchLabel)+'</span>'+(stageLabel&&matchLabel?' <span style="color:rgba(255,255,255,0.5);font-size:11px">'+matchLabel+'</span>':'')+'</div>':'') +
+    (stageInfo.badge?'<div style="margin-bottom:8px"><span style="background:rgba(255,255,255,0.15);color:rgba(255,255,255,0.9);font-size:11px;font-weight:600;padding:3px 10px;border-radius:3px;letter-spacing:1px">'+stageInfo.badge+'</span></div>':'') +
     '<div class="sc-result">'+resultText+'</div>'+
     '<div class="sc-meta-row">'+
     (dt?'<div class="sc-meta-item"><strong>'+dt+'</strong></div>':'')+
     (sc.season?'<div class="sc-meta-item">Season <strong>'+sc.season+'</strong></div>':'')+
+    (stageInfo.stageOnly?'<div class="sc-meta-item">Stage <strong>'+stageInfo.stageOnly+'</strong></div>':'')+
+    (sc.match_number?'<div class="sc-meta-item">Match <strong>'+sc.match_number+'</strong></div>':'')+
     (sc.venue?'<div class="sc-meta-item">📍 <strong>'+sc.venue+'</strong></div>':'')+
     '</div>';
   sv.appendChild(hero);
@@ -643,6 +643,16 @@ function formatStage(stage){
   if(s.includes('group') || s.includes('league') || s.includes('stage')) return 'Group Stage';
   if(s === 'champion') return '🏆 Final';
   return stage;
+}
+
+function getStageInfo(stage, matchNumber){
+  const stageOnly = stage ? formatStage(stage) : (matchNumber ? 'Group Stage' : '');
+  const matchNoText = matchNumber ? String(matchNumber).trim() : '';
+  const isPlayoff = /qualifier|eliminator|final|semi/i.test(stageOnly);
+  const badge = isPlayoff
+    ? stageOnly + (matchNoText ? ' · Match ' + matchNoText : '')
+    : (matchNoText ? stageOnly + ' · Match ' + matchNoText : stageOnly);
+  return { stageOnly, badge };
 }
 
 function formatOutcome(outcome){
