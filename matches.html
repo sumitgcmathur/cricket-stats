@@ -460,20 +460,48 @@ function drawCharts(sc){
     // Economy
     const ec=document.getElementById('ch-econ-'+id);
     if(ec){
+      const oversToBalls = (ov) => {
+        const o = Number(ov);
+        if(!Number.isFinite(o) || o <= 0) return 0;
+        const full = Math.floor(o);
+        const part = Math.round((o - full) * 10); // 3.2 => 2 balls
+        return full * 6 + Math.max(0, Math.min(5, part));
+      };
+
       const bl=[...(inn.bowlers||[])]
-        .map(b=>({ ...b, overs:+b.overs, economy:+b.economy }))
+        .map(b=>{
+          const overs = Number(b.overs);
+          const balls = oversToBalls(overs);
+          let econ = Number(b.economy);
+          // Some historical/generated scorecards may store runs/ball (0.x) instead of economy.
+          if(Number.isFinite(econ) && econ > 0 && econ <= 2) econ = +(econ * 6).toFixed(2);
+          // If economy is missing/invalid, compute from runs & balls.
+          if(!Number.isFinite(econ) || econ <= 0){
+            const runs = Number(b.runs);
+            econ = (balls > 0 && Number.isFinite(runs)) ? +((runs / balls) * 6).toFixed(2) : NaN;
+          }
+          return { ...b, overs, economy:econ };
+        })
         .filter(b=>b.overs>0 && Number.isFinite(b.economy))
         .sort((a,b)=>a.economy-b.economy);
-      const ecc=ec.getContext?.('2d');
-      if(ecc && bl.length){
-        charts.push(new Chart(ecc,{type:'bar',data:{
+
+      const maxEco = bl.reduce((m,b)=>Math.max(m,b.economy), 0);
+      if(bl.length){
+        charts.push(new Chart(ec,{type:'bar',data:{
           labels:bl.map(b=>b.name.split(' ').pop()),
           datasets:[{
             data:bl.map(b=>b.economy),
             backgroundColor:bl.map(b=>b.economy<=6?'#2D9648':b.economy<=8?'#DAA520':'#C0392B'),
             borderRadius:3
           }]
-        },options:{...bo,indexAxis:'y'}}));
+        },options:{
+          ...bo,
+          indexAxis:'y',
+          scales:{
+            ...bo.scales,
+            x:{...bo.scales.x, beginAtZero:true, suggestedMax: Math.max(10, Math.ceil(maxEco+1))}
+          }
+        }}));
       }
     }
     // Boundaries
