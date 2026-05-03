@@ -23,6 +23,13 @@ import sys
 import datetime
 from collections import defaultdict
 
+# Ensure Unicode output works on Windows consoles (avoid crashing on emoji).
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
+except Exception:
+    pass
+
 COMPETITIONS = [
     {"code": "tests",   "name": "Test Matches",               "format": "Test", "type": "international"},
     {"code": "odis",    "name": "One Day Internationals",      "format": "ODI",  "type": "international"},
@@ -462,13 +469,17 @@ def parse_zip(zip_bytes, comp):
                         # Per-season tracking
                         if season:
                             if season not in b["by_season"]:
-                                b["by_season"][season] = {"runs":0,"balls":0,"fours":0,"sixes":0,"fifties":0,"hundreds":0,"matches":set(),"dismissals":0}
+                                b["by_season"][season] = {"runs":0,"balls":0,"fours":0,"sixes":0,"fifties":0,"hundreds":0,"mvp_pts":0.0,"matches":set(),"dismissals":0}
                             bs = b["by_season"][season]
                             bs["runs"]  += runs_bat
                             bs["balls"] += 1
                             bs["matches"].add(match_id)
-                            if runs_bat == 4: bs["fours"] += 1
-                            if runs_bat == 6: bs["sixes"] += 1
+                            if runs_bat == 4:
+                                bs["fours"] += 1
+                                bs["mvp_pts"] += 2.5
+                            if runs_bat == 6:
+                                bs["sixes"] += 1
+                                bs["mvp_pts"] += 3.5
 
                     # Track dismissals for correct batting average
                     player_out = row.get("player_dismissed","").strip()
@@ -511,11 +522,16 @@ def parse_zip(zip_bytes, comp):
                         # Per-season tracking
                         if season:
                             if season not in bowlers[bowler]["by_season"]:
-                                bowlers[bowler]["by_season"][season] = {"runs":0,"balls":0,"wickets":0,"matches":set()}
+                                bowlers[bowler]["by_season"][season] = {"runs":0,"balls":0,"wickets":0,"mvp_pts":0.0,"matches":set()}
                             bs = bowlers[bowler]["by_season"][season]
                             bs["runs"]  += runs_bat + extras
                             bs["balls"] += 1
                             bs["matches"].add(match_id)
+                            # Per-season MVP points (must match overall logic above)
+                            if wicket_t and wicket_t not in ("run out","retired hurt","obstructing the field"):
+                                bs["mvp_pts"] += 3.5
+                            elif not wides and not noballs and runs_bat == 0 and not extras:
+                                bs["mvp_pts"] += 1.0
 
                 for inn, bmap in inn_runs.items():
                     for batter, runs in bmap.items():
@@ -583,6 +599,7 @@ def build_output(batters, bowlers, teams, seasons, total_matches, comp, team_sea
                 "sr":  round(ss["runs"]/ss["balls"]*100,2) if ss["balls"] else 0,
                 "fours": ss["fours"], "sixes": ss["sixes"],
                 "fifties": ss["fifties"], "hundreds": ss["hundreds"],
+                "mvp_pts": round(ss.get("mvp_pts", 0), 1),
             }
         # Performance index: avg * (SR/100) - rewards both consistency and aggression
         perf_index = round(avg * (sr/100), 1) if sr > 0 else 0
@@ -628,7 +645,8 @@ def build_output(batters, bowlers, teams, seasons, total_matches, comp, team_sea
             savg = round(sr/sw, 2) if sw else None
             sbi = round((sw/sm)*(6/secon), 2) if secon > 0 and sm > 0 else 0
             bowl_by_season[ssn] = {"matches":sm,"wickets":sw,"runs":sr,"balls":sb,
-                                   "economy":secon,"avg":savg,"bowl_index":sbi}
+                                   "economy":secon,"avg":savg,"bowl_index":sbi,
+                                   "mvp_pts": round(ss.get("mvp_pts", 0), 1)}
         # Phase stats for bowler
         raw_bps = s.get("phase_stats",{})
         bowl_phase_stats = {}

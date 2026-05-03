@@ -952,9 +952,10 @@ function filterBySeason(data) {
         acc.sixes    += s.sixes    || 0;
         acc.fifties  += s.fifties  || 0;
         acc.hundreds += s.hundreds || 0;
+        acc.mvp_pts  += s.mvp_pts  || 0;
         acc.dismissals += (s.dismissals || 0);
         return acc;
-      }, {matches:0,runs:0,balls:0,fours:0,sixes:0,fifties:0,hundreds:0,dismissals:0});
+      }, {matches:0,runs:0,balls:0,fours:0,sixes:0,fifties:0,hundreds:0,mvp_pts:0,dismissals:0});
       if (!agg.runs) return null;
       return {
         ...p,
@@ -965,6 +966,7 @@ function filterBySeason(data) {
         sixes:    agg.sixes,
         fifties:  agg.fifties,
         hundreds: agg.hundreds,
+        mvp_pts:  +agg.mvp_pts.toFixed(1),
         avg: agg.dismissals ? +(agg.runs/agg.dismissals).toFixed(2) : agg.runs,
         sr:  agg.balls ? +((agg.runs/agg.balls)*100).toFixed(2) : 0,
       };
@@ -1012,8 +1014,9 @@ function filterBySeason(data) {
         acc.wickets += s.wickets || 0;
         acc.runs    += s.runs    || 0;
         acc.balls   += s.balls   || 0;
+        acc.mvp_pts += s.mvp_pts || 0;
         return acc;
-      }, {matches:0, wickets:0, runs:0, balls:0});
+      }, {matches:0, wickets:0, runs:0, balls:0, mvp_pts:0});
       if (!agg.balls) return null;
       // If matches is 0 (old data with set), estimate from overs
       if (!agg.matches) agg.matches = Math.ceil(agg.balls / 24); // ~4 overs per match
@@ -1023,7 +1026,8 @@ function filterBySeason(data) {
       const bowl_index = economy > 0 && agg.matches > 0
         ? +((agg.wickets / agg.matches) * (6 / economy)).toFixed(2) : 0;
       return { ...p, matches: agg.matches, wickets: agg.wickets, runs: agg.runs,
-        balls: agg.balls, overs: +overs.toFixed(1), economy, avg, bowl_index };
+        balls: agg.balls, overs: +overs.toFixed(1), economy, avg, bowl_index,
+        mvp_pts: +agg.mvp_pts.toFixed(1) };
     })
     .filter(Boolean)
     .sort((a,b) => b.wickets - a.wickets);
