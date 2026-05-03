@@ -473,8 +473,14 @@ function drawCharts(sc){
           const overs = Number(b.overs);
           const balls = oversToBalls(overs);
           let econ = Number(b.economy);
-          // Some historical/generated scorecards may store runs/ball (0.x) instead of economy.
-          if(Number.isFinite(econ) && econ > 0 && econ <= 2) econ = +(econ * 6).toFixed(2);
+          // Some scorecards may store runs/ball (0.x) or economy/10 (0.x) instead of economy.
+          if(Number.isFinite(econ) && econ > 0 && econ <= 2){
+            const e6  = econ * 6;
+            const e10 = econ * 10;
+            // Prefer the transform that lands in a realistic economy band.
+            if(e10 >= 2 && e10 <= 20) econ = +e10.toFixed(2);
+            else econ = +e6.toFixed(2);
+          }
           // If economy is missing/invalid, compute from runs & balls.
           if(!Number.isFinite(econ) || econ <= 0){
             const runs = Number(b.runs);
@@ -487,6 +493,17 @@ function drawCharts(sc){
 
       const maxEco = bl.reduce((m,b)=>Math.max(m,b.economy), 0);
       if(bl.length){
+        // Inline debug (helps detect bad source data in production)
+        try{
+          const wrap = ec.closest?.('.chart-card') || ec.parentElement;
+          if(wrap){
+            const dbg = wrap.querySelector?.('.econ-debug') || document.createElement('div');
+            dbg.className = 'econ-debug';
+            dbg.style.cssText = 'margin-top:8px;font-size:11px;color:var(--muted);line-height:1.35;';
+            dbg.textContent = 'Economy used: ' + bl.slice(0,8).map(x=>`${x.name.split(' ').pop()} ${x.economy}`).join(' · ') + (bl.length>8?' …':'');
+            if(!dbg.parentElement) wrap.appendChild(dbg);
+          }
+        }catch(e){}
         charts.push(new Chart(ec,{type:'bar',data:{
           labels:bl.map(b=>b.name.split(' ').pop()),
           datasets:[{
