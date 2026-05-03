@@ -512,11 +512,23 @@ function drawCharts(sc){
             borderRadius:3
           }]
         },options:{
-          ...bo,
-          indexAxis:'y',
+          responsive:true,
+          maintainAspectRatio:false,
+          plugins:{legend:{display:false}},
           scales:{
-            ...bo.scales,
-            x:{...bo.scales.x, beginAtZero:true, suggestedMax: Math.max(10, Math.ceil(maxEco+1))}
+            x:{
+              type:'category',
+              grid:{display:false},
+              ticks:{font:{size:10},color:'#6B7A8D'}
+            },
+            y:{
+              type:'linear',
+              beginAtZero:true,
+              min:0,
+              suggestedMax: Math.max(10, Math.ceil(maxEco+1)),
+              grid:{color:'#E2E6EA'},
+              ticks:{font:{size:10},color:'#6B7A8D'}
+            }
           }
         }}));
       }
