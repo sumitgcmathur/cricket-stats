@@ -632,7 +632,7 @@ function renderMatchups(){
   }
 
   // Batter vs pace/spin chart
-  if(bat?.vs_type){
+  if(batPlayer?.vs_type){
     const ctx=document.getElementById('mu-vs-type')?.getContext('2d');
     if(ctx){
       const types=['pace','spin'];
