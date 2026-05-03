@@ -323,6 +323,9 @@ def parse_zip(zip_bytes, comp):
 
     batters  = defaultdict(lambda: {"runs":0,"balls":0,"fours":0,"sixes":0,"fifties":0,"hundreds":0,"matches":set(),"dismissals":0,"by_season":{}})
     bowlers  = defaultdict(lambda: {"runs":0,"balls":0,"wickets":0,"matches":set(),"by_season":{}})
+    # Global style maps reduce misclassification when match info omits style rows.
+    global_bowling_styles = {}
+    global_batting_hands = {}
     # Normalise historical team name variants to current names
     TEAM_ALIASES = {
         "Delhi Daredevils": "Delhi Capitals",
@@ -400,6 +403,13 @@ def parse_zip(zip_bytes, comp):
                                         bstyle = ",".join(parts[3:]).strip().lower()
                                         is_spin = any(x in bstyle for x in ["spin","finger","wrist","orthodox","chinaman","leg-break","off-break"])
                                         match_bowling_styles[pname] = "spin" if is_spin else "pace"
+                                        global_bowling_styles[pname] = match_bowling_styles[pname]
+                                    elif parts[1] == "batting_style" and len(parts) >= 4:
+                                        pname = parts[2].strip()
+                                        bstyle = ",".join(parts[3:]).strip().lower()
+                                        hand = "left" if "left" in bstyle else "right"
+                                        match_batting_hands[pname] = hand
+                                        global_batting_hands[pname] = hand
                     except:
                         pass
 
@@ -461,11 +471,12 @@ def parse_zip(zip_bytes, comp):
                         b["phase_stats"][phase]["b"] += 1
                         # vs bowler type (pace/spin)
                         if bowler:
-                            bowl_type = match_bowling_styles.get(bowler, "pace")
+                            bowl_type = match_bowling_styles.get(bowler) or global_bowling_styles.get(bowler)
                             if "vs_type" not in b:
                                 b["vs_type"] = {"pace":{"r":0,"b":0},"spin":{"r":0,"b":0}}
-                            b["vs_type"][bowl_type]["r"] += runs_bat
-                            b["vs_type"][bowl_type]["b"] += 1
+                            if bowl_type in ("pace", "spin"):
+                                b["vs_type"][bowl_type]["r"] += runs_bat
+                                b["vs_type"][bowl_type]["b"] += 1
                         # Per-season tracking
                         if season:
                             if season not in b["by_season"]:
@@ -501,6 +512,16 @@ def parse_zip(zip_bytes, comp):
                         bl["matches"].add(match_id)
                         if wicket_t and wicket_t not in ("run out","retired hurt","obstructing the field"):
                             bl["wickets"] += 1
+                        # Bowler split vs batter handedness
+                        if "vs_hand" not in bl:
+                            bl["vs_hand"] = {"left":{"runs":0,"balls":0,"wickets":0}, "right":{"runs":0,"balls":0,"wickets":0}}
+                        batter_hand = match_batting_hands.get(batter) or global_batting_hands.get(batter)
+                        if batter_hand in ("left", "right"):
+                            hs = bl["vs_hand"][batter_hand]
+                            hs["runs"] += runs_bat + extras
+                            hs["balls"] += 1
+                            if wicket_t and wicket_t not in ("run out","retired hurt","obstructing the field"):
+                                hs["wickets"] += 1
                         # MVP points: wickets=3.5, dot balls=1
                         if "mvp_pts" not in bl: bl["mvp_pts"] = 0.0
                         if wicket_t and wicket_t not in ("run out","retired hurt","obstructing the field"):
@@ -653,10 +674,21 @@ def build_output(batters, bowlers, teams, seasons, total_matches, comp, team_sea
         for ph, ps in raw_bps.items():
             econ_ph = round(ps["r"]/ps["b"]*6,2) if ps["b"] else 0
             bowl_phase_stats[ph] = {"runs":ps["r"],"balls":ps["b"],"wickets":ps["w"],"economy":econ_ph}
+        # Bowler split vs batter handedness
+        vs_hand = {}
+        for hand, hs in s.get("vs_hand", {}).items():
+            hecon = round(hs["runs"]/hs["balls"]*6, 2) if hs.get("balls") else 0
+            vs_hand[hand] = {
+                "runs": hs.get("runs", 0),
+                "balls": hs.get("balls", 0),
+                "wickets": hs.get("wickets", 0),
+                "economy": hecon
+            }
         bowling_list.append({"name":name,"matches":m,"wickets":s["wickets"],"runs":s["runs"],
             "overs":overs,"economy":economy,"avg":avg,"bowl_index":bowl_index,
             "mvp_pts": round(s.get("mvp_pts",0), 1),
             "phase_stats":bowl_phase_stats,
+            "vs_hand":vs_hand,
             "by_season":bowl_by_season})
 
 
@@ -690,8 +722,8 @@ def build_output(batters, bowlers, teams, seasons, total_matches, comp, team_sea
         "total_matches": total_matches,
         "seasons":       seasons,
         "last_updated":  datetime.datetime.now().strftime("%d %b %Y, %H:%M"),
-        "batting":       batting_list[:300],
-        "bowling":       bowling_list[:300],
+        "batting":       batting_list,
+        "bowling":       bowling_list,
         "sixes":         sixes_list,
         "teams":         teams_list,
     }

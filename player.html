@@ -578,28 +578,6 @@ function renderMatchups(){
     </div>`;
   }
 
-  // vs Bowler Type
-  if(batPlayer?.vs_type && (batPlayer.vs_type.pace?.balls > 0 || batPlayer.vs_type.spin?.balls > 0)){
-    const vt = batPlayer.vs_type;
-    html += `<div class="section-title">⚔️ vs Bowler Type (Pace vs Spin)</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
-      <div class="stat-card" style="border-top:3px solid #1E3A5F">
-        <div class="sc-label">vs Pace</div>
-        <div class="sc-val">${vt.pace?.runs||0}</div>
-        <div class="sc-sub">${vt.pace?.balls||0} balls · SR ${vt.pace?.sr||0}</div>
-      </div>
-      <div class="stat-card" style="border-top:3px solid #7B2FBE">
-        <div class="sc-label">vs Spin</div>
-        <div class="sc-val">${vt.spin?.runs||0}</div>
-        <div class="sc-sub">${vt.spin?.balls||0} balls · SR ${vt.spin?.sr||0}</div>
-      </div>
-    </div>
-    <div class="chart-card" style="margin-bottom:24px">
-      <h3>Strike Rate vs Pace vs Spin</h3>
-      <div class="chart-wrap-sm"><canvas id="mu-bat-type"></canvas></div>
-    </div>`;
-  }
-
   // Season-by-season batting trend
   if(batPlayer?.by_season && Object.keys(batPlayer.by_season).length > 1){
     const seasons = Object.keys(batPlayer.by_season).sort();
@@ -628,6 +606,28 @@ function renderMatchups(){
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:28px">
       <div class="chart-card"><h3>Economy by Phase</h3><div class="chart-wrap-sm"><canvas id="mu-bowl-econ"></canvas></div></div>
       <div class="chart-card"><h3>Wickets by Phase</h3><div class="chart-wrap-sm"><canvas id="mu-bowl-wkts"></canvas></div></div>
+    </div>`;
+  }
+
+  // Bowler vs batter handedness
+  if(bowlPlayer?.vs_hand && (bowlPlayer.vs_hand.left?.balls > 0 || bowlPlayer.vs_hand.right?.balls > 0)){
+    const vh = bowlPlayer.vs_hand;
+    html += `<div class="section-title">🧭 Bowling vs Batter Handedness</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
+      <div class="stat-card" style="border-top:3px solid #7B2FBE">
+        <div class="sc-label">vs Left-Hand Batters</div>
+        <div class="sc-val" style="color:#7B2FBE">${vh.left?.wickets||0}W</div>
+        <div class="sc-sub">${vh.left?.balls||0} balls · Econ ${vh.left?.economy||0} · ${vh.left?.runs||0}R</div>
+      </div>
+      <div class="stat-card" style="border-top:3px solid #1E3A5F">
+        <div class="sc-label">vs Right-Hand Batters</div>
+        <div class="sc-val" style="color:#1E3A5F">${vh.right?.wickets||0}W</div>
+        <div class="sc-sub">${vh.right?.balls||0} balls · Econ ${vh.right?.economy||0} · ${vh.right?.runs||0}R</div>
+      </div>
+    </div>
+    <div class="chart-card" style="margin-bottom:28px">
+      <h3>Economy & Wickets vs Left/Right Batters</h3>
+      <div class="chart-wrap-sm"><canvas id="mu-bowl-hand"></canvas></div>
     </div>`;
   }
 
@@ -687,22 +687,6 @@ function drawMatchupCharts(batArg, bowlArg){
       datasets:[{data:phKeys.map(k=>batArg.phase_stats[k]?.sr||0),backgroundColor:colors,borderRadius:6}]},options:bopts}));
   }
 
-  // vs bowler type
-  if(batArg?.vs_type){
-    const typeCtx=document.getElementById('mu-bat-type')?.getContext('2d');
-    if(typeCtx){
-      charts.push(new Chart(typeCtx,{type:'bar',data:{
-        labels:['vs Pace','vs Spin'],
-        datasets:[
-          {label:'Strike Rate',data:[batArg.vs_type.pace?.sr||0, batArg.vs_type.spin?.sr||0],
-           backgroundColor:['#1E3A5F','#7B2FBE'],borderRadius:8},
-        ]
-      },options:{...bopts,plugins:{...bopts.plugins,
-        annotation:{annotations:{line1:{type:'line',yMin:batArg.sr,yMax:batArg.sr,borderColor:'#DAA520',borderWidth:2,borderDash:[5,3],
-          label:{display:true,content:'Career SR: '+batArg.sr,position:'end',font:{size:10}}}}}}}}));
-    }
-  }
-
   // Batting season trend
   if(batArg?.by_season){
     const ctx=document.getElementById('mu-bat-season')?.getContext('2d');
@@ -740,6 +724,24 @@ function drawMatchupCharts(batArg, bowlArg){
       ]},options:{responsive:true,maintainAspectRatio:false,
         plugins:{legend:{display:true,position:'top',labels:{font:{size:10},boxWidth:10}}},
         scales:{x:{grid:{display:false},ticks:{font:{size:10}}},
+          y:{grid:{color:'#E2E6EA'},ticks:{font:{size:10}},title:{display:true,text:'Wickets',font:{size:9}}},
+          y2:{position:'right',grid:{display:false},ticks:{font:{size:10}},title:{display:true,text:'Economy',font:{size:9}}}}}}));
+    }
+  }
+
+  // Bowling handedness chart
+  if(bowlArg?.vs_hand){
+    const ctx=document.getElementById('mu-bowl-hand')?.getContext('2d');
+    if(ctx){
+      const labels=['vs Left','vs Right'];
+      const left=bowlArg.vs_hand.left||{};
+      const right=bowlArg.vs_hand.right||{};
+      charts.push(new Chart(ctx,{type:'bar',data:{labels,datasets:[
+        {type:'bar',label:'Wickets',data:[left.wickets||0,right.wickets||0],backgroundColor:['#7B2FBE','#1E3A5F'],borderRadius:5,yAxisID:'y'},
+        {type:'line',label:'Economy',data:[left.economy||0,right.economy||0],borderColor:'#2D9648',backgroundColor:'transparent',pointRadius:5,borderWidth:2,tension:0.2,yAxisID:'y2'},
+      ]},options:{responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{display:true,position:'top',labels:{font:{size:10},boxWidth:10}}},
+        scales:{x:{grid:{display:false},ticks:{font:{size:11}}},
           y:{grid:{color:'#E2E6EA'},ticks:{font:{size:10}},title:{display:true,text:'Wickets',font:{size:9}}},
           y2:{position:'right',grid:{display:false},ticks:{font:{size:10}},title:{display:true,text:'Economy',font:{size:9}}}}}}));
     }
