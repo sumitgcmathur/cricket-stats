@@ -460,8 +460,21 @@ function drawCharts(sc){
     // Economy
     const ec=document.getElementById('ch-econ-'+id);
     if(ec){
-      const bl=[...(inn.bowlers||[])].filter(b=>b.overs>0).sort((a,b)=>a.economy-b.economy);
-      if(bl.length)charts.push(new Chart(ec,{type:'bar',data:{labels:bl.map(b=>b.name.split(' ').pop()),datasets:[{data:bl.map(b=>b.economy),backgroundColor:bl.map(b=>b.economy<=6?'#2D9648':b.economy<=8?'#DAA520':'#C0392B'),borderRadius:3}]},options:{...bo,indexAxis:'y'}}));
+      const bl=[...(inn.bowlers||[])]
+        .map(b=>({ ...b, overs:+b.overs, economy:+b.economy }))
+        .filter(b=>b.overs>0 && Number.isFinite(b.economy))
+        .sort((a,b)=>a.economy-b.economy);
+      const ecc=ec.getContext?.('2d');
+      if(ecc && bl.length){
+        charts.push(new Chart(ecc,{type:'bar',data:{
+          labels:bl.map(b=>b.name.split(' ').pop()),
+          datasets:[{
+            data:bl.map(b=>b.economy),
+            backgroundColor:bl.map(b=>b.economy<=6?'#2D9648':b.economy<=8?'#DAA520':'#C0392B'),
+            borderRadius:3
+          }]
+        },options:{...bo,indexAxis:'y'}}));
+      }
     }
     // Boundaries
     const bnc=document.getElementById('ch-bound-'+id);
