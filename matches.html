@@ -648,16 +648,17 @@ function formatStage(stage){
 function inferIplStageFromMatchNumber(season, matchNumber){
   const mn = Number(matchNumber);
   if(!Number.isFinite(mn) || !season || comp !== 'ipl') return '';
-  const seasonNums = matches
+  const seasonNums = [...new Set(matches
     .filter(m => m.season === season && Number.isFinite(Number(m.match_number)))
-    .map(m => Number(m.match_number));
+    .map(m => Number(m.match_number)))].sort((a,b)=>a-b);
   if(!seasonNums.length) return '';
-  const maxNo = Math.max(...seasonNums);
-  const delta = maxNo - mn;
-  if(delta === 0) return '🏆 Final';
-  if(delta === 1) return 'Qualifier 2';
-  if(delta === 2) return 'Eliminator';
-  if(delta === 3) return 'Qualifier 1';
+  const tail = seasonNums.slice(-4);
+  if(tail.length < 4) return '';
+  const idx = tail.indexOf(mn);
+  if(idx === 0) return 'Qualifier 1';
+  if(idx === 1) return 'Eliminator';
+  if(idx === 2) return 'Qualifier 2';
+  if(idx === 3) return '🏆 Final';
   return '';
 }
 
