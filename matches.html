@@ -182,9 +182,10 @@ function renderList(){
   document.getElementById('sc-view').style.display='none';
   const season=document.getElementById('season-sel').value;
   const q=document.getElementById('srch').value.toLowerCase();
-  let f=matches;
-  if(season!=='all')f=f.filter(m=>m.season===season);
-  if(q)f=f.filter(m=>(m.teams||[]).join(' ').toLowerCase().includes(q)||(m.venue||'').toLowerCase().includes(q));
+  let seasonMatches=matches;
+  if(season!=='all') seasonMatches=seasonMatches.filter(m=>m.season===season);
+  let f=seasonMatches;
+  if(q) f=f.filter(m=>(m.teams||[]).join(' ').toLowerCase().includes(q)||(m.venue||'').toLowerCase().includes(q));
 
   const wrap=document.getElementById('list-view');
   wrap.innerHTML='';
@@ -192,7 +193,8 @@ function renderList(){
   // Points table (only when a specific season is selected)
   if(season !== 'all'){
     try{
-      wrap.innerHTML += buildPointsTableHtml(f, season);
+      // IMPORTANT: points table should not be affected by the search box.
+      wrap.innerHTML += buildPointsTableHtml(seasonMatches, season);
     }catch(e){}
   }
 

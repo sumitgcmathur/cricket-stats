@@ -76,7 +76,7 @@ def download_zip(code):
 
 
 # ── SCORECARD BUILDER ────────────────────────────────────────────────────────
-def build_scorecard(match_id, rows, match_winner="", match_win_margin="", match_outcome="", match_number="", match_stage=""):
+def build_scorecard(match_id, rows, match_winner="", match_win_margin="", match_outcome="", match_number="", match_stage="", match_teams=None):
     """Build a full match scorecard from ball-by-ball rows."""
     if not rows:
         return None
@@ -86,12 +86,16 @@ def build_scorecard(match_id, rows, match_winner="", match_win_margin="", match_
     venue    = r0.get("venue", "")
     date     = r0.get("start_date", "") or r0.get("date", "")
 
-    # Collect teams in batting order
+    # Collect teams in batting order (ball rows may be empty for washouts)
     team_order = []
     for row in rows:
         t = norm_team(row.get("batting_team", ""))
         if t and t not in team_order:
             team_order.append(t)
+    if (not team_order or len(team_order) < 2) and match_teams:
+        for t in [norm_team(x) for x in match_teams]:
+            if t and t not in team_order:
+                team_order.append(t)
 
     winner     = norm_team(match_winner)
     win_margin = match_win_margin
@@ -288,16 +292,26 @@ def build_scorecard(match_id, rows, match_winner="", match_win_margin="", match_
     innings_list = [serialise_innings(k, v) for k, v in sorted(innings_data.items())]
 
     # Match summary for index
-    teams = [i["batting_team"] for i in innings_list]
-    scores = [f"{i['total_runs']}/{i['total_wickets']} ({i['overs']} ov)" for i in innings_list]
+    teams_from_innings = [i["batting_team"] for i in innings_list if i.get("batting_team")]
+    scores_from_innings = [f"{i['total_runs']}/{i['total_wickets']} ({i['overs']} ov)" for i in innings_list]
+
+    # Prefer the teams collected from ball rows / info (handles washouts cleanly).
+    teams = team_order[:2] if len(team_order) >= 2 else (teams_from_innings[:2] if len(teams_from_innings) >= 2 else team_order)
+    # Scores only exist if innings exist; keep array aligned with teams.
+    if len(scores_from_innings) >= 2:
+        scores = scores_from_innings[:2]
+    elif len(scores_from_innings) == 1 and len(teams) >= 2:
+        scores = [scores_from_innings[0], ""]
+    else:
+        scores = scores_from_innings[:2]
 
     return {
         "match_id":    match_id,
         "season":      season,
         "date":        date,
         "venue":       venue,
-        "teams":       teams[:2] if len(teams) >= 2 else teams,
-        "scores":      scores[:2] if len(scores) >= 2 else scores,
+        "teams":       teams,
+        "scores":      scores,
         "winner":      winner,
         "win_margin":  win_margin,
         "outcome":     outcome,
@@ -381,6 +395,7 @@ def parse_zip(zip_bytes, comp):
                 match_number_from_info = ""
                 match_stage_from_info = ""
                 match_event_from_info = ""
+                match_teams_from_info = []
                 match_bowling_styles = {}
                 match_batting_hands = {}
                 info_key = fname.replace(".csv","").split("/")[-1]
@@ -392,6 +407,10 @@ def parse_zip(zip_bytes, comp):
                                 if len(parts) >= 3 and parts[0] == "info":
                                     if parts[1] == "winner":
                                         match_winner_from_info = ",".join(parts[2:]).strip()
+                                    elif parts[1] == "team":
+                                        t = norm_team(",".join(parts[2:]).strip())
+                                        if t and t not in match_teams_from_info:
+                                            match_teams_from_info.append(t)
                                     elif parts[1] == "by":
                                         match_margin_from_info = ",".join(parts[2:]).strip()
                                     elif parts[1] == "outcome":
@@ -581,7 +600,16 @@ def parse_zip(zip_bytes, comp):
 
                 # Build and save scorecard
                 try:
-                    sc = build_scorecard(match_id, rows, match_winner_from_info, match_margin_from_info, match_outcome_from_info, match_number_from_info, match_stage_from_info)
+                    sc = build_scorecard(
+                        match_id,
+                        rows,
+                        match_winner_from_info,
+                        match_margin_from_info,
+                        match_outcome_from_info,
+                        match_number_from_info,
+                        match_stage_from_info,
+                        match_teams_from_info,
+                    )
                 except Exception as _sc_err:
                     print(f"  ⚠️  Scorecard {match_id}: {_sc_err}")
                     sc = None
