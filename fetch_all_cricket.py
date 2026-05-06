@@ -48,6 +48,24 @@ COMPETITIONS = [
 BASE_URL  = "https://cricsheet.org/downloads/{code}_male_csv2.zip"
 STATS_DIR = "stats"
 
+# Normalise historical team name variants.
+# Keep these stable across ALL outputs (scorecards, match index, team stats).
+TEAM_ALIASES = {
+    "Delhi Daredevils": "Delhi Capitals",
+    "Deccan Chargers": "Sunrisers Hyderabad",
+    "Rising Pune Supergiant": "Rising Pune Supergiants",
+    "Rising Pune Supergiants": "Rising Pune Supergiants",
+    "Pune Warriors": "Pune Warriors India",
+    "Pune Warriors India": "Pune Warriors India",
+    "Royal Challengers Bangalore": "Royal Challengers Bengaluru",
+    "Royal Challengers Bengaluru": "Royal Challengers Bengaluru",
+    "Kings XI Punjab": "Punjab Kings",
+}
+
+def norm_team(name: str) -> str:
+    n = (name or "").strip()
+    return TEAM_ALIASES.get(n, n)
+
 
 def download_zip(code):
     url = BASE_URL.format(code=code)
@@ -71,11 +89,11 @@ def build_scorecard(match_id, rows, match_winner="", match_win_margin="", match_
     # Collect teams in batting order
     team_order = []
     for row in rows:
-        t = row.get("batting_team", "")
+        t = norm_team(row.get("batting_team", ""))
         if t and t not in team_order:
             team_order.append(t)
 
-    winner     = match_winner
+    winner     = norm_team(match_winner)
     win_margin = match_win_margin
     outcome    = match_outcome   # no result, tie, super over etc
     match_num  = match_number
@@ -110,8 +128,8 @@ def build_scorecard(match_id, rows, match_winner="", match_win_margin="", match_
         batter     = row.get("striker", "").strip()
         non_str    = row.get("non_striker", "").strip()
         bowler     = row.get("bowler", "").strip()
-        bat_team   = row.get("batting_team", "").strip()
-        bowl_team  = row.get("bowling_team", "").strip()
+        bat_team   = norm_team(row.get("batting_team", "").strip())
+        bowl_team  = norm_team(row.get("bowling_team", "").strip())
         runs_bat   = int(row.get("runs_off_bat", 0) or 0)
         extras_tot = int(row.get("extras", 0) or 0)
         wides      = int(row.get("wides", 0) or 0)
@@ -326,15 +344,6 @@ def parse_zip(zip_bytes, comp):
     # Global style maps reduce misclassification when match info omits style rows.
     global_bowling_styles = {}
     global_batting_hands = {}
-    # Normalise historical team name variants to current names
-    TEAM_ALIASES = {
-        "Delhi Daredevils": "Delhi Capitals",
-        "Deccan Chargers": "Sunrisers Hyderabad",
-        "Rising Pune Supergiants": "Rising Pune Supergiant",
-        "Pune Warriors": "Pune Warriors India",
-        "Kochi Tuskers Kerala": "Kochi Tuskers Kerala",
-    }
-
     teams    = defaultdict(lambda: {"wins":0,"matches":set(),"by_season":{}})
     team_won_matches = defaultdict(set)  # track per-match wins separately
     team_season_matches = defaultdict(lambda: defaultdict(set))  # team->season->match_ids
@@ -419,7 +428,7 @@ def parse_zip(zip_bytes, comp):
                         pass
 
                 # Track winner from info file
-                match_winner_from_info = TEAM_ALIASES.get(match_winner_from_info, match_winner_from_info)
+                match_winner_from_info = norm_team(match_winner_from_info)
                 if match_winner_from_info and match_id not in team_won_matches[match_winner_from_info]:
                     team_won_matches[match_winner_from_info].add(match_id)
                     teams[match_winner_from_info]["wins"] += 1
@@ -433,8 +442,8 @@ def parse_zip(zip_bytes, comp):
                 for row in rows:
                     batter     = row.get("striker","").strip()
                     bowler     = row.get("bowler","").strip()
-                    bat_team   = TEAM_ALIASES.get(row.get("batting_team","").strip(), row.get("batting_team","").strip())
-                    bowl_team  = TEAM_ALIASES.get(row.get("bowling_team","").strip(), row.get("bowling_team","").strip())
+                    bat_team   = norm_team(row.get("batting_team","").strip())
+                    bowl_team  = norm_team(row.get("bowling_team","").strip())
                     runs_bat   = int(row.get("runs_off_bat",0) or 0)
                     extras     = int(row.get("extras",0) or 0)
                     # Needed for dot-ball logic (and some derived stats)
