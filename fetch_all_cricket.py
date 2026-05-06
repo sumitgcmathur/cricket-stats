@@ -60,6 +60,11 @@ TEAM_ALIASES = {
     "Royal Challengers Bangalore": "Royal Challengers Bengaluru",
     "Royal Challengers Bengaluru": "Royal Challengers Bengaluru",
     "Kings XI Punjab": "Punjab Kings",
+    # Collapse older Gujarat/Pune franchises into latest names (per project convention)
+    "Gujarat Lions": "Gujarat Titans",
+    "Gujarat Titans": "Gujarat Titans",
+    "Pune Warriors India": "Rising Pune Supergiants",
+    "Pune Warriors": "Rising Pune Supergiants",
 }
 
 def norm_team(name: str) -> str:
@@ -618,13 +623,20 @@ def parse_zip(zip_bytes, comp):
                     with open(sc_path, "w", encoding="utf-8") as sf:
                         json.dump(sc, sf, ensure_ascii=False, separators=(",",":"))
                     # Add to match index (lightweight)
+                    norm_teams = [norm_team(t) for t in (sc.get("teams") or []) if t]
+                    # ensure 2 teams when possible
+                    if match_teams_from_info:
+                        for t in [norm_team(x) for x in match_teams_from_info]:
+                            if t and t not in norm_teams:
+                                norm_teams.append(t)
+                    norm_teams = norm_teams[:2]
                     match_index.append({
                         "id":      match_id,
                         "season":  sc["season"],
                         "date":    sc["date"],
-                        "teams":   sc["teams"],
+                        "teams":   norm_teams,
                         "scores":  sc["scores"],
-                        "winner":  sc["winner"],
+                        "winner":  norm_team(sc["winner"]),
                         "outcome": sc["outcome"],
                         "match_number": sc["match_number"],
                         "stage":   sc["stage"],

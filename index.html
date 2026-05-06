@@ -1431,17 +1431,48 @@ function renderTeams(d, target) {
   const sorted = [...(d.teams||[])].sort((a,b) => ((a[key]??-1)<(b[key]??-1)?-1:1)*dir);
   const maxWins = Math.max(...(d.teams||[]).map(t => t.wins), 1);
 
-  const cols = [{k:'matches',l:'Matches'},{k:'wins',l:'Wins',hi:true},{k:'win_pct',l:'Win %'}];
+  const honors = (team) => {
+    const H = {
+      'Chennai Super Kings': {t:5, r:5, p:12},
+      'Mumbai Indians': {t:5, r:1, p:11},
+      'Kolkata Knight Riders': {t:3, r:1, p:9},
+      'Sunrisers Hyderabad': {t:1, r:2, p:7},
+      'Rajasthan Royals': {t:1, r:1, p:6},
+      'Gujarat Titans': {t:1, r:1, p:3},
+      'Delhi Capitals': {t:0, r:1, p:6},
+      'Punjab Kings': {t:0, r:1, p:2},
+      'Royal Challengers Bengaluru': {t:0, r:3, p:9},
+      'Lucknow Super Giants': {t:0, r:0, p:2},
+      'Rising Pune Supergiants': {t:0, r:1, p:1},
+    };
+    return H[team] || {t:0, r:0, p:0};
+  };
+
+  const cols = [
+    {k:'matches',l:'Matches'},
+    {k:'wins',l:'Wins',hi:true},
+    {k:'win_pct',l:'Win %'},
+    {k:'trophies',l:'Trophies'},
+    {k:'runner_up',l:'Runner-up'},
+    {k:'playoffs',l:'Playoffs'},
+  ];
   const thCols = cols.map(c =>
     `<th class="${key===c.k?'sorted':''}" onclick="sortTbl('${target}','teams','${c.k}',${key===c.k?dir*-1:-1},'${target}')">${c.l}${key===c.k?(dir===-1?'↓':'↑'):''}</th>`
   ).join('');
 
-  const trs = sorted.map((t,i) => `
+  const withHonors = sorted.map(t => {
+    const h = honors(t.team);
+    return {...t, trophies:h.t, runner_up:h.r, playoffs:h.p};
+  });
+  const trs = withHonors.map((t,i) => `
     <tr>
       <td><span class="rank ${i<3?'top3':''}">${i+1}</span> <a class="pname" href="team.html?comp=ipl&season=${encodeURIComponent(activeSeason||'all')}&team=${encodeURIComponent(t.team)}" style="text-decoration:none;color:var(--text);font-weight:500">${t.team}</a></td>
       <td>${t.matches}</td>
       <td class="hi">${t.wins}</td>
       <td>${t.win_pct}%</td>
+      <td>${t.trophies}</td>
+      <td>${t.runner_up}</td>
+      <td>${t.playoffs}</td>
       <td><div class="win-bar"><div class="win-bar-bg"><div class="win-bar-fill" style="width:${(t.wins/maxWins*100).toFixed(0)}%"></div></div></div></td>
     </tr>`).join('');
 
