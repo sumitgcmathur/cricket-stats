@@ -106,6 +106,12 @@ td:nth-child(2){text-align:left;color:var(--muted);font-size:12px;}
 .spinner{width:24px;height:24px;border:2px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin 0.7s linear infinite;margin:0 auto 12px;}
 @keyframes spin{to{transform:rotate(360deg);}}
 .empty-msg{text-align:center;padding:48px;color:var(--muted);font-size:13px;}
+/* Points table */
+.pt-wrap{background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow);overflow:hidden;margin-bottom:16px;}
+.pt-title{padding:10px 16px;background:var(--surface2);border-bottom:1px solid var(--border);font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.pt-sub{font-size:11px;color:var(--muted);font-weight:500;letter-spacing:0.2px;text-transform:none;}
+.tlink{color:var(--blue);text-decoration:none;font-weight:600;}
+.tlink:hover{text-decoration:underline;}
 footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-size:12px;color:var(--muted);margin-top:40px;}
 footer a{color:var(--blue);text-decoration:none;}
 @media(max-width:640px){.charts-grid{grid-template-columns:1fr;}.main{padding:16px;}td:nth-child(n+5){display:none;}th:nth-child(n+5){display:none;}}
@@ -183,6 +189,13 @@ function renderList(){
   const wrap=document.getElementById('list-view');
   wrap.innerHTML='';
 
+  // Points table (only when a specific season is selected)
+  if(season !== 'all'){
+    try{
+      wrap.innerHTML += buildPointsTableHtml(f, season);
+    }catch(e){}
+  }
+
   if(!f.length){wrap.innerHTML='<div class="empty-msg">No matches found</div>';return;}
 
   const info=document.createElement('div');
@@ -202,12 +215,13 @@ function renderList(){
     card.className='match-card';
 
     const left=document.createElement('div');
-    const teams=document.createElement('div');teams.className='match-teams';teams.textContent=t1+' vs '+t2;
+    const teams=document.createElement('div');teams.className='match-teams';
+    teams.innerHTML = `<a class="tlink" href="team.html?comp=${encodeURIComponent(comp)}&season=${encodeURIComponent(m.season||'all')}&team=${encodeURIComponent(t1)}" onclick="event.stopPropagation()">${t1}</a> vs <a class="tlink" href="team.html?comp=${encodeURIComponent(comp)}&season=${encodeURIComponent(m.season||'all')}&team=${encodeURIComponent(t2)}" onclick="event.stopPropagation()">${t2}</a>`;
     const scores=document.createElement('div');scores.className='match-scores';scores.textContent=s1+(s2?' | '+s2:'');
     const meta=document.createElement('div');meta.className='match-meta';
 
     // Stage + match number combined label
-    const stageInfo = getStageInfo(m.stage, m.match_number, m.season);
+    const stageInfo = getStageInfo(m.stage, m.match_number);
     if(stageInfo.badge){
       const b=document.createElement('span');
       b.style.cssText='background:#7B2FBE20;color:#7B2FBE;font-size:10px;font-weight:600;padding:2px 8px;border-radius:3px;white-space:nowrap';
@@ -269,7 +283,7 @@ function buildScorecard(sv,sc){
   let resultText = 'Result unavailable';
   if(sc.winner) resultText = sc.winner + ' won' + (sc.win_margin?' · '+sc.win_margin:'');
   else if(sc.outcome) resultText = formatOutcome(sc.outcome);
-  const stageInfo = getStageInfo(sc.stage, sc.match_number, sc.season);
+  const stageInfo = getStageInfo(sc.stage, sc.match_number);
   hero.innerHTML='<div class="sc-teams">'+t1+'<span class="vs">VS</span>'+t2+'</div>'+
     (stageInfo.badge?'<div style="margin-bottom:8px"><span style="background:rgba(255,255,255,0.15);color:rgba(255,255,255,0.9);font-size:11px;font-weight:600;padding:3px 10px;border-radius:3px;letter-spacing:1px">'+stageInfo.badge+'</span></div>':'') +
     '<div class="sc-result">'+resultText+'</div>'+
@@ -645,31 +659,14 @@ function formatStage(stage){
   return stage;
 }
 
-function inferIplStageFromMatchNumber(season, matchNumber){
-  const mn = Number(matchNumber);
-  if(!Number.isFinite(mn) || !season || comp !== 'ipl') return '';
-  const seasonNums = [...new Set(matches
-    .filter(m => m.season === season && Number.isFinite(Number(m.match_number)))
-    .map(m => Number(m.match_number)))].sort((a,b)=>a-b);
-  if(!seasonNums.length) return '';
-  const tail = seasonNums.slice(-4);
-  if(tail.length < 4) return '';
-  const idx = tail.indexOf(mn);
-  if(idx === 0) return 'Qualifier 1';
-  if(idx === 1) return 'Eliminator';
-  if(idx === 2) return 'Qualifier 2';
-  if(idx === 3) return '🏆 Final';
-  return '';
-}
-
-function getStageInfo(stage, matchNumber, season){
-  const inferred = inferIplStageFromMatchNumber(season, matchNumber);
-  const stageOnly = stage ? formatStage(stage) : (inferred || (matchNumber ? 'Group Stage' : ''));
+function getStageInfo(stage, matchNumber){
+  const stageOnly = stage ? formatStage(stage) : (matchNumber ? 'Group Stage' : '');
   const matchNoText = matchNumber ? String(matchNumber).trim() : '';
   const isPlayoff = /qualifier|eliminator|final|semi/i.test(stageOnly);
-  const badge = isPlayoff
-    ? stageOnly + (matchNoText ? ' · Match ' + matchNoText : '')
-    : (matchNoText ? stageOnly + ' · Match ' + matchNoText : stageOnly);
+  // Always show match number when we have it (stage is optional).
+  const badge = matchNoText
+    ? ((isPlayoff ? stageOnly : stageOnly) + ' · Match ' + matchNoText)
+    : stageOnly;
   return { stageOnly, badge };
 }
 
@@ -681,6 +678,75 @@ function formatOutcome(outcome){
   if(outcome.toLowerCase().includes('abandoned')) return 'Abandoned';
   if(outcome.toLowerCase().includes('rain')) return 'Rain - No Result';
   return outcome;
+}
+
+function parseScore(s){
+  // "189/5 (20 ov)" -> {runs:189, overs:20}
+  if(!s) return null;
+  const m = String(s).match(/(\d+)\s*\/\s*(\d+)\s*\(([\d.]+)\s*ov\)/i);
+  if(!m) return null;
+  const runs = Number(m[1]);
+  const overs = Number(m[3]);
+  if(!Number.isFinite(runs) || !Number.isFinite(overs) || overs<=0) return null;
+  return { runs, overs };
+}
+
+function buildPointsTableHtml(ms, season){
+  const byTeam = {};
+  const ensure = (t) => byTeam[t] || (byTeam[t] = {team:t, p:0, w:0, l:0, nr:0, pts:0, rf:0, of:0, ra:0, oa:0});
+  ms.forEach(m=>{
+    const t1=(m.teams||[])[0], t2=(m.teams||[])[1];
+    if(!t1 || !t2) return;
+    const a=ensure(t1), b=ensure(t2);
+    a.p++; b.p++;
+
+    const isNR = !!m.outcome && /no result|abandoned|rain/i.test(m.outcome);
+    if(isNR){
+      a.nr++; b.nr++; a.pts+=1; b.pts+=1;
+    }else if(m.winner){
+      if(m.winner===t1){ a.w++; b.l++; a.pts+=2; }
+      else if(m.winner===t2){ b.w++; a.l++; b.pts+=2; }
+      else { a.nr++; b.nr++; a.pts+=1; b.pts+=1; } // fallback
+    }else{
+      a.nr++; b.nr++; a.pts+=1; b.pts+=1;
+    }
+
+    // NRR (optional): only if both innings scores are present
+    const s1=parseScore((m.scores||[])[0]);
+    const s2=parseScore((m.scores||[])[1]);
+    if(s1 && s2){
+      // Treat first listed team as innings1, second as innings2 (matches index follows scorecard order)
+      a.rf += s1.runs; a.of += s1.overs;
+      a.ra += s2.runs; a.oa += s2.overs;
+      b.rf += s2.runs; b.of += s2.overs;
+      b.ra += s1.runs; b.oa += s1.overs;
+    }
+  });
+  const rows = Object.values(byTeam).map(t=>{
+    const nrr = (t.of>0 && t.oa>0) ? +(((t.rf/t.of)-(t.ra/t.oa)).toFixed(3)) : null;
+    return {...t, nrr};
+  }).sort((x,y)=>(y.pts-x.pts)||((y.nrr||-999)-(x.nrr||-999))||(y.w-x.w)||x.team.localeCompare(y.team));
+
+  const body = rows.map((r,i)=>`
+    <tr>
+      <td style="text-align:left"><span style="color:#C5CDD6;width:18px;display:inline-block">${i+1}</span>
+        <a class="tlink" href="team.html?comp=${encodeURIComponent(comp)}&season=${encodeURIComponent(season)}&team=${encodeURIComponent(r.team)}">${r.team}</a>
+      </td>
+      <td>${r.p}</td><td>${r.w}</td><td>${r.l}</td><td>${r.nr}</td>
+      <td class="hi">${r.pts}</td>
+      <td>${r.nrr==null?'—':(r.nrr>0?'+':'')+r.nrr}</td>
+    </tr>`).join('');
+
+  return `<div class="pt-wrap animate">
+    <div class="pt-title">Points Table <span class="pt-sub">Season ${season}</span></div>
+    <table>
+      <thead><tr>
+        <th style="text-align:left">Team</th>
+        <th>P</th><th>W</th><th>L</th><th>NR</th><th>Pts</th><th>NRR</th>
+      </tr></thead>
+      <tbody>${body || ''}</tbody>
+    </table>
+  </div>`;
 }
 
 function goPlayer(name){window.location.href='player.html?name='+encodeURIComponent(name);}

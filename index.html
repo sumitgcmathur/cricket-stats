@@ -1438,7 +1438,7 @@ function renderTeams(d, target) {
 
   const trs = sorted.map((t,i) => `
     <tr>
-      <td><span class="rank ${i<3?'top3':''}">${i+1}</span> <span class="pname">${t.team}</span></td>
+      <td><span class="rank ${i<3?'top3':''}">${i+1}</span> <a class="pname" href="team.html?comp=ipl&season=${encodeURIComponent(activeSeason||'all')}&team=${encodeURIComponent(t.team)}" style="text-decoration:none;color:var(--text);font-weight:500">${t.team}</a></td>
       <td>${t.matches}</td>
       <td class="hi">${t.wins}</td>
       <td>${t.win_pct}%</td>
