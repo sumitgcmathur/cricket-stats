@@ -151,9 +151,7 @@ footer a{color:var(--blue);text-decoration:none;}
 <footer>Data: <a href="https://cricsheet.org" target="_blank">cricsheet.org</a> &nbsp;·&nbsp; Auto-updated daily</footer>
 
 <script>
-const COMPS=[
-  {code:'ipl',name:'IPL',format:'T20'},
-];
+let COMPS=[];
 const COLORS=['#1E3A5F','#E85D04','#2D9648','#7B2FBE','#D4A017','#1A7A9A','#C0392B','#4A4A8A'];
 
 let playerName='';
@@ -175,7 +173,18 @@ async function boot(){
   // Load photo async (non-blocking)
   loadPhoto(playerName);
 
-  // Load all competitions
+  try{
+    const ir=await fetch('stats/index.json');
+    if(ir.ok){
+      const idx=await ir.json();
+      COMPS=(idx.competitions||[])
+        .filter(c=>c.format==='T20')
+        .map(c=>({code:c.code,name:c.name,format:c.format||'T20'}));
+    }
+  }catch(e){ console.warn('index.json',e); }
+  if(!COMPS.length) COMPS=[{code:'ipl',name:'IPL',format:'T20'}];
+
+  // Load all T20 competitions (missing JSON is skipped in loadComp)
   try {
     await Promise.all(COMPS.map(c=>loadComp(c.code)));
     console.log('Data loaded:', Object.keys(allData));
@@ -271,21 +280,22 @@ function getPlayerBowling(code){
 
 function renderHero(){
   const ipl=getPlayerBatting('ipl');
-  const t20=getPlayerBatting('t20is');
-  const odi=getPlayerBatting('odis');
-  const test=getPlayerBatting('tests');
-  const bowl=getPlayerBowling('ipl')||getPlayerBowling('t20is')||getPlayerBowling('odis');
+  const t20=getPlayerBatting('t20s')||getPlayerBatting('t20s_female');
+  const bowl=COMPS.map(c=>getPlayerBowling(c.code)).find(Boolean)||null;
 
-  // Tags
+  // Tags: one per competition that has any data for this player (cap display)
   const tags=[];
-  if(ipl) tags.push('IPL');
-  if(t20) tags.push('T20I');
-  if(odi) tags.push('ODI');
-  if(test) tags.push('Test');
+  COMPS.forEach(c=>{
+    if(getPlayerBatting(c.code)||getPlayerBowling(c.code)){
+      const short=c.name.length>22?c.name.slice(0,20)+'…':c.name;
+      tags.push(short);
+    }
+  });
+  if(tags.length>6) tags.length=6;
   document.getElementById('hero-tags').innerHTML=tags.map(t=>`<span class="player-tag">${t}</span>`).join('');
 
   // KPIs - use best batting source (same competition as primary batting block)
-  const bat=ipl||t20||odi||test;
+  const bat=ipl||t20||COMPS.map(c=>getPlayerBatting(c.code)).find(Boolean)||null;
   const kpis=[];
   if(bat){
     kpis.push({label:'Runs',val:bat.runs.toLocaleString()});

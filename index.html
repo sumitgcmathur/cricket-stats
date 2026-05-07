@@ -726,7 +726,7 @@ footer a { color: var(--blue); text-decoration: none; }
     <div class="logo">IPL <span>STATS</span></div>
     <nav class="nav">
       <button class="nav-btn active" onclick="setView('ipl', this)">IPL</button>
-      <button class="nav-btn" onclick="setView('international', this)">International</button>
+      <button class="nav-btn" onclick="setView('international', this)">T20 comps</button>
       <button class="nav-btn" onclick="setView('player', this)">Player Search</button>
       <a href="matches.html" class="nav-btn" style="text-decoration:none;display:flex;align-items:center;">Matches</a>
     </nav>
@@ -786,7 +786,7 @@ footer a { color: var(--blue); text-decoration: none; }
   <!-- INTERNATIONAL VIEW -->
   <div id="view-international" style="display:none">
     <div id="int-picker">
-      <p class="section-title">Select Competition</p>
+      <p class="section-title">Select T20 competition</p>
       <div class="comp-grid" id="int-comp-grid"></div>
     </div>
     <div id="int-stats" style="display:none">
@@ -873,8 +873,8 @@ function setView(name, btn) {
     if (loadedData['ipl']) renderStatTab(loadedData['ipl']);
     else loadComp('ipl').then(d => { if(d) renderStatTab(d); });
   } else if (name === 'international') {
-    document.getElementById('hero-strip').querySelector('.hero-title').innerHTML = 'International <span style="color:var(--gold-light)">Cricket</span>';
-    document.getElementById('hero-strip').querySelector('.hero-sub').textContent = 'Tests · ODIs · T20 Internationals · Cricsheet data';
+    document.getElementById('hero-strip').querySelector('.hero-title').innerHTML = 'T20 <span style="color:var(--gold-light)">Competitions</span>';
+    document.getElementById('hero-strip').querySelector('.hero-sub').textContent = 'BBL · PSL · CPL · T20 World Cups · internationals · Cricsheet';
     updateHeroKPIs(null);
   }
 }
@@ -1226,7 +1226,13 @@ function kpi(label, val, name) {
 // ── INTERNATIONAL ─────────────────────────────────────────────────────────────
 function buildIntGrid() {
   if (!index) return;
-  const intComps = index.competitions.filter(c => c.type === 'international');
+  // All T20 competitions except IPL (IPL has its own tab)
+  const intComps = index.competitions.filter(c => c.format === 'T20' && c.code !== 'ipl');
+  if (!intComps.length) {
+    document.getElementById('int-comp-grid').innerHTML =
+      '<div class="empty" style="padding:20px">No T20 competitions in <code>stats/index.json</code> besides IPL.<br><small>Run <code>python fetch_all_cricket.py</code> to download and build them.</small></div>';
+    return;
+  }
   document.getElementById('int-comp-grid').innerHTML = intComps.map(c => `
     <div class="comp-card" onclick="loadIntComp('${c.code}')">
       <div>
@@ -1250,7 +1256,8 @@ async function loadIntComp(code) {
   }
 
   const comp = index.competitions.find(c => c.code === code);
-  document.getElementById('int-label').textContent = comp.format + ' · International';
+  const tier = comp.type === 'international' ? 'International' : (comp.type === 'league' ? 'League' : 'Domestic');
+  document.getElementById('int-label').textContent = (comp.format || 'T20') + ' · ' + tier;
   document.getElementById('int-title').textContent = comp.name;
 
   const topBat  = d.batting[0];

@@ -72,10 +72,7 @@
     <div class="toolbar-inner">
       <span class="filter-label">Competition</span>
       <select id="comp-sel" onchange="onFilters()">
-        <option value="ipl">IPL</option>
-        <option value="tests">Tests</option>
-        <option value="odis">ODIs</option>
-        <option value="t20is">T20Is</option>
+        <option value="ipl">Loading competitions…</option>
       </select>
       <span class="filter-label">Season</span>
       <select id="season-sel" onchange="onFilters()">
@@ -94,6 +91,18 @@
 
 <script>
 let matches=[], comp='ipl', seasons=[], teams=[], charts=[];
+let compListLoaded=false;
+
+async function ensureCompList(){
+  if(compListLoaded) return;
+  try{
+    const r=await fetch('stats/index.json');
+    const j=await r.json();
+    const sel=document.getElementById('comp-sel');
+    sel.innerHTML=(j.competitions||[]).map(c=>`<option value="${c.code}">${c.name}</option>`).join('');
+    compListLoaded=true;
+  }catch(e){ console.warn(e); }
+}
 
 function qs(k){return new URLSearchParams(location.search).get(k);}
 function setQS(params){
@@ -104,6 +113,7 @@ function setQS(params){
 function killCharts(){charts.forEach(c=>{try{c.destroy();}catch(e){}});charts=[];}
 
 async function loadData(){
+  await ensureCompList();
   comp = qs('comp') || 'ipl';
   document.getElementById('comp-sel').value = comp;
   try{

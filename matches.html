@@ -131,10 +131,7 @@ footer a{color:var(--blue);text-decoration:none;}
   <div class="toolbar-inner">
     <span class="filter-label">Competition</span>
     <select id="comp-sel" onchange="onCompChange()">
-      <option value="ipl">IPL</option>
-      <option value="tests">Tests</option>
-      <option value="odis">ODIs</option>
-      <option value="t20is">T20Is</option>
+      <option value="ipl">Loading competitions…</option>
     </select>
     <span class="filter-label">Season</span>
     <select id="season-sel" onchange="renderList()"><option value="all">All Seasons</option></select>
@@ -150,11 +147,25 @@ footer a{color:var(--blue);text-decoration:none;}
 <script>
 const COLORS=['#1E3A5F','#E85D04','#2D9648','#7B2FBE','#D4A017','#1A7A9A','#C0392B','#4A4A8A','#1A7A4A','#8B4513'];
 let matches=[],comp='ipl',charts=[];
+let compListLoaded=false;
+
+async function ensureCompList(){
+  if(compListLoaded) return;
+  try{
+    const r=await fetch('stats/index.json');
+    const j=await r.json();
+    const sel=document.getElementById('comp-sel');
+    sel.innerHTML=(j.competitions||[]).map(c=>`<option value="${c.code}">${c.name}</option>`).join('');
+    compListLoaded=true;
+  }catch(e){ console.warn(e); }
+}
 
 async function boot(){await load('ipl');}
 
 async function load(c){
+  await ensureCompList();
   comp=c;
+  document.getElementById('comp-sel').value=c;
   setLoading();
   try{
     const r=await fetch('stats/matches/'+c+'/index.json');

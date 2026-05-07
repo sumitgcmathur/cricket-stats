@@ -1,7 +1,7 @@
 """
-Cricket Stats Fetcher — All Cricsheet Data
+Cricket Stats Fetcher — T20 only (Cricsheet)
 ==========================================
-Downloads ball-by-ball CSV data for ALL competitions from cricsheet.org
+Downloads ball-by-ball CSV data for T20 competitions from cricsheet.org
 Generates:
   stats/index.json              — master competition list
   stats/{code}.json             — aggregated player/team stats (player "matches" = Cricsheet playing squad, info,player)
@@ -9,8 +9,8 @@ Generates:
   stats/matches/{code}/index.json — match list for competition
 
 Usage:
-  python fetch_all_cricket.py              # fetch everything
-  python fetch_all_cricket.py --comp ipl  # fetch one competition only
+  python fetch_all_cricket.py              # fetch all T20 competitions below
+  python fetch_all_cricket.py --comp ipl  # fetch one competition only (e.g. t20s, bbl, icc_mens_t20_world_cup)
 """
 
 import urllib.request
@@ -30,22 +30,32 @@ try:
 except Exception:
     pass
 
+# Cricsheet zips: most use {code}_male_csv2.zip — see https://cricsheet.org/downloads/
+# Use "zip_name" when the archive name does not follow that pattern.
 COMPETITIONS = [
-    {"code": "tests",   "name": "Test Matches",               "format": "Test", "type": "international"},
-    {"code": "odis",    "name": "One Day Internationals",      "format": "ODI",  "type": "international"},
-    {"code": "t20is",   "name": "T20 Internationals",          "format": "T20",  "type": "international"},
-    {"code": "ipl",     "name": "Indian Premier League",       "format": "T20",  "type": "league"},
-    {"code": "bbl",     "name": "Big Bash League",             "format": "T20",  "type": "league"},
-    {"code": "psl",     "name": "Pakistan Super League",       "format": "T20",  "type": "league"},
-    {"code": "cpl",     "name": "Caribbean Premier League",    "format": "T20",  "type": "league"},
-    {"code": "sa20",    "name": "SA20",                        "format": "T20",  "type": "league"},
-    {"code": "lpl",     "name": "Lanka Premier League",        "format": "T20",  "type": "league"},
-    {"code": "hundred", "name": "The Hundred",                 "format": "T20",  "type": "league"},
-    {"code": "ilt20",   "name": "International League T20",    "format": "T20",  "type": "league"},
-    {"code": "mlc",     "name": "Major League Cricket",        "format": "T20",  "type": "league"},
+    # Men's T20 internationals (Cricsheet file is t20s_male_csv2.zip, code is t20s)
+    {"code": "t20s", "name": "Men's T20 Internationals", "format": "T20", "type": "international"},
+    {"code": "icc_mens_t20_world_cup", "name": "ICC Men's T20 World Cup", "format": "T20", "type": "international"},
+    {"code": "t20s_female", "name": "Women's T20 Internationals", "format": "T20", "type": "international", "zip_name": "t20s_female_csv2.zip"},
+    {"code": "icc_womens_t20_world_cup", "name": "ICC Women's T20 World Cup", "format": "T20", "type": "international", "zip_name": "icc_womens_t20_world_cup_female_csv2.zip"},
+    # Men's T20 leagues
+    {"code": "ipl", "name": "Indian Premier League", "format": "T20", "type": "league"},
+    {"code": "bbl", "name": "Big Bash League", "format": "T20", "type": "league"},
+    {"code": "psl", "name": "Pakistan Super League", "format": "T20", "type": "league"},
+    {"code": "cpl", "name": "Caribbean Premier League", "format": "T20", "type": "league"},
+    {"code": "msl", "name": "Mzansi Super League", "format": "T20", "type": "league"},
+    {"code": "bpl", "name": "Bangladesh Premier League", "format": "T20", "type": "league"},
+    {"code": "npl", "name": "Nepal Premier League", "format": "T20", "type": "league"},
+    {"code": "lpl", "name": "Lanka Premier League", "format": "T20", "type": "league"},
+    {"code": "mlc", "name": "Major League Cricket", "format": "T20", "type": "league"},
+    {"code": "sma", "name": "Syed Mushtaq Ali Trophy", "format": "T20", "type": "league"},
+    # Women's T20 leagues (non-_male_csv2 archives on Cricsheet)
+    {"code": "wpl", "name": "Women's Premier League (India)", "format": "T20", "type": "league", "zip_name": "wpl_csv2.zip"},
+    {"code": "wbb", "name": "Women's Big Bash League", "format": "T20", "type": "league", "zip_name": "wbb_female_csv2.zip"},
 ]
 
-BASE_URL  = "https://cricsheet.org/downloads/{code}_male_csv2.zip"
+DOWNLOAD_BASE = "https://cricsheet.org/downloads/"
+BASE_URL = DOWNLOAD_BASE + "{code}_male_csv2.zip"
 STATS_DIR = "stats"
 
 # Normalise historical team name variants.
@@ -72,8 +82,14 @@ def norm_team(name: str) -> str:
     return TEAM_ALIASES.get(n, n)
 
 
-def download_zip(code):
-    url = BASE_URL.format(code=code)
+def download_zip(comp):
+    """comp is a competition dict (needs at least code; optional zip_name)."""
+    if isinstance(comp, str):
+        comp = {"code": comp}
+    if comp.get("zip_name"):
+        url = DOWNLOAD_BASE + comp["zip_name"]
+    else:
+        url = BASE_URL.format(code=comp["code"])
     print(f"  📥 {url}")
     req = urllib.request.Request(url, headers={"User-Agent": "cricket-stats-fetcher/1.0"})
     with urllib.request.urlopen(req, timeout=120) as r:
@@ -848,7 +864,7 @@ def fetch_competition(comp):
     code = comp["code"]
     print(f"\n{'─'*50}\n🏏 {comp['name']} ({code})")
     try:
-        zip_bytes = download_zip(code)
+        zip_bytes = download_zip(comp)
         batters, bowlers, teams, seasons, total, tsm, xi_m, xi_bs = parse_zip(zip_bytes, comp)
         data = build_output(batters, bowlers, teams, seasons, total, comp, tsm, xi_m, xi_bs)
         out_path = os.path.join(STATS_DIR, f"{code}.json")
