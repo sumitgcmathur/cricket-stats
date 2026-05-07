@@ -7,6 +7,7 @@
 <title>T20 Stats — Across Leagues</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Bebas+Neue&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="t20-filters.js"></script>
 <style>
 :root {
   --gold: #B8860B;
@@ -784,7 +785,7 @@ footer a { color: var(--blue); text-decoration: none; }
     <nav class="nav">
       <button class="nav-btn active" onclick="setView('dashboard', this)">Stats</button>
       <button class="nav-btn" onclick="setView('player', this)">Player Search</button>
-      <a href="matches.html" class="nav-btn" style="text-decoration:none;display:flex;align-items:center;">Matches</a>
+      <a href="matches.html" class="nav-btn" id="nav-matches-link" style="text-decoration:none;display:flex;align-items:center;">Matches</a>
     </nav>
     <div class="header-meta" id="header-updated">Loading...</div>
   </div>
@@ -918,6 +919,7 @@ function onTournamentFilterChange() {
   } else {
     document.getElementById('season-select').value = prev;
   }
+  syncIndexFiltersToURL();
   refreshDashboard();
 }
 
@@ -931,6 +933,7 @@ function selectAllTournaments() {
   document.getElementById('year-from').value = '';
   document.getElementById('year-to').value = '';
   updateSeasonBanner();
+  syncIndexFiltersToURL();
   refreshDashboard();
 }
 
@@ -942,6 +945,7 @@ function clearTournamentSelection() {
   activeSeason = 'all';
   document.getElementById('season-select').value = 'all';
   updateSeasonBanner();
+  syncIndexFiltersToURL();
   refreshDashboard();
 }
 
@@ -1087,12 +1091,22 @@ async function boot() {
     const res = await fetch('stats/index.json');
     if (!res.ok) throw new Error('stats/index.json not found (HTTP ' + res.status + ')');
     index = await res.json();
+    if (typeof t20PrimeIndexCache === 'function') t20PrimeIndexCache(index);
     document.getElementById('header-updated').textContent = 'Updated: ' + index.last_updated;
     document.getElementById('footer-updated').textContent = 'Updated: ' + index.last_updated;
-    const t20 = getT20Competitions();
-    selectedTournamentCodes = t20.map(c => c.code);
+    const fp = t20ReadFilterParams(location.search, index);
+    selectedTournamentCodes = fp.codes;
+    activeSeason = fp.activeSeason;
+    yearFrom = fp.yearFrom;
+    yearTo = fp.yearTo;
+    if (!selectedTournamentCodes.length) selectedTournamentCodes = getT20Competitions().map(c => c.code);
     renderTournamentFilters();
     populateSeasons(unionSeasonsForCodes(selectedTournamentCodes));
+    document.getElementById('season-select').value = activeSeason;
+    document.getElementById('year-from').value = yearFrom || '';
+    document.getElementById('year-to').value = yearTo || '';
+    updateSeasonBanner();
+    updateMatchesNavLinkOnly();
     await refreshDashboard();
   } catch (e) {
     console.error('Boot error:', e);
@@ -1139,6 +1153,7 @@ function onSeasonChange() {
   document.getElementById('year-from').value = '';
   document.getElementById('year-to').value = '';
   updateSeasonBanner();
+  syncIndexFiltersToURL();
   refreshDashboard();
 }
 
@@ -1148,6 +1163,7 @@ function onYearRange() {
   activeSeason = 'all';
   document.getElementById('season-select').value = 'all';
   updateSeasonBanner();
+  syncIndexFiltersToURL();
   refreshDashboard();
 }
 
@@ -1167,115 +1183,38 @@ function updateSeasonBanner() {
 
 // ── FILTER DATA BY SEASON ─────────────────────────────────────────────────────
 function filterBySeason(data) {
-  if (!data) return data;
-  if (activeSeason === 'all' && !yearFrom && !yearTo) return data;
+  return t20FilterBySeason(data, activeSeason, yearFrom, yearTo);
+}
 
-  // Filter function for a season string
-  const seasonMatches = (season) => {
-    if (!season) return false;
-    const yr = parseInt(season);
-    if (activeSeason !== 'all') return season === activeSeason;
-    if (yearFrom && yr < yearFrom) return false;
-    if (yearTo   && yr > yearTo)   return false;
-    return true;
-  };
+function currentT20FilterState() {
+  return { codes: selectedTournamentCodes.slice(), activeSeason, yearFrom, yearTo };
+}
 
-  // Filter batting using by_season data
-  const filteredBatting = data.batting
-    .map(p => {
-      if (!p.by_season) return null;
-      // Sum up matching seasons
-      const matchingSeasons = Object.entries(p.by_season).filter(([s]) => seasonMatches(s));
-      if (!matchingSeasons.length) return null;
-      const agg = matchingSeasons.reduce((acc, [, s]) => {
-        acc.matches  += s.matches  || 0;
-        acc.runs     += s.runs     || 0;
-        acc.balls    += s.balls    || 0;
-        acc.fours    += s.fours    || 0;
-        acc.sixes    += s.sixes    || 0;
-        acc.fifties  += s.fifties  || 0;
-        acc.hundreds += s.hundreds || 0;
-        acc.mvp_pts  += s.mvp_pts  || 0;
-        acc.dismissals += (s.dismissals || 0);
-        return acc;
-      }, {matches:0,runs:0,balls:0,fours:0,sixes:0,fifties:0,hundreds:0,mvp_pts:0,dismissals:0});
-      if (!agg.runs) return null;
-      return {
-        ...p,
-        matches:  agg.matches,
-        runs:     agg.runs,
-        balls:    agg.balls,
-        fours:    agg.fours,
-        sixes:    agg.sixes,
-        fifties:  agg.fifties,
-        hundreds: agg.hundreds,
-        mvp_pts:  +agg.mvp_pts.toFixed(1),
-        avg: agg.dismissals ? +(agg.runs/agg.dismissals).toFixed(2) : agg.runs,
-        sr:  agg.balls ? +((agg.runs/agg.balls)*100).toFixed(2) : 0,
-      };
-    })
-    .filter(Boolean)
-    .sort((a,b) => b.runs - a.runs);
+function playerHref(name) {
+  const q = t20FilterQS(currentT20FilterState(), index);
+  q.set('name', name);
+  return 'player.html?' + q.toString();
+}
 
-  // Filter sixes using by_season
-  const filteredSixes = data.sixes
-    .map(p => {
-      if (!p.by_season) return null;
-      const matching = Object.entries(p.by_season).filter(([s]) => seasonMatches(s));
-      if (!matching.length) return null;
-      const totalSixes   = matching.reduce((sum,[,v]) => sum + (v?.sixes || v || 0), 0);
-      const totalMatches = matching.reduce((sum,[,v]) => sum + (v?.matches || 0), 0);
-      if (!totalSixes) return null;
-      return { ...p, sixes: totalSixes, matches: totalMatches || p.matches };
-    })
-    .filter(Boolean)
-    .sort((a,b) => b.sixes - a.sixes);
+function teamHref(teamName) {
+  const q = t20FilterQS(currentT20FilterState(), index);
+  q.set('team', teamName);
+  return 'team.html?' + q.toString();
+}
 
-  // Filter teams by season
-  const filteredTeams = data.teams
-    .map(t => {
-      if (!t.by_season) return t; // no season data, return as-is
-      const matchingSeasons = Object.entries(t.by_season).filter(([s]) => seasonMatches(s));
-      if (!matchingSeasons.length) return null;
-      const totalMatches = matchingSeasons.reduce((sum,[,v]) => sum + (v.matches||0), 0);
-      const totalWins    = matchingSeasons.reduce((sum,[,v]) => sum + (v.wins||0), 0);
-      return { ...t, matches: totalMatches, wins: totalWins, win_pct: totalMatches ? +(totalWins/totalMatches*100).toFixed(1) : 0 };
-    })
-    .filter(Boolean)
-    .sort((a,b) => b.wins - a.wins);
+function matchesNavHref() {
+  return 'matches.html?' + t20FilterQS(currentT20FilterState(), index).toString();
+}
 
-  // Filter bowling using by_season data
-  const filteredBowling = data.bowling
-    .map(p => {
-      if (!p.by_season || !Object.keys(p.by_season).length) return null;
-      const matchingSeasons = Object.entries(p.by_season).filter(([s]) => seasonMatches(s));
-      if (!matchingSeasons.length) return null;
-      const agg = matchingSeasons.reduce((acc, [, s]) => {
-        // matches might be number or serialized set (empty object {}) - handle both
-        const sm = typeof s.matches === 'number' ? s.matches : 0;
-        acc.matches += sm;
-        acc.wickets += s.wickets || 0;
-        acc.runs    += s.runs    || 0;
-        acc.balls   += s.balls   || 0;
-        acc.mvp_pts += s.mvp_pts || 0;
-        return acc;
-      }, {matches:0, wickets:0, runs:0, balls:0, mvp_pts:0});
-      if (!agg.balls) return null;
-      // If matches is 0 (old data with set), estimate from overs
-      if (!agg.matches) agg.matches = Math.ceil(agg.balls / 24); // ~4 overs per match
-      const economy = +(agg.runs / agg.balls * 6).toFixed(2);
-      const avg = agg.wickets ? +(agg.runs / agg.wickets).toFixed(2) : null;
-      const overs = Math.floor(agg.balls/6) + (agg.balls%6)/10;
-      const bowl_index = economy > 0 && agg.matches > 0
-        ? +((agg.wickets / agg.matches) * (6 / economy)).toFixed(2) : 0;
-      return { ...p, matches: agg.matches, wickets: agg.wickets, runs: agg.runs,
-        balls: agg.balls, overs: +overs.toFixed(1), economy, avg, bowl_index,
-        mvp_pts: +agg.mvp_pts.toFixed(1) };
-    })
-    .filter(Boolean)
-    .sort((a,b) => b.wickets - a.wickets);
+function updateMatchesNavLinkOnly() {
+  const nm = document.getElementById('nav-matches-link');
+  if (nm && index) nm.href = matchesNavHref();
+}
 
-  return { ...data, batting: filteredBatting, bowling: filteredBowling, sixes: filteredSixes, teams: filteredTeams };
+function syncIndexFiltersToURL() {
+  if (!index) return;
+  t20WriteFilterParams(currentT20FilterState());
+  updateMatchesNavLinkOnly();
 }
 
 function aggregateSeasonData() {} // kept for compatibility
@@ -1349,7 +1288,7 @@ function renderMVP(d, target) {
   const rows = players.map((p,i) => `<tr>
     <td style="padding:10px 18px">
       <span class="rank ${i<3?'top3':''}">${i+1}</span>
-      <a href="player.html?name=${encodeURIComponent(p.name)}" class="pname" style="text-decoration:none;color:var(--text);font-weight:500">${p.name}</a>
+      <a href="${playerHref(p.name)}" class="pname" style="text-decoration:none;color:var(--text);font-weight:500">${p.name}</a>
     </td>
     <td style="padding:10px 18px"><span style="font-size:10px;padding:2px 8px;border-radius:3px;background:${roleColor(p.role)}20;color:${roleColor(p.role)};font-weight:600">${p.role}</span></td>
     <td style="padding:10px 18px;text-align:right">${p.matches}</td>
@@ -1504,7 +1443,7 @@ function renderTable(target, type, rows, cols, defaultSort, filterQ, showAllRows
   const trs = visRows.map((r, i) => {
     const rank = showAll ? i+1 : sorted.indexOf(r)+1;
     return `<tr>
-      <td><span class="rank ${rank<=3?'top3':''}">${rank}</span> <a href="player.html?name=${encodeURIComponent(r.name)}" class="pname" style="text-decoration:none;color:var(--text);font-weight:500">${r.name}</a></td>
+      <td><span class="rank ${rank<=3?'top3':''}">${rank}</span> <a href="${playerHref(r.name)}" class="pname" style="text-decoration:none;color:var(--text);font-weight:500">${r.name}</a></td>
       ${cols.map(col => `<td class="${col.hi?'hi':''}">${r[col.k] ?? '—'}</td>`).join('')}
     </tr>`;
   }).join('');
@@ -1574,10 +1513,6 @@ function expandTable(type, target, filterQ) {
   else if (type === 'bowling') renderBowling(currentMergedData, target, true, filterQ);
 }
 
-function primaryCompForLinks() {
-  return (selectedTournamentCodes && selectedTournamentCodes.length) ? selectedTournamentCodes[0] : 'ipl';
-}
-
 function renderSixes(d, target) {
   const html = (d.sixes || []).slice(0, 30).map((p, i) => `
     <div class="six-card">
@@ -1632,7 +1567,7 @@ function renderTeams(d, target) {
   });
   const trs = withHonors.map((t,i) => `
     <tr>
-      <td><span class="rank ${i<3?'top3':''}">${i+1}</span> <a class="pname" href="team.html?comp=${primaryCompForLinks()}&season=${encodeURIComponent(activeSeason||'all')}&team=${encodeURIComponent(t.team)}" style="text-decoration:none;color:var(--text);font-weight:500">${t.team}</a></td>
+      <td><span class="rank ${i<3?'top3':''}">${i+1}</span> <a class="pname" href="${teamHref(t.team)}" style="text-decoration:none;color:var(--text);font-weight:500">${t.team}</a></td>
       <td>${t.matches}</td>
       <td class="hi">${t.wins}</td>
       <td>${t.win_pct}%</td>
@@ -1725,7 +1660,7 @@ function searchPlayer(query) {
   document.getElementById('player-results').innerHTML = Object.entries(found).map(([name, comps]) => `
     <div class="player-result-card animate">
       <h3>${name}</h3>
-      <a href="player.html?name=${encodeURIComponent(name)}" style="display:inline-block;margin-bottom:12px;background:var(--blue);color:#fff;font-size:12px;font-weight:500;padding:6px 14px;border-radius:6px;text-decoration:none">View Full Profile →</a>
+      <a href="${playerHref(name)}" style="display:inline-block;margin-bottom:12px;background:var(--blue);color:#fff;font-size:12px;font-weight:500;padding:6px 14px;border-radius:6px;text-decoration:none">View Full Profile →</a>
       <div class="player-comps">
         ${comps.map(c => `
           <div class="player-comp-row">

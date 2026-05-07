@@ -4,9 +4,11 @@
   <meta charset="UTF-8">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Team — Cricket Stats</title>
+  <title>Team — T20 Stats</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Bebas+Neue&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="t20-toolbar.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+  <script src="t20-filters.js"></script>
   <style>
     :root{--gold:#B8860B;--gold-light:#DAA520;--gold-bg:#FFF8E7;--blue:#1E3A5F;--blue-mid:#2E5A8F;--blue-light:#EBF3FF;--bg:#F5F7FA;--surface:#FFFFFF;--surface2:#F0F2F5;--border:#E2E6EA;--text:#1A2332;--muted:#6B7A8D;--green:#1A7A4A;--green-bg:#E8F5EE;--red:#C0392B;--shadow:0 1px 3px rgba(0,0,0,0.08);--shadow-md:0 4px 12px rgba(0,0,0,0.08);}
     *{margin:0;padding:0;box-sizing:border-box;}
@@ -20,8 +22,6 @@
     .breadcrumb a:hover{color:#fff;}
     .breadcrumb .sep{opacity:0.4;}
     .breadcrumb .current{color:#fff;font-weight:500;}
-    .toolbar{background:var(--surface);border-bottom:1px solid var(--border);padding:12px 24px;position:sticky;top:56px;z-index:100;box-shadow:var(--shadow);}
-    .toolbar-inner{max-width:1200px;margin:0 auto;display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
     select{background:var(--surface);border:1px solid var(--border);color:var(--text);font-family:'Inter',sans-serif;font-size:13px;padding:7px 10px;border-radius:6px;outline:none;transition:border-color 0.15s;}
     select:focus{border-color:var(--blue-mid);}
     .filter-label{font-size:11px;color:var(--muted);font-weight:500;}
@@ -59,27 +59,39 @@
 <body>
   <div class="header">
     <div class="header-inner">
-      <a href="index.html" class="logo">IPL <span>STATS</span></a>
+      <a href="index.html" class="logo">T20 <span>STATS</span></a>
       <div class="breadcrumb">
         <a href="index.html">Home</a><span class="sep">›</span>
-        <a href="matches.html">Match Browser</a><span class="sep">›</span>
+        <a href="matches.html" id="team-nav-matches">Match Browser</a><span class="sep">›</span>
         <span class="current" id="bc">Team</span>
       </div>
     </div>
   </div>
 
-  <div class="toolbar">
-    <div class="toolbar-inner">
-      <span class="filter-label">Competition</span>
-      <select id="comp-sel" onchange="onFilters()">
-        <option value="ipl">Loading competitions…</option>
-      </select>
-      <span class="filter-label">Season</span>
-      <select id="season-sel" onchange="onFilters()">
+  <div class="t20-toolbar">
+    <div class="t20-toolbar-inner">
+      <div class="filter-panel" style="flex:1 1 100%;margin:0">
+        <div class="filter-panel-title">Tournaments (multi-select)</div>
+        <div class="filter-actions">
+          <button type="button" onclick="teamSelectAllTournaments()">All</button>
+          <button type="button" onclick="teamClearTournaments()">Clear</button>
+        </div>
+        <div class="filter-chips" id="team-filter-tournaments"></div>
+      </div>
+      <span class="t20-toolbar-label">Season</span>
+      <select class="t20-season-select" id="team-season-select" onchange="onTeamSeasonChange()">
         <option value="all">All Seasons</option>
       </select>
-      <span class="filter-label">Team</span>
-      <select id="team-sel" onchange="onFilters()"></select>
+      <div class="t20-toolbar-sep"></div>
+      <span class="t20-toolbar-label">Year range</span>
+      <div class="t20-year-range">
+        <input class="t20-year-input" type="number" id="team-year-from" placeholder="From" min="1995" max="2035" onchange="onTeamYearRange()">
+        <span class="t20-year-to-label">to</span>
+        <input class="t20-year-input" type="number" id="team-year-to" placeholder="To" min="1995" max="2035" onchange="onTeamYearRange()">
+      </div>
+      <div class="t20-toolbar-sep"></div>
+      <span class="t20-toolbar-label">Team</span>
+      <select class="t20-season-select" id="team-sel" style="min-width:200px" onchange="onTeamPick()"></select>
     </div>
   </div>
 
@@ -90,63 +102,199 @@
   <footer>Data: <a href="https://cricsheet.org" target="_blank">cricsheet.org</a></footer>
 
 <script>
-let matches=[], comp='ipl', seasons=[], teams=[], charts=[];
-let compListLoaded=false;
-
-async function ensureCompList(){
-  if(compListLoaded) return;
-  try{
-    const r=await fetch('stats/index.json');
-    const j=await r.json();
-    const sel=document.getElementById('comp-sel');
-    sel.innerHTML=(j.competitions||[]).map(c=>`<option value="${c.code}">${c.name}</option>`).join('');
-    compListLoaded=true;
-  }catch(e){ console.warn(e); }
-}
+let COMPS=[];
+let championshipIndex=null;
+let allMatchesRaw=[];
+let matchesFiltered=[];
+let selectedTournamentCodes=[];
+let activeSeason='all';
+let yearFrom=null,yearTo=null;
+let charts=[];
 
 function qs(k){return new URLSearchParams(location.search).get(k);}
-function setQS(params){
-  const u=new URL(location.href);
-  Object.entries(params).forEach(([k,v])=>u.searchParams.set(k,v));
-  history.replaceState({},'',u.toString());
-}
+
 function killCharts(){charts.forEach(c=>{try{c.destroy();}catch(e){}});charts=[];}
 
-async function loadData(){
-  await ensureCompList();
-  comp = qs('comp') || 'ipl';
-  document.getElementById('comp-sel').value = comp;
-  try{
-    const r=await fetch('stats/matches/'+comp+'/index.json');
-    matches=(await r.json()).matches||[];
-  }catch(e){ matches=[]; }
+function renderTeamFilterChips(){
+  const wrap=document.getElementById('team-filter-tournaments');
+  if(!wrap)return;
+  wrap.innerHTML=COMPS.map(c=>`
+    <label class="filter-chip">
+      <input type="checkbox" value="${c.code}" ${selectedTournamentCodes.includes(c.code)?'checked':''} onchange="onTeamTournamentChange()">
+      <span>${c.name}</span>
+    </label>`).join('');
+}
 
-  seasons=[...new Set(matches.map(m=>m.season).filter(Boolean))].sort((a,b)=>b.localeCompare(a));
-  teams=[...new Set(matches.flatMap(m=>m.teams||[]).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+function fillTeamSeasonSelect(){
+  const sel=document.getElementById('team-season-select');
+  if(!sel)return;
+  const cur=activeSeason;
+  const seasons=t20UnionSeasonsForCodes(championshipIndex,selectedTournamentCodes);
+  sel.innerHTML='<option value="all">All Seasons</option>';
+  seasons.forEach(s=>{
+    const o=document.createElement('option');
+    o.value=s;o.textContent=s;sel.appendChild(o);
+  });
+  sel.value=[...sel.options].some(o=>o.value===cur)?cur:'all';
+  activeSeason=sel.value;
+}
 
-  const seasonSel=document.getElementById('season-sel');
-  seasonSel.innerHTML='<option value="all">All Seasons</option>'+seasons.map(s=>`<option value="${s}">${s}</option>`).join('');
+function updateMatchesBreadcrumb(){
+  const a=document.getElementById('team-nav-matches');
+  if(a&&championshipIndex){
+    a.href='matches.html?'+t20FilterQS({codes:selectedTournamentCodes,activeSeason,yearFrom,yearTo},championshipIndex).toString();
+  }
+}
 
+function applyTeamMatchFilter(){
+  matchesFiltered=allMatchesRaw.filter(m=>t20MatchPassesFilters(m,activeSeason,yearFrom,yearTo));
+}
+
+function buildTeamDropdown(){
+  const teams=[...new Set(matchesFiltered.flatMap(m=>m.teams||[]).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
   const teamSel=document.getElementById('team-sel');
-  teamSel.innerHTML = teams.map(t=>`<option value="${t}">${t}</option>`).join('');
+  teamSel.innerHTML='';
+  teams.forEach(t=>{
+    const o=document.createElement('option');
+    o.value=t;o.textContent=t;teamSel.appendChild(o);
+  });
+  if(!teams.length){
+    const o=document.createElement('option');
+    o.value='';o.textContent='No teams in filter';teamSel.appendChild(o);
+  }
+}
 
-  const seasonQ = qs('season') || 'all';
-  const teamQ = qs('team') || teams[0] || '';
-  if(seasonQ) seasonSel.value = seasonQ;
-  if(teamQ) teamSel.value = teamQ;
+async function loadAllMatchIndices(){
+  allMatchesRaw=[];
+  for(const code of selectedTournamentCodes){
+    try{
+      const r=await fetch('stats/matches/'+code+'/index.json');
+      if(!r.ok)continue;
+      const j=await r.json();
+      (j.matches||[]).forEach(m=>{allMatchesRaw.push(Object.assign({},m,{_comp:code}));});
+    }catch(e){}
+  }
+  applyTeamMatchFilter();
+}
 
+function onTeamTournamentChange(){
+  const checked=[...document.querySelectorAll('#team-filter-tournaments input:checked')].map(i=>i.value);
+  selectedTournamentCodes=checked.length?checked:COMPS.map(c=>c.code);
+  if(!checked.length)renderTeamFilterChips();
+  const prev=activeSeason;
+  fillTeamSeasonSelect();
+  if(prev!=='all'&&![...document.getElementById('team-season-select').options].some(o=>o.value===prev)){
+    activeSeason='all';
+    document.getElementById('team-season-select').value='all';
+  }else document.getElementById('team-season-select').value=prev;
+  activeSeason=document.getElementById('team-season-select').value;
+  loadAllMatchIndices().then(()=>{
+    buildTeamDropdown();
+    const teamSel=document.getElementById('team-sel');
+    if(teamSel.options.length&&!teamSel.value)teamSel.selectedIndex=0;
+    t20WriteFilterParams({codes:selectedTournamentCodes,activeSeason,yearFrom,yearTo},{team:teamSel.value||''});
+    updateMatchesBreadcrumb();
+    render();
+  });
+}
+
+function teamSelectAllTournaments(){
+  selectedTournamentCodes=COMPS.map(c=>c.code);
+  renderTeamFilterChips();
+  fillTeamSeasonSelect();
+  activeSeason='all';
+  document.getElementById('team-season-select').value='all';
+  yearFrom=yearTo=null;
+  document.getElementById('team-year-from').value='';
+  document.getElementById('team-year-to').value='';
+  loadAllMatchIndices().then(()=>{
+    buildTeamDropdown();
+    t20WriteFilterParams({codes:selectedTournamentCodes,activeSeason,yearFrom,yearTo},{team:document.getElementById('team-sel').value||''});
+    updateMatchesBreadcrumb();
+    render();
+  });
+}
+
+function teamClearTournaments(){
+  selectedTournamentCodes=COMPS.length?[COMPS[0].code]:[];
+  renderTeamFilterChips();
+  fillTeamSeasonSelect();
+  activeSeason='all';
+  document.getElementById('team-season-select').value='all';
+  loadAllMatchIndices().then(()=>{
+    buildTeamDropdown();
+    t20WriteFilterParams({codes:selectedTournamentCodes,activeSeason,yearFrom,yearTo},{team:document.getElementById('team-sel').value||''});
+    updateMatchesBreadcrumb();
+    render();
+  });
+}
+
+function onTeamSeasonChange(){
+  activeSeason=document.getElementById('team-season-select').value;
+  yearFrom=yearTo=null;
+  document.getElementById('team-year-from').value='';
+  document.getElementById('team-year-to').value='';
+  applyTeamMatchFilter();
+  buildTeamDropdown();
+  t20WriteFilterParams({codes:selectedTournamentCodes,activeSeason,yearFrom,yearTo},{team:document.getElementById('team-sel').value||''});
+  updateMatchesBreadcrumb();
   render();
 }
 
-function onFilters(){
-  comp = document.getElementById('comp-sel').value;
-  setQS({
-    comp,
-    season: document.getElementById('season-sel').value,
-    team: document.getElementById('team-sel').value
-  });
-  // reload match index if competition changed
-  loadData();
+function onTeamYearRange(){
+  yearFrom=parseInt(document.getElementById('team-year-from').value,10)||null;
+  yearTo=parseInt(document.getElementById('team-year-to').value,10)||null;
+  activeSeason='all';
+  document.getElementById('team-season-select').value='all';
+  applyTeamMatchFilter();
+  buildTeamDropdown();
+  t20WriteFilterParams({codes:selectedTournamentCodes,activeSeason,yearFrom,yearTo},{team:document.getElementById('team-sel').value||''});
+  updateMatchesBreadcrumb();
+  render();
+}
+
+function onTeamPick(){
+  t20WriteFilterParams({codes:selectedTournamentCodes,activeSeason,yearFrom,yearTo},{team:document.getElementById('team-sel').value||''});
+  render();
+}
+
+async function boot(){
+  try{
+    championshipIndex=await t20FetchIndex();
+    COMPS=t20GetT20Competitions(championshipIndex).map(c=>({code:c.code,name:c.name}));
+  }catch(e){
+    console.warn(e);
+    championshipIndex=null;
+  }
+  if(!COMPS.length)COMPS=[{code:'ipl',name:'IPL'}];
+
+  let fp=t20ReadFilterParams(location.search,championshipIndex);
+  const legacy=qs('comp');
+  if(!qs('comps')&&legacy){
+    const ok=COMPS.some(c=>c.code===legacy);
+    if(ok)fp.codes=[legacy];
+  }
+  selectedTournamentCodes=fp.codes;
+  activeSeason=fp.activeSeason;
+  yearFrom=fp.yearFrom;
+  yearTo=fp.yearTo;
+  if(!selectedTournamentCodes.length)selectedTournamentCodes=COMPS.map(c=>c.code);
+
+  renderTeamFilterChips();
+  fillTeamSeasonSelect();
+  document.getElementById('team-season-select').value=activeSeason;
+  document.getElementById('team-year-from').value=yearFrom||'';
+  document.getElementById('team-year-to').value=yearTo||'';
+
+  await loadAllMatchIndices();
+  buildTeamDropdown();
+  const want=qs('team');
+  const teamSel=document.getElementById('team-sel');
+  if(want&&[...teamSel.options].some(o=>o.value===want))teamSel.value=want;
+  else if(teamSel.options.length)teamSel.selectedIndex=0;
+
+  updateMatchesBreadcrumb();
+  render();
 }
 
 function parseScore(s){
@@ -159,13 +307,12 @@ function parseScore(s){
 
 function render(){
   killCharts();
-  const season=document.getElementById('season-sel').value;
+  const season=activeSeason;
   const team=document.getElementById('team-sel').value;
   document.getElementById('bc').textContent = team || 'Team';
 
-  let ms=matches;
-  if(season!=='all') ms=ms.filter(m=>m.season===season);
-  ms=ms.filter(m=>(m.teams||[]).includes(team));
+  let ms=matchesFiltered.filter(m=>(m.teams||[]).includes(team));
+  const compLabel=selectedTournamentCodes.map(code=>(COMPS.find(c=>c.code===code)||{}).name||code).slice(0,5).join(' · ');
 
   const played=ms.length;
   let wins=0, losses=0, nr=0;
@@ -212,7 +359,7 @@ function render(){
   main.innerHTML = `
     <div class="hero">
       <div class="hero-title">${team}</div>
-      <div class="hero-sub">${comp.toUpperCase()} · ${season==='all'?'All seasons':('Season '+season)} · ${played} matches</div>
+      <div class="hero-sub">${compLabel||'T20'} · ${season==='all'&&!yearFrom&&!yearTo?'All seasons':(season!=='all'?'Season '+season:((yearFrom||'…')+'–'+(yearTo||'…')))} · ${played} matches</div>
       <div class="kpis">
         <div class="kpi"><div class="lab">Played</div><div class="val">${played}</div></div>
         <div class="kpi"><div class="lab">Wins</div><div class="val">${wins}</div></div>
@@ -281,7 +428,7 @@ function render(){
   },50);
 }
 
-loadData();
+boot();
 </script>
 </body>
 </html>

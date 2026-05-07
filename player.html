@@ -4,9 +4,11 @@
 <meta charset="UTF-8">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Player Profile — Cricket Stats</title>
+<title>Player Profile — T20 Stats</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Bebas+Neue&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="t20-toolbar.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="t20-filters.js"></script>
 <style>
 :root{--gold:#B8860B;--gold-light:#DAA520;--gold-bg:#FFF8E7;--blue:#1E3A5F;--blue-mid:#2E5A8F;--blue-light:#EBF3FF;--bg:#F5F7FA;--surface:#FFFFFF;--surface2:#F0F2F5;--border:#E2E6EA;--text:#1A2332;--muted:#6B7A8D;--green:#1A7A4A;--green-bg:#E8F5EE;--red:#C0392B;--shadow:0 1px 3px rgba(0,0,0,0.08);--shadow-md:0 4px 12px rgba(0,0,0,0.08);}
 *{margin:0;padding:0;box-sizing:border-box;}
@@ -97,7 +99,7 @@ footer a{color:var(--blue);text-decoration:none;}
 
 <div class="header">
   <div class="header-inner">
-    <a href="index.html" class="logo">IPL <span>STATS</span></a>
+    <a href="index.html" class="logo">T20 <span>STATS</span></a>
     <div class="breadcrumb">
       <a href="index.html">Home</a><span class="sep">›</span>
       <span class="current" id="bc-name">Player Profile</span>
@@ -108,6 +110,29 @@ footer a{color:var(--blue);text-decoration:none;}
 <div style="background:var(--surface);border-bottom:1px solid var(--border);padding:8px 24px;">
   <div style="max-width:1200px;margin:0 auto">
     <button onclick="history.back()" style="background:none;border:none;color:var(--muted);font-family:Inter,sans-serif;font-size:13px;cursor:pointer;padding:4px 0;display:inline-flex;align-items:center;gap:6px">← Back</button>
+  </div>
+</div>
+<div class="t20-toolbar">
+  <div class="t20-toolbar-inner">
+    <div class="filter-panel" style="flex:1 1 100%;margin:0">
+      <div class="filter-panel-title">Tournaments (multi-select)</div>
+      <div class="filter-actions">
+        <button type="button" onclick="playerSelectAllTournaments()">All</button>
+        <button type="button" onclick="playerClearTournaments()">Clear</button>
+      </div>
+      <div class="filter-chips" id="player-filter-tournaments"></div>
+    </div>
+    <span class="t20-toolbar-label">Season</span>
+    <select class="t20-season-select" id="player-season-select" onchange="onPlayerSeasonChange()">
+      <option value="all">All Seasons</option>
+    </select>
+    <div class="t20-toolbar-sep"></div>
+    <span class="t20-toolbar-label">Year range</span>
+    <div class="t20-year-range">
+      <input class="t20-year-input" type="number" id="player-year-from" placeholder="From" min="1995" max="2035" onchange="onPlayerYearRange()">
+      <span class="t20-year-to-label">to</span>
+      <input class="t20-year-input" type="number" id="player-year-to" placeholder="To" min="1995" max="2035" onchange="onPlayerYearRange()">
+    </div>
   </div>
 </div>
 <div class="player-hero">
@@ -155,12 +180,152 @@ let COMPS=[];
 const COLORS=['#1E3A5F','#E85D04','#2D9648','#7B2FBE','#D4A017','#1A7A9A','#C0392B','#4A4A8A'];
 
 let playerName='';
-let allData={};   // code -> comp JSON
+let championshipIndex=null;
+let allDataRaw={};
+let allData={};
 let charts=[];
+let selectedTournamentCodes=[];
+let activeSeason='all';
+let yearFrom=null,yearTo=null;
+let activePlayerTab='batting';
+
+function visibleComps(){
+  return COMPS.filter(c=>selectedTournamentCodes.includes(c.code));
+}
+
+function renderPlayerFilterChips(){
+  const wrap=document.getElementById('player-filter-tournaments');
+  if(!wrap||!COMPS.length){if(wrap)wrap.innerHTML='';return;}
+  wrap.innerHTML=COMPS.map(c=>`
+    <label class="filter-chip">
+      <input type="checkbox" value="${c.code}" ${selectedTournamentCodes.includes(c.code)?'checked':''} onchange="onPlayerTournamentChange()">
+      <span>${c.name}</span>
+    </label>`).join('');
+}
+
+function fillPlayerSeasonOptions(seasons){
+  const sel=document.getElementById('player-season-select');
+  if(!sel)return;
+  const cur=activeSeason;
+  sel.innerHTML='<option value="all">All Seasons</option>';
+  [...seasons].sort((a,b)=>b.localeCompare(a)).forEach(s=>{
+    const o=document.createElement('option');
+    o.value=s;o.textContent=s;sel.appendChild(o);
+  });
+  sel.value=[...sel.options].some(o=>o.value===cur)?cur:'all';
+  activeSeason=sel.value;
+}
+
+function onPlayerTournamentChange(){
+  const checked=[...document.querySelectorAll('#player-filter-tournaments input:checked')].map(i=>i.value);
+  selectedTournamentCodes=checked.length?checked:COMPS.map(c=>c.code);
+  if(!checked.length)renderPlayerFilterChips();
+  const prev=activeSeason;
+  fillPlayerSeasonOptions(t20UnionSeasonsForCodes(championshipIndex,selectedTournamentCodes));
+  if(prev!=='all'&&![...document.getElementById('player-season-select').options].some(o=>o.value===prev)){
+    activeSeason='all';
+    document.getElementById('player-season-select').value='all';
+  }else document.getElementById('player-season-select').value=prev;
+  Promise.all(selectedTournamentCodes.map(loadCompRaw)).then(()=>{
+    applyPlayerFilters();
+    t20WriteFilterParams({codes:selectedTournamentCodes,activeSeason,yearFrom,yearTo},{name:playerName});
+    renderHero();
+    renderCurrentPlayerTab();
+  });
+}
+
+function playerSelectAllTournaments(){
+  selectedTournamentCodes=COMPS.map(c=>c.code);
+  renderPlayerFilterChips();
+  fillPlayerSeasonOptions(t20UnionSeasonsForCodes(championshipIndex,selectedTournamentCodes));
+  activeSeason='all';
+  document.getElementById('player-season-select').value='all';
+  yearFrom=yearTo=null;
+  document.getElementById('player-year-from').value='';
+  document.getElementById('player-year-to').value='';
+  Promise.all(selectedTournamentCodes.map(loadCompRaw)).then(()=>{
+    applyPlayerFilters();
+    t20WriteFilterParams({codes:selectedTournamentCodes,activeSeason,yearFrom,yearTo},{name:playerName});
+    renderHero();
+    renderCurrentPlayerTab();
+  });
+}
+
+function playerClearTournaments(){
+  selectedTournamentCodes=COMPS.length?[COMPS[0].code]:[];
+  renderPlayerFilterChips();
+  fillPlayerSeasonOptions(t20UnionSeasonsForCodes(championshipIndex,selectedTournamentCodes));
+  activeSeason='all';
+  document.getElementById('player-season-select').value='all';
+  Promise.all(selectedTournamentCodes.map(loadCompRaw)).then(()=>{
+    applyPlayerFilters();
+    t20WriteFilterParams({codes:selectedTournamentCodes,activeSeason,yearFrom,yearTo},{name:playerName});
+    renderHero();
+    renderCurrentPlayerTab();
+  });
+}
+
+function onPlayerSeasonChange(){
+  activeSeason=document.getElementById('player-season-select').value;
+  yearFrom=yearTo=null;
+  document.getElementById('player-year-from').value='';
+  document.getElementById('player-year-to').value='';
+  applyPlayerFilters();
+  t20WriteFilterParams({codes:selectedTournamentCodes,activeSeason,yearFrom,yearTo},{name:playerName});
+  renderHero();
+  renderCurrentPlayerTab();
+}
+
+function onPlayerYearRange(){
+  yearFrom=parseInt(document.getElementById('player-year-from').value,10)||null;
+  yearTo=parseInt(document.getElementById('player-year-to').value,10)||null;
+  activeSeason='all';
+  document.getElementById('player-season-select').value='all';
+  applyPlayerFilters();
+  t20WriteFilterParams({codes:selectedTournamentCodes,activeSeason,yearFrom,yearTo},{name:playerName});
+  renderHero();
+  renderCurrentPlayerTab();
+}
+
+function applyPlayerFilters(){
+  allData={};
+  selectedTournamentCodes.forEach(code=>{
+    const raw=allDataRaw[code];
+    if(!raw)return;
+    try{
+      allData[code]=t20FilterBySeason(JSON.parse(JSON.stringify(raw)),activeSeason,yearFrom,yearTo);
+    }catch(e){
+      allData[code]=t20FilterBySeason(raw,activeSeason,yearFrom,yearTo);
+    }
+  });
+}
+
+async function loadCompRaw(code){
+  if(allDataRaw[code])return;
+  try{
+    const r=await fetch(`stats/${code}.json`);
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    allDataRaw[code]=await r.json();
+  }catch(e){
+    console.warn(`Could not load stats/${code}.json:`,e.message);
+  }
+}
+
+function renderCurrentPlayerTab(){
+  if(!playerName)return;
+  killCharts();
+  setTimeout(()=>{
+    try{
+      if(activePlayerTab==='batting')renderBatting();
+      else if(activePlayerTab==='bowling')renderBowling();
+      else if(activePlayerTab==='overview')renderOverview();
+      else if(activePlayerTab==='matchups')renderMatchups();
+    }catch(e){console.error(e);}
+  },50);
+}
 
 async function boot(){
   playerName=decodeURIComponent(new URLSearchParams(window.location.search).get('name')||'');
-  console.log('Loading player:', playerName);
   if(!playerName){
     document.getElementById('hero-name').textContent='No player specified';
     document.getElementById('batting-content').innerHTML='<div class="no-data">No player name provided in URL</div>';
@@ -168,57 +333,56 @@ async function boot(){
   }
   document.getElementById('hero-name').textContent=playerName;
   document.getElementById('bc-name').textContent=playerName;
-  document.title=playerName+' — Cricket Stats';
+  document.title=playerName+' — T20 Stats';
 
-  // Load photo async (non-blocking)
   loadPhoto(playerName);
 
   try{
-    const ir=await fetch('stats/index.json');
-    if(ir.ok){
-      const idx=await ir.json();
-      COMPS=(idx.competitions||[])
-        .filter(c=>c.format==='T20')
-        .map(c=>({code:c.code,name:c.name,format:c.format||'T20'}));
-    }
-  }catch(e){ console.warn('index.json',e); }
-  if(!COMPS.length) COMPS=[{code:'ipl',name:'IPL',format:'T20'}];
+    championshipIndex=await t20FetchIndex();
+    COMPS=t20GetT20Competitions(championshipIndex).map(c=>({code:c.code,name:c.name,format:c.format||'T20'}));
+  }catch(e){
+    console.warn('index.json',e);
+    championshipIndex=null;
+  }
+  if(!COMPS.length)COMPS=[{code:'ipl',name:'IPL',format:'T20'}];
 
-  // Load all T20 competitions (missing JSON is skipped in loadComp)
-  try {
-    await Promise.all(COMPS.map(c=>loadComp(c.code)));
-    console.log('Data loaded:', Object.keys(allData));
-  } catch(e) {
-    console.error('Error loading data:', e);
+  const fp=t20ReadFilterParams(location.search,championshipIndex);
+  selectedTournamentCodes=fp.codes;
+  activeSeason=fp.activeSeason;
+  yearFrom=fp.yearFrom;
+  yearTo=fp.yearTo;
+  if(!selectedTournamentCodes.length)selectedTournamentCodes=COMPS.map(c=>c.code);
+
+  renderPlayerFilterChips();
+  fillPlayerSeasonOptions(t20UnionSeasonsForCodes(championshipIndex,selectedTournamentCodes));
+  document.getElementById('player-season-select').value=activeSeason;
+  document.getElementById('player-year-from').value=yearFrom||'';
+  document.getElementById('player-year-to').value=yearTo||'';
+
+  try{
+    await Promise.all(selectedTournamentCodes.map(c=>loadCompRaw(c.code)));
+    applyPlayerFilters();
+  }catch(e){
+    console.error('Error loading data:',e);
   }
 
   renderHero();
-  // Show most relevant tab first
-  const hasBatting = COMPS.some(comp => getPlayerBatting(comp.code));
-  const hasBowling = COMPS.some(comp => getPlayerBowling(comp.code));
-  if(!hasBatting && hasBowling){
-    // Pure bowler - show bowling tab first
+  const compsList=visibleComps();
+  const hasBatting=compsList.some(comp=>getPlayerBatting(comp.code));
+  const hasBowling=compsList.some(comp=>getPlayerBowling(comp.code));
+  if(!hasBatting&&hasBowling){
     document.querySelectorAll('.ptab').forEach(b=>b.classList.remove('active'));
     document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
     document.querySelector('.ptab:nth-child(2)').classList.add('active');
     document.getElementById('tab-bowling').classList.add('active');
+    activePlayerTab='bowling';
     renderBowling();
-  } else {
+  }else{
+    activePlayerTab='batting';
     renderBatting();
   }
   renderBowling();
   renderOverview();
-}
-
-async function loadComp(code){
-  try{
-    const r=await fetch(`stats/${code}.json`);
-    if(!r.ok) throw new Error('HTTP '+r.status);
-    allData[code]=await r.json();
-    console.log(`Loaded ${code}: ${allData[code].batting?.length} batters`);
-  }catch(e){
-    console.warn(`Could not load stats/${code}.json:`, e.message);
-  }
 }
 
 function showInitials(){
@@ -279,13 +443,11 @@ function getPlayerBowling(code){
 }
 
 function renderHero(){
-  const ipl=getPlayerBatting('ipl');
-  const t20=getPlayerBatting('t20s')||getPlayerBatting('t20s_female');
-  const bowl=COMPS.map(c=>getPlayerBowling(c.code)).find(Boolean)||null;
+  const vc=visibleComps();
+  const bowl=vc.map(c=>getPlayerBowling(c.code)).find(Boolean)||null;
 
-  // Tags: one per competition that has any data for this player (cap display)
   const tags=[];
-  COMPS.forEach(c=>{
+  vc.forEach(c=>{
     if(getPlayerBatting(c.code)||getPlayerBowling(c.code)){
       const short=c.name.length>22?c.name.slice(0,20)+'…':c.name;
       tags.push(short);
@@ -294,8 +456,7 @@ function renderHero(){
   if(tags.length>6) tags.length=6;
   document.getElementById('hero-tags').innerHTML=tags.map(t=>`<span class="player-tag">${t}</span>`).join('');
 
-  // KPIs - use best batting source (same competition as primary batting block)
-  const bat=ipl||t20||COMPS.map(c=>getPlayerBatting(c.code)).find(Boolean)||null;
+  const bat=vc.map(c=>getPlayerBatting(c.code)).find(Boolean)||null;
   const kpis=[];
   if(bat){
     kpis.push({label:'Runs',val:bat.runs.toLocaleString()});
@@ -319,34 +480,27 @@ function renderHero(){
 }
 
 function showTab(name,btn){
+  activePlayerTab=name;
   document.querySelectorAll('.ptab').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
   document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
   document.getElementById('tab-'+name).classList.add('active');
   if(!playerName) return;
-  killCharts();
-  setTimeout(()=>{
-    try {
-      if(name==='batting') renderBatting();
-      else if(name==='bowling') renderBowling();
-      else if(name==='overview') renderOverview();
-      else if(name==='matchups') renderMatchups();
-    } catch(e) { console.error('Tab render error:', e); }
-  }, 50);
+  renderCurrentPlayerTab();
 }
 
 // ── BATTING TAB ──────────────────────────────────────────────────────────────
 function renderBatting(){
   killCharts();
-  const rows=COMPS.map(c=>{
+  const rows=visibleComps().map(c=>{
     const bat=getPlayerBatting(c.code);
     if(!bat) return null;
     const bowl=getPlayerBowling(c.code);
     return {comp:c,bat,bowl};
   }).filter(Boolean);
-  if(!rows.length){document.getElementById('batting-content').innerHTML='<div class="no-data">No batting data found for this player</div>';return;}
+  if(!rows.length){document.getElementById('batting-content').innerHTML='<div class="no-data">No batting data for this player in the current filter</div>';return;}
 
-  const ipl=getPlayerBatting('ipl');
+  const milestoneBat=rows.length?rows.reduce((best,r)=>r.bat.runs>(best.bat.runs||0)?r:best,rows[0]):null;
 
   let html=`
     <div class="stat-cards">
@@ -370,9 +524,9 @@ function renderBatting(){
         <h3>Boundary Breakdown</h3>
         <div class="chart-wrap"><canvas id="ch-bat-bounds"></canvas></div>
       </div>
-      ${ipl?`
+      ${milestoneBat?`
       <div class="chart-card">
-        <h3>Milestones (IPL)</h3>
+        <h3>Milestones (${milestoneBat.comp.name})</h3>
         <div class="chart-wrap"><canvas id="ch-bat-milestones"></canvas></div>
       </div>`:''}
     </div>`;
@@ -429,21 +583,22 @@ function renderBatting(){
 
     // Milestones bar (IPL)
     const msCtx=document.getElementById('ch-bat-milestones')?.getContext('2d');
-    if(msCtx&&ipl){
-      charts.push(new Chart(msCtx,{type:'bar',data:{labels:['Fifties','Hundreds','Matches'],datasets:[{data:[ipl.fifties||0,ipl.hundreds||0,ipl.matches],backgroundColor:['#DAA520','#C0392B','#2E5A8F'],borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:11}}},y:{grid:{color:'#E2E6EA'},ticks:{font:{size:11}}}}}}));
+    if(msCtx&&milestoneBat){
+      const mb=milestoneBat.bat;
+      charts.push(new Chart(msCtx,{type:'bar',data:{labels:['Fifties','Hundreds','Matches'],datasets:[{data:[mb.fifties||0,mb.hundreds||0,mb.matches],backgroundColor:['#DAA520','#C0392B','#2E5A8F'],borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:11}}},y:{grid:{color:'#E2E6EA'},ticks:{font:{size:11}}}}}}));
     }
   },100);
 }
 
 // ── BOWLING TAB ───────────────────────────────────────────────────────────────
 function renderBowling(){
-  const rows=COMPS.map(c=>{
+  const rows=visibleComps().map(c=>{
     const bowl=getPlayerBowling(c.code);
     if(!bowl) return null;
     const bat=getPlayerBatting(c.code);
     return {comp:c,bowl,bat};
   }).filter(Boolean);
-  if(!rows.length){document.getElementById('bowling-content').innerHTML='<div class="no-data">No bowling data found for this player</div>';return;}
+  if(!rows.length){document.getElementById('bowling-content').innerHTML='<div class="no-data">No bowling data for this player in the current filter</div>';return;}
 
   let html=`
     <div class="stat-cards">
@@ -500,7 +655,7 @@ function renderBowling(){
 
 // ── OVERVIEW TAB ──────────────────────────────────────────────────────────────
 function renderOverview(){
-  const batRows=COMPS.map(c=>({comp:c,bat:getPlayerBatting(c.code),bowl:getPlayerBowling(c.code)})).filter(x=>x.bat||x.bowl);
+  const batRows=visibleComps().map(c=>({comp:c,bat:getPlayerBatting(c.code),bowl:getPlayerBowling(c.code)})).filter(x=>x.bat||x.bowl);
   if(!batRows.length){document.getElementById('overview-content').innerHTML='<div class="no-data">No data found</div>';return;}
 
   let html=`<div class="charts-grid">
@@ -543,13 +698,23 @@ function renderOverview(){
 }
 
 function renderMatchups(){
-  const ipl = allData['ipl'];
-  if(!ipl){ document.getElementById('matchups-content').innerHTML='<div class="no-data">IPL data not loaded</div>'; return; }
-
-  const batP = ipl.batting?.find(p=>p.name===playerName);
-  const bowlP = ipl.bowling?.find(p=>p.name===playerName);
-  const batPlayer = batP;
-  const bowlPlayer = bowlP;
+  let muse=null;
+  for(const c of visibleComps()){
+    const d=allData[c.code];
+    if(!d)continue;
+    const batP=d.batting?.find(p=>p.name===playerName);
+    const bowlP=d.bowling?.find(p=>p.name===playerName);
+    if(batP?.phase_stats||bowlP?.phase_stats){
+      muse={batP,bowlP,compName:c.name};
+      break;
+    }
+  }
+  if(!muse){
+    document.getElementById('matchups-content').innerHTML='<div class="no-data">No phase breakdown in the current filter<br><small>Phase stats are built for some competitions only (rebuild with fetch_all_cricket.py).</small></div>';
+    return;
+  }
+  const batPlayer=muse.batP;
+  const bowlPlayer=muse.bowlP;
   const phases = [
     {key:'powerplay', label:'Powerplay', sub:'Overs 1-6',  color:'#2E5A8F'},
     {key:'middle',    label:'Middle',    sub:'Overs 7-15', color:'#DAA520'},
@@ -623,7 +788,7 @@ function renderMatchups(){
     <small>Run <code>python fetch_all_cricket.py --comp ipl</code> to generate phase data</small></div>`;
 
   document.getElementById('matchups-content').innerHTML=html;
-  setTimeout(()=>drawMatchupCharts(batP,bowlP),100);
+  setTimeout(()=>drawMatchupCharts(batPlayer,bowlPlayer),100);
 }
 
 function drawMatchupCharts(batArg, bowlArg){
