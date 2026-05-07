@@ -1321,7 +1321,7 @@ function renderBowling(d, target, expanded, filterQ) {
   renderTable(target, 'bowl', d.bowling || [], cols, 'wickets');
 }
 
-function renderTable(target, type, rows, cols, defaultSort, filterQ) {
+function renderTable(target, type, rows, cols, defaultSort, filterQ, showAllRows) {
   const key = currentSort[type]?.key || defaultSort;
   const dir = currentSort[type]?.dir || -1;
 
@@ -1336,7 +1336,7 @@ function renderTable(target, type, rows, cols, defaultSort, filterQ) {
   ).join('');
 
   const PAGE = 50;
-  const showAll = !!filterQ || sorted.length <= PAGE;
+  const showAll = !!showAllRows || !!filterQ || sorted.length <= PAGE;
   const visRows = showAll ? sorted : sorted.slice(0, PAGE);
 
   const trs = visRows.map((r, i) => {
@@ -1349,7 +1349,7 @@ function renderTable(target, type, rows, cols, defaultSort, filterQ) {
 
   const showMoreBtn = !showAll
     ? `<div style="text-align:center;padding:12px;border-top:1px solid var(--border)">
-        <button onclick="renderTable('${target}','${type}',currentTableRows['${type}'],currentTableCols['${type}'],'${defaultSort}','_all')"
+        <button onclick="renderTable('${target}','${type}',currentTableRows['${type}'],currentTableCols['${type}'],'${defaultSort}',null,true)"
           style="background:var(--blue);color:#fff;border:none;padding:7px 20px;border-radius:6px;cursor:pointer;font-size:13px">
           Show all ${sorted.length} players
         </button></div>` : '';
