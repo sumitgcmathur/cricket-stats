@@ -289,12 +289,19 @@ function onPlayerYearRange(){
 
 function applyPlayerFilters(){
   allData={};
+  const needSeasonFilter=activeSeason!=='all'||yearFrom||yearTo;
   selectedTournamentCodes.forEach(code=>{
     const raw=allDataRaw[code];
     if(!raw)return;
+    if(!needSeasonFilter){
+      allData[code]=raw;
+      return;
+    }
     try{
-      allData[code]=t20FilterBySeason(JSON.parse(JSON.stringify(raw)),activeSeason,yearFrom,yearTo);
+      const copy=typeof structuredClone==='function'?structuredClone(raw):JSON.parse(JSON.stringify(raw));
+      allData[code]=t20FilterBySeason(copy,activeSeason,yearFrom,yearTo);
     }catch(e){
+      console.warn('applyPlayerFilters clone',code,e);
       allData[code]=t20FilterBySeason(raw,activeSeason,yearFrom,yearTo);
     }
   });
@@ -324,8 +331,14 @@ function renderCurrentPlayerTab(){
   },50);
 }
 
+function readPlayerNameFromQs(){
+  const raw=new URLSearchParams(window.location.search).get('name');
+  if(!raw)return'';
+  try{return decodeURIComponent(raw).trim();}catch(e){return String(raw).trim();}
+}
+
 async function boot(){
-  playerName=decodeURIComponent(new URLSearchParams(window.location.search).get('name')||'');
+  playerName=readPlayerNameFromQs();
   if(!playerName){
     document.getElementById('hero-name').textContent='No player specified';
     document.getElementById('batting-content').innerHTML='<div class="no-data">No player name provided in URL</div>';
@@ -435,11 +448,14 @@ async function loadPhoto(name){
   console.log('No photo found for', name);
 }
 
+function samePlayerName(a,b){
+  return String(a||'').trim().toLowerCase()===String(b||'').trim().toLowerCase();
+}
 function getPlayerBatting(code){
-  return allData[code]?.batting?.find(p=>p.name===playerName)||null;
+  return allData[code]?.batting?.find(p=>samePlayerName(p.name,playerName))||null;
 }
 function getPlayerBowling(code){
-  return allData[code]?.bowling?.find(p=>p.name===playerName)||null;
+  return allData[code]?.bowling?.find(p=>samePlayerName(p.name,playerName))||null;
 }
 
 function renderHero(){
@@ -562,7 +578,7 @@ function renderBatting(){
     if(scCtx){
       const bestComp=rows[0];
       const allBat=allData[bestComp.comp.code]?.batting||[];
-      const others=allBat.filter(p=>p.name!==playerName&&p.matches>=5).map(p=>({x:p.avg,y:p.sr}));
+      const others=allBat.filter(p=>!samePlayerName(p.name,playerName)&&p.matches>=5).map(p=>({x:p.avg,y:p.sr}));
       const me={x:bestComp.bat.avg,y:bestComp.bat.sr};
       charts.push(new Chart(scCtx,{type:'scatter',data:{datasets:[
         {label:'Other Players',data:others,backgroundColor:'rgba(107,122,141,0.2)',pointRadius:3},
@@ -702,8 +718,8 @@ function renderMatchups(){
   for(const c of visibleComps()){
     const d=allData[c.code];
     if(!d)continue;
-    const batP=d.batting?.find(p=>p.name===playerName);
-    const bowlP=d.bowling?.find(p=>p.name===playerName);
+    const batP=d.batting?.find(p=>samePlayerName(p.name,playerName));
+    const bowlP=d.bowling?.find(p=>samePlayerName(p.name,playerName));
     if(batP?.phase_stats||bowlP?.phase_stats){
       muse={batP,bowlP,compName:c.name};
       break;
