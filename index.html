@@ -174,7 +174,7 @@ body {
   margin-top: 2px;
 }
 
-/* TOOLBAR */
+/* TOOLBAR — two tiers: collapsible leagues, then one calm row (season / year / tabs) */
 .toolbar {
   background: var(--surface);
   border-bottom: 1px solid var(--border);
@@ -188,51 +188,95 @@ body {
 .toolbar-inner {
   max-width: 1200px;
   margin: 0 auto;
-  display: flex;
-  align-items: flex-start;
-  flex-wrap: wrap;
-  gap: 12px 16px;
-  min-height: 48px;
-  padding: 8px 0 10px;
-  overflow-x: auto;
-  scrollbar-width: none;
+  padding: 0;
 }
 
-.toolbar-inner::-webkit-scrollbar { display: none; }
-
-.toolbar-label {
+.tournament-details {
+  border-bottom: 1px solid var(--border);
+}
+.tournament-details summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  user-select: none;
+}
+.tournament-details summary::-webkit-details-marker { display: none; }
+.ts-label {
   font-size: 11px;
-  color: var(--muted);
+  font-weight: 600;
   letter-spacing: 1px;
   text-transform: uppercase;
-  white-space: nowrap;
+  color: var(--muted);
   flex-shrink: 0;
 }
+.ts-value {
+  font-size: 13px;
+  color: var(--text);
+  font-weight: 500;
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ts-hint {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 400;
+  flex-shrink: 0;
+}
+.ts-chev {
+  font-size: 11px;
+  color: var(--muted);
+  flex-shrink: 0;
+  width: 1.25rem;
+  text-align: center;
+}
+.ts-chev::before { content: '▸'; }
+.tournament-details[open] .ts-chev::before { content: '▾'; }
+.tournament-panel {
+  padding: 0 0 14px;
+}
+.tournament-panel .filter-actions { margin-bottom: 8px; }
 
-.toolbar-sep {
+.toolbar-main-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px 20px;
+  padding: 12px 0 14px;
+}
+.toolbar-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.inline-lab {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.toolbar-sep-v {
   width: 1px;
-  height: 20px;
+  height: 28px;
   background: var(--border);
   flex-shrink: 0;
-}
-
-/* Full-width line break before stat tabs (so pills are never clipped below filters) */
-.toolbar-inner > .toolbar-sep-pills-row {
-  flex-basis: 100%;
-  width: 100%;
-  height: 0;
-  border: none;
-  margin: 0;
-  padding: 0;
+  align-self: center;
 }
 
 .pill-group {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  flex: 1 1 100%;
   align-items: center;
-  padding-top: 2px;
+  flex: 1;
+  min-width: min(100%, 260px);
 }
 
 .pill {
@@ -773,13 +817,15 @@ footer a { color: var(--blue); text-decoration: none; }
   .nav-btn { padding: 0 8px; font-size: 11px; height: 48px; }
   .header-meta { display: none; }
   .toolbar { padding: 8px 12px; }
-  .toolbar-inner { gap: 6px; flex-wrap: wrap; height: auto; padding: 4px 0; }
-  .filter-label { display: none; }
+  .toolbar-main-row { flex-direction: column; align-items: stretch; gap: 12px; padding: 10px 0 12px; }
+  .toolbar-sep-v { display: none; }
+  .toolbar-filters { gap: 6px 10px; }
   .season-select, .year-input { font-size: 12px; padding: 4px 6px; max-width: 90px; }
   .year-range-label { display: none; }
-  .toolbar-sep:not(.toolbar-sep-pills-row) { display: none; }
+  .ts-hint { display: none; }
+  .tournament-details summary { padding: 8px 0; }
   .pill { font-size: 10px; padding: 3px 8px; }
-  .pill-group { gap: 2px; }
+  .pill-group { gap: 4px; width: 100%; }
   td:nth-child(n+6) { display: none; }
   th:nth-child(n+6) { display: none; }
   .stat-cards { grid-template-columns: repeat(2, 1fr); }
@@ -810,7 +856,7 @@ footer a { color: var(--blue); text-decoration: none; }
 <div class="hero-strip" id="hero-strip">
   <div class="hero-inner">
     <div class="hero-title">T20 <span style="color:var(--gold-light)">Across Leagues</span></div>
-    <div class="hero-sub">Choose tournaments and seasons below · Cricsheet data</div>
+    <div class="hero-sub">Pick a season or year range, then open <strong>Leagues</strong> if you want fewer tournaments · Cricsheet data</div>
     <div class="kpi-strip" id="hero-kpis">
       <div class="kpi-card"><div class="k-label">Loading</div><div class="k-val">—</div></div>
     </div>
@@ -820,33 +866,44 @@ footer a { color: var(--blue); text-decoration: none; }
 <!-- TOOLBAR -->
 <div class="toolbar">
   <div class="toolbar-inner" id="toolbar-inner">
-    <div class="toolbar-sep" style="width:100%;height:0;flex-basis:100%;border:none;margin:0"></div>
-    <div class="filter-panel" style="flex-basis:100%;margin:0 0 4px 0">
-      <div class="filter-panel-title">Tournaments (multi-select)</div>
-      <div class="filter-actions">
-        <button type="button" onclick="selectAllTournaments()">All</button>
-        <button type="button" onclick="clearTournamentSelection()">Clear</button>
+    <div class="toolbar-stack">
+      <details class="tournament-details" id="tournament-details">
+        <summary class="tournament-summary">
+          <span class="ts-label">Leagues</span>
+          <span class="ts-value" id="tournament-summary-text">Loading…</span>
+          <span class="ts-hint">tap to change</span>
+          <span class="ts-chev" aria-hidden="true"></span>
+        </summary>
+        <div class="tournament-panel">
+          <div class="filter-actions">
+            <button type="button" onclick="selectAllTournaments()">Select all</button>
+            <button type="button" onclick="clearTournamentSelection()">Reset to one</button>
+          </div>
+          <div class="filter-chips" id="filter-tournaments"></div>
+        </div>
+      </details>
+      <div class="toolbar-main-row">
+        <div class="toolbar-filters">
+          <span class="inline-lab">Season</span>
+          <select class="season-select" id="season-select" onchange="onSeasonChange()">
+            <option value="all">All Seasons</option>
+          </select>
+          <span class="inline-lab">Years</span>
+          <div class="year-range">
+            <input class="year-input" type="number" id="year-from" placeholder="From" min="1995" max="2035" onchange="onYearRange()">
+            <span class="year-range-label">to</span>
+            <input class="year-input" type="number" id="year-to" placeholder="To" min="1995" max="2035" onchange="onYearRange()">
+          </div>
+        </div>
+        <div class="toolbar-sep-v" aria-hidden="true"></div>
+        <div class="pill-group" id="stat-pills">
+          <button class="pill active" onclick="showStatTab('batting', this)">Batting</button>
+          <button class="pill" onclick="showStatTab('bowling', this)">Bowling</button>
+          <button class="pill" onclick="showStatTab('sixes', this)">Sixes</button>
+          <button class="pill" onclick="showStatTab('teams', this)">Teams</button>
+          <button class="pill" onclick="showStatTab('mvp', this)">🏅 MVP</button>
+        </div>
       </div>
-      <div class="filter-chips" id="filter-tournaments"></div>
-    </div>
-    <span class="toolbar-label">Season</span>
-    <select class="season-select" id="season-select" onchange="onSeasonChange()">
-      <option value="all">All Seasons</option>
-    </select>
-    <div class="toolbar-sep"></div>
-    <span class="toolbar-label">Year range</span>
-    <div class="year-range">
-      <input class="year-input" type="number" id="year-from" placeholder="From" min="1995" max="2035" onchange="onYearRange()">
-      <span class="year-range-label">to</span>
-      <input class="year-input" type="number" id="year-to" placeholder="To" min="1995" max="2035" onchange="onYearRange()">
-    </div>
-    <div class="toolbar-sep toolbar-sep-pills-row"></div>
-    <div class="pill-group" id="stat-pills">
-      <button class="pill active" onclick="showStatTab('batting', this)">Batting</button>
-      <button class="pill" onclick="showStatTab('bowling', this)">Bowling</button>
-      <button class="pill" onclick="showStatTab('sixes', this)">Sixes</button>
-      <button class="pill" onclick="showStatTab('teams', this)">Teams</button>
-      <button class="pill" onclick="showStatTab('mvp', this)">🏅 MVP</button>
     </div>
   </div>
 </div>
@@ -907,12 +964,36 @@ function unionSeasonsForCodes(codes) {
   return [...s].sort((a, b) => b.localeCompare(a));
 }
 
+function updateTournamentSummaryText() {
+  const el = document.getElementById('tournament-summary-text');
+  if (!el) return;
+  const comps = getT20Competitions();
+  if (!comps.length) {
+    el.textContent = 'No T20 leagues in index';
+    return;
+  }
+  const codes = (selectedTournamentCodes && selectedTournamentCodes.length)
+    ? selectedTournamentCodes
+    : comps.map(c => c.code);
+  const nameByCode = Object.fromEntries(comps.map(c => [c.code, c.name]));
+  const allSelected = codes.length === comps.length && comps.every(c => codes.includes(c.code));
+  if (allSelected) {
+    el.textContent = `All ${comps.length} T20 competitions`;
+    return;
+  }
+  const names = codes.map(c => nameByCode[c] || c);
+  if (names.length === 1) el.textContent = names[0];
+  else if (names.length === 2) el.textContent = names.join(' · ');
+  else el.textContent = `${names.slice(0, 2).join(' · ')} +${names.length - 2} more`;
+}
+
 function renderTournamentFilters() {
   const wrap = document.getElementById('filter-tournaments');
   if (!wrap) return;
   const comps = getT20Competitions();
   if (!comps.length) {
     wrap.innerHTML = '<span class="empty" style="font-size:12px">No T20 competitions in index.json</span>';
+    updateTournamentSummaryText();
     return;
   }
   wrap.innerHTML = comps.map(c => `
@@ -920,12 +1001,14 @@ function renderTournamentFilters() {
       <input type="checkbox" value="${c.code}" ${selectedTournamentCodes.includes(c.code) ? 'checked' : ''} onchange="onTournamentFilterChange()">
       <span>${c.name}</span>
     </label>`).join('');
+  updateTournamentSummaryText();
 }
 
 function onTournamentFilterChange() {
   const checked = [...document.querySelectorAll('#filter-tournaments input[type=checkbox]:checked')].map(i => i.value);
   selectedTournamentCodes = checked.length ? checked : getT20Competitions().map(c => c.code);
   if (!checked.length) renderTournamentFilters();
+  else updateTournamentSummaryText();
   const prev = activeSeason;
   populateSeasons(unionSeasonsForCodes(selectedTournamentCodes));
   if (prev !== 'all' && ![...document.getElementById('season-select').options].some(o => o.value === prev)) {
@@ -1138,10 +1221,14 @@ function setView(name, btn) {
   document.getElementById('view-player').style.display = name === 'player' ? '' : 'none';
   const toolbarEl = document.getElementById('toolbar-inner');
   toolbarEl.style.display = (name === 'player') ? 'none' : '';
+  if (name === 'player') {
+    const td = document.getElementById('tournament-details');
+    if (td) td.removeAttribute('open');
+  }
   document.getElementById('hero-strip').style.display = name === 'player' ? 'none' : '';
   if (name === 'dashboard') {
     document.getElementById('hero-strip').querySelector('.hero-title').innerHTML = 'T20 <span style="color:var(--gold-light)">Across Leagues</span>';
-    document.getElementById('hero-strip').querySelector('.hero-sub').textContent = 'Choose tournaments and seasons below · Cricsheet data';
+    document.getElementById('hero-strip').querySelector('.hero-sub').textContent = 'Pick a season or year range, then open Leagues if you want fewer tournaments · Cricsheet data';
     if (currentMergedData) {
       updateHeroKPIs(currentMergedData);
       renderStatTab(currentMergedData, true);
