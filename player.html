@@ -308,6 +308,7 @@ function applyPlayerFilters(){
 }
 
 async function loadCompRaw(code){
+  if(!code||typeof code!=='string'){console.warn('loadCompRaw: missing competition code');return;}
   if(allDataRaw[code])return;
   try{
     const r=await fetch(`stats/${code}.json`);
@@ -378,7 +379,7 @@ async function boot(){
   document.getElementById('player-year-to').value=yearTo||'';
 
   try{
-    await Promise.all(selectedTournamentCodes.map(c=>loadCompRaw(c.code)));
+    await Promise.all(selectedTournamentCodes.map(code=>loadCompRaw(code)));
     applyPlayerFilters();
   }catch(e){
     console.error('Error loading data:',e);
@@ -439,12 +440,16 @@ async function loadPhoto(name){
       if(page.missing !== undefined) continue; // page not found
       if(page.thumbnail?.source){
         const img = document.getElementById('player-photo');
+        let src=page.thumbnail.source;
+        if(src.startsWith('//'))src='https:'+src;
+        else if(/^http:\/\//i.test(src))src='https://'+src.slice(7);
+        img.referrerPolicy='no-referrer';
         img.onload = () => {
           img.style.display='block';
           document.getElementById('player-initials').style.display='none';
         };
-        img.onerror = () => { img.style.display='none'; };
-        img.src = page.thumbnail.source;
+        img.onerror = () => { img.style.display='none';showInitials(); };
+        img.src = src;
         console.log('Photo loaded for', name, 'via', query);
         return;
       }
