@@ -269,12 +269,6 @@ function getPlayerBowling(code){
   return allData[code]?.bowling?.find(p=>p.name===playerName)||null;
 }
 
-/** Matches in a competition: max(batting games, bowling games) so hero/tabs/overview agree. */
-function matchesInComp(code){
-  const b=getPlayerBatting(code), w=getPlayerBowling(code);
-  return Math.max(b?.matches||0, w?.matches||0);
-}
-
 function renderHero(){
   const ipl=getPlayerBatting('ipl');
   const t20=getPlayerBatting('t20is');
@@ -290,13 +284,12 @@ function renderHero(){
   if(test) tags.push('Test');
   document.getElementById('hero-tags').innerHTML=tags.map(t=>`<span class="player-tag">${t}</span>`).join('');
 
-  // KPIs - use best batting source; "Matches" uses same competition as those batting stats
+  // KPIs - use best batting source (same competition as primary batting block)
   const bat=ipl||t20||odi||test;
-  const batCode=ipl?'ipl':t20?'t20is':odi?'odis':test?'tests':null;
   const kpis=[];
   if(bat){
     kpis.push({label:'Runs',val:bat.runs.toLocaleString()});
-    kpis.push({label:'Matches',val:batCode?matchesInComp(batCode):bat.matches});
+    kpis.push({label:'Matches',val:bat.matches});
     kpis.push({label:'Avg',val:bat.avg});
     kpis.push({label:'SR',val:bat.sr});
     if(bat.hundreds) kpis.push({label:'100s',val:bat.hundreds});
@@ -307,11 +300,12 @@ function renderHero(){
     kpis.push({label:'Wickets',val:bowl.wickets});
     kpis.push({label:'Economy',val:bowl.economy});
   }
+  const dataNote = 'Match counts follow Cricsheet official playing squads (info,player rows in each match file). Batting and bowling tables use the same number. Rebuild stats with fetch_all_cricket.py after updates.';
   document.getElementById('hero-kpis').innerHTML=kpis.map(k=>`
     <div class="player-kpi">
       <span class="pk-val">${k.val}</span>
       <span class="pk-label">${k.label}</span>
-    </div>`).join('');
+    </div>`).join('')+`<div style="flex-basis:100%;max-width:620px;font-size:11px;line-height:1.5;color:rgba(255,255,255,0.52);margin-top:14px">${dataNote}</div>`;
 }
 
 function showTab(name,btn){
@@ -338,8 +332,7 @@ function renderBatting(){
     const bat=getPlayerBatting(c.code);
     if(!bat) return null;
     const bowl=getPlayerBowling(c.code);
-    const matches=matchesInComp(c.code);
-    return {comp:c,bat,bowl,matches};
+    return {comp:c,bat,bowl};
   }).filter(Boolean);
   if(!rows.length){document.getElementById('batting-content').innerHTML='<div class="no-data">No batting data found for this player</div>';return;}
 
@@ -351,7 +344,7 @@ function renderBatting(){
         <div class="stat-card">
           <div class="sc-label">${r.comp.name} Runs</div>
           <div class="sc-val">${r.bat.runs.toLocaleString()}</div>
-          <div class="sc-sub">${r.matches} matches · avg ${r.bat.avg}</div>
+          <div class="sc-sub">${r.bat.matches} matches · avg ${r.bat.avg}</div>
         </div>`).join('')}
     </div>
     <div class="charts-grid">
@@ -376,10 +369,10 @@ function renderBatting(){
 
   // Detailed table
   html+=`<div class="card"><div class="card-title">Career Batting Stats</div>
-    <table><thead><tr><th>Competition</th><th title="Games in squad (batted or bowled)">Mat</th><th>Runs</th><th>Avg</th><th>SR</th><th>4s</th><th>6s</th><th>50s</th><th>100s</th></tr></thead>
+    <table><thead><tr><th>Competition</th><th title="Matches in official squad list (Cricsheet)">Mat</th><th>Runs</th><th>Avg</th><th>SR</th><th>4s</th><th>6s</th><th>50s</th><th>100s</th></tr></thead>
     <tbody>${rows.map(r=>`<tr>
       <td>${r.comp.name} <span style="font-size:10px;color:var(--muted)">(${r.comp.format})</span></td>
-      <td>${r.matches}</td><td class="hi">${r.bat.runs.toLocaleString()}</td>
+      <td>${r.bat.matches}</td><td class="hi">${r.bat.runs.toLocaleString()}</td>
       <td>${r.bat.avg}</td><td>${r.bat.sr}</td>
       <td>${r.bat.fours||'—'}</td><td>${r.bat.sixes||'—'}</td>
       <td>${r.bat.fifties||'—'}</td><td>${r.bat.hundreds||'—'}</td>
@@ -427,8 +420,7 @@ function renderBatting(){
     // Milestones bar (IPL)
     const msCtx=document.getElementById('ch-bat-milestones')?.getContext('2d');
     if(msCtx&&ipl){
-      const iplApps=matchesInComp('ipl');
-      charts.push(new Chart(msCtx,{type:'bar',data:{labels:['Fifties','Hundreds','Matches'],datasets:[{data:[ipl.fifties||0,ipl.hundreds||0,iplApps],backgroundColor:['#DAA520','#C0392B','#2E5A8F'],borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:11}}},y:{grid:{color:'#E2E6EA'},ticks:{font:{size:11}}}}}}));
+      charts.push(new Chart(msCtx,{type:'bar',data:{labels:['Fifties','Hundreds','Matches'],datasets:[{data:[ipl.fifties||0,ipl.hundreds||0,ipl.matches],backgroundColor:['#DAA520','#C0392B','#2E5A8F'],borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:11}}},y:{grid:{color:'#E2E6EA'},ticks:{font:{size:11}}}}}}));
     }
   },100);
 }
@@ -439,8 +431,7 @@ function renderBowling(){
     const bowl=getPlayerBowling(c.code);
     if(!bowl) return null;
     const bat=getPlayerBatting(c.code);
-    const matches=matchesInComp(c.code);
-    return {comp:c,bowl,bat,matches};
+    return {comp:c,bowl,bat};
   }).filter(Boolean);
   if(!rows.length){document.getElementById('bowling-content').innerHTML='<div class="no-data">No bowling data found for this player</div>';return;}
 
@@ -449,7 +440,7 @@ function renderBowling(){
       ${rows.map(r=>`<div class="stat-card">
         <div class="sc-label">${r.comp.name} Wickets</div>
         <div class="sc-val">${r.bowl.wickets}</div>
-        <div class="sc-sub">${r.matches} matches · econ ${r.bowl.economy}</div>
+        <div class="sc-sub">${r.bowl.matches} matches · econ ${r.bowl.economy}</div>
       </div>`).join('')}
     </div>
     <div class="charts-grid">
@@ -464,10 +455,10 @@ function renderBowling(){
     </div>`;
 
   html+=`<div class="card"><div class="card-title">Career Bowling Stats</div>
-    <table><thead><tr><th>Competition</th><th title="Games in squad (batted or bowled)">Mat</th><th>Wkts</th><th>Avg</th><th>Econ</th><th>Overs</th><th>Runs</th></tr></thead>
+    <table><thead><tr><th>Competition</th><th title="Matches in official squad list (Cricsheet)">Mat</th><th>Wkts</th><th>Avg</th><th>Econ</th><th>Overs</th><th>Runs</th></tr></thead>
     <tbody>${rows.map(r=>`<tr>
       <td>${r.comp.name} <span style="font-size:10px;color:var(--muted)">(${r.comp.format})</span></td>
-      <td>${r.matches}</td><td class="hi">${r.bowl.wickets}</td>
+      <td>${r.bowl.matches}</td><td class="hi">${r.bowl.wickets}</td>
       <td>${r.bowl.avg||'—'}</td><td>${r.bowl.economy}</td>
       <td>${r.bowl.overs}</td><td>${r.bowl.runs.toLocaleString()}</td>
     </tr>`).join('')}</tbody></table>
@@ -510,11 +501,11 @@ function renderOverview(){
   </div>`;
 
   html+=`<div class="card"><div class="card-title">All-Format Summary</div>
-    <table><thead><tr><th>Competition</th><th>Format</th><th title="Games in squad (batted or bowled)">Mat</th><th>Runs</th><th>Bat Avg</th><th>SR</th><th>Wkts</th><th>Economy</th></tr></thead>
+    <table><thead><tr><th>Competition</th><th>Format</th><th title="Official squad appearances (Cricsheet)">Mat</th><th>Runs</th><th>Bat Avg</th><th>SR</th><th>Wkts</th><th>Economy</th></tr></thead>
     <tbody>${batRows.map(r=>`<tr>
       <td>${r.comp.name}</td>
       <td><span style="font-size:10px;padding:2px 6px;border-radius:3px;background:var(--blue-light);color:var(--blue);font-weight:600">${r.comp.format}</span></td>
-      <td>${matchesInComp(r.comp.code)}</td>
+      <td>${r.bat?.matches ?? r.bowl?.matches ?? '—'}</td>
       <td class="hi">${r.bat?.runs?.toLocaleString()||'—'}</td>
       <td>${r.bat?.avg||'—'}</td>
       <td>${r.bat?.sr||'—'}</td>

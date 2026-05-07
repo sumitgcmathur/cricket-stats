@@ -4,7 +4,7 @@ Cricket Stats Fetcher — All Cricsheet Data
 Downloads ball-by-ball CSV data for ALL competitions from cricsheet.org
 Generates:
   stats/index.json              — master competition list
-  stats/{code}.json             — aggregated player/team stats
+  stats/{code}.json             — aggregated player/team stats (player "matches" = Cricsheet playing squad, info,player)
   stats/matches/{code}/         — one JSON per match (scorecard)
   stats/matches/{code}/index.json — match list for competition
 
@@ -366,6 +366,9 @@ def parse_zip(zip_bytes, comp):
     teams    = defaultdict(lambda: {"wins":0,"matches":set(),"by_season":{}})
     team_won_matches = defaultdict(set)  # track per-match wins separately
     team_season_matches = defaultdict(lambda: defaultdict(set))  # team->season->match_ids
+    # Official playing squad per match (Cricsheet info,player,Team,Player) — canonical "matches"
+    xi_matches = defaultdict(set)  # player -> {match_id, ...}
+    xi_by_season = defaultdict(lambda: defaultdict(set))  # player -> season -> {match_id}
     seasons  = set()
     match_index = []
 
@@ -448,6 +451,13 @@ def parse_zip(zip_bytes, comp):
                                         hand = "left" if "left" in bstyle else "right"
                                         match_batting_hands[pname] = hand
                                         global_batting_hands[pname] = hand
+                                    elif parts[1] == "player" and len(parts) >= 4:
+                                        # info,player,TeamName,Player Name — playing squad (Cricsheet)
+                                        pname = ",".join(parts[3:]).strip()
+                                        if pname:
+                                            xi_matches[pname].add(match_id)
+                                            if season:
+                                                xi_by_season[pname][season].add(match_id)
                     except:
                         pass
 
@@ -648,24 +658,58 @@ def parse_zip(zip_bytes, comp):
     with open(os.path.join(matches_dir, "index.json"), "w", encoding="utf-8") as f:
         json.dump({"matches": match_index}, f, ensure_ascii=False, separators=(",",":"))
 
-    return batters, bowlers, teams, sorted(seasons), total, team_season_matches
+    return batters, bowlers, teams, sorted(seasons), total, team_season_matches, xi_matches, xi_by_season
 
 
-def build_output(batters, bowlers, teams, seasons, total_matches, comp, team_season_matches=None):
+def _official_matches(name, ball_match_ids, xi_matches):
+    """Cricsheet squad (info,player) when present; else ball-derived match IDs."""
+    xs = xi_matches.get(name) if xi_matches else None
+    if xs:
+        return len(xs)
+    return len(ball_match_ids)
+
+
+def _official_matches_season(name, season, ball_season_ss, xi_by_season):
+    inner = (xi_by_season or {}).get(name) or {}
+    xs = inner.get(season) if hasattr(inner, "get") else None
+    if xs:
+        return len(xs)
+    return len(ball_season_ss["matches"]) if isinstance(ball_season_ss.get("matches"), set) else int(
+        ball_season_ss.get("matches", 0) or 0
+    )
+
+
+def build_output(
+    batters,
+    bowlers,
+    teams,
+    seasons,
+    total_matches,
+    comp,
+    team_season_matches=None,
+    xi_matches=None,
+    xi_by_season=None,
+):
     if team_season_matches is None:
         team_season_matches = {}
+    if xi_matches is None:
+        xi_matches = {}
+    if xi_by_season is None:
+        xi_by_season = {}
     batting_list = []
     for name, s in batters.items():
-        m = len(s["matches"])
-        if m < 1 or s["balls"] < 6: continue  # min 1 match, min 1 over faced
+        m = _official_matches(name, s["matches"], xi_matches)
+        if m < 1 or s["balls"] < 6:
+            continue  # min 1 match, min 1 over faced
         sr  = round(s["runs"] / s["balls"] * 100, 2) if s["balls"] else 0
         dismissals = s.get("dismissals", 0)
         avg = round(s["runs"]/dismissals, 2) if dismissals > 0 else s["runs"]  # not out avg
         # Build per-season summary
         by_season = {}
         for ssn, ss in s.get("by_season",{}).items():
-            sm = len(ss["matches"])
-            if sm < 1: continue
+            sm = _official_matches_season(name, ssn, ss, xi_by_season)
+            if sm < 1:
+                continue
             sd = ss.get("dismissals",0)
             by_season[ssn] = {
                 "matches": sm, "runs": ss["runs"], "balls": ss["balls"],
@@ -701,8 +745,9 @@ def build_output(batters, bowlers, teams, seasons, total_matches, comp, team_sea
 
     bowling_list = []
     for name, s in bowlers.items():
-        m = len(s["matches"])
-        if m < 1 or s["balls"] < 1: continue  # show anyone who bowled
+        m = _official_matches(name, s["matches"], xi_matches)
+        if m < 1 or s["balls"] < 1:
+            continue  # show anyone who bowled
         overs   = round(s["balls"]//6 + (s["balls"]%6)/10, 1)
         economy = round(s["runs"]/s["balls"]*6, 2) if s["balls"] else 0
         avg     = round(s["runs"]/s["wickets"], 2) if s["wickets"] else None
@@ -711,8 +756,9 @@ def build_output(batters, bowlers, teams, seasons, total_matches, comp, team_sea
         # Build by_season for bowling
         bowl_by_season = {}
         for ssn, ss in s.get("by_season",{}).items():
-            sm = len(ss["matches"]) if isinstance(ss.get("matches"), set) else int(ss.get("matches",0))
-            if sm < 1: continue
+            sm = _official_matches_season(name, ssn, ss, xi_by_season)
+            if sm < 1:
+                continue
             sw = ss.get("wickets",0)
             sb = ss.get("balls",0)
             sr = ss.get("runs",0)
@@ -749,11 +795,26 @@ def build_output(batters, bowlers, teams, seasons, total_matches, comp, team_sea
     bowling_list.sort(key=lambda x: x["wickets"], reverse=True)
 
     sixes_list = sorted(
-        [{"name":n,"sixes":s["sixes"],"matches":len(s["matches"]),
-          "by_season":{ssn:{"sixes":ss["sixes"],"matches":len(ss["matches"]) if isinstance(ss.get("matches"),set) else ss.get("matches",0)}
-                       for ssn,ss in s.get("by_season",{}).items() if ss.get("sixes",0)>0}}
-         for n,s in batters.items() if s["sixes"]>0],
-        key=lambda x: x["sixes"], reverse=True)[:100]
+        [
+            {
+                "name": n,
+                "sixes": s["sixes"],
+                "matches": _official_matches(n, s["matches"], xi_matches),
+                "by_season": {
+                    ssn: {
+                        "sixes": ss["sixes"],
+                        "matches": _official_matches_season(n, ssn, ss, xi_by_season),
+                    }
+                    for ssn, ss in s.get("by_season", {}).items()
+                    if ss.get("sixes", 0) > 0
+                },
+            }
+            for n, s in batters.items()
+            if s["sixes"] > 0
+        ],
+        key=lambda x: x["sixes"],
+        reverse=True,
+    )[:100]
 
     teams_list = []
     for name, s in teams.items():
@@ -788,8 +849,8 @@ def fetch_competition(comp):
     print(f"\n{'─'*50}\n🏏 {comp['name']} ({code})")
     try:
         zip_bytes = download_zip(code)
-        batters, bowlers, teams, seasons, total, tsm = parse_zip(zip_bytes, comp)
-        data = build_output(batters, bowlers, teams, seasons, total, comp, tsm)
+        batters, bowlers, teams, seasons, total, tsm, xi_m, xi_bs = parse_zip(zip_bytes, comp)
+        data = build_output(batters, bowlers, teams, seasons, total, comp, tsm, xi_m, xi_bs)
         out_path = os.path.join(STATS_DIR, f"{code}.json")
         with open(out_path, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, separators=(",",":"))
