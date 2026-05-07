@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>IPL & Cricket Stats</title>
+<title>T20 Stats — Across Leagues</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Bebas+Neue&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <style>
@@ -495,6 +495,63 @@ td:first-child { text-align: left; }
 .format-badge.ODI  { background: var(--blue-light); color: var(--blue); }
 .format-badge.T20  { background: var(--gold-bg); color: var(--gold); }
 
+/* TOURNAMENT FILTERS */
+.filter-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px 16px;
+  margin-bottom: 14px;
+  box-shadow: var(--shadow);
+}
+.filter-panel-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+.filter-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.filter-actions button {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 12px;
+  padding: 5px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: 'Inter', sans-serif;
+}
+.filter-actions button:hover { border-color: var(--blue-mid); color: var(--blue); }
+.filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-height: 160px;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text);
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 5px 10px 5px 8px;
+  cursor: pointer;
+  user-select: none;
+}
+.filter-chip:has(input:checked) {
+  background: var(--blue-light);
+  border-color: var(--blue-mid);
+  color: var(--blue);
+}
+.filter-chip input { accent-color: var(--blue); }
+
 /* PLAYER SEARCH */
 .player-search-wrap { padding: 24px 0; }
 
@@ -723,10 +780,9 @@ footer a { color: var(--blue); text-decoration: none; }
 <!-- HEADER -->
 <div class="header">
   <div class="header-inner">
-    <div class="logo">IPL <span>STATS</span></div>
+    <a href="index.html" class="logo" style="text-decoration:none;color:inherit">T20 <span>STATS</span></a>
     <nav class="nav">
-      <button class="nav-btn active" onclick="setView('ipl', this)">IPL</button>
-      <button class="nav-btn" onclick="setView('international', this)">T20 comps</button>
+      <button class="nav-btn active" onclick="setView('dashboard', this)">Stats</button>
       <button class="nav-btn" onclick="setView('player', this)">Player Search</button>
       <a href="matches.html" class="nav-btn" style="text-decoration:none;display:flex;align-items:center;">Matches</a>
     </nav>
@@ -737,8 +793,8 @@ footer a { color: var(--blue); text-decoration: none; }
 <!-- HERO -->
 <div class="hero-strip" id="hero-strip">
   <div class="hero-inner">
-    <div class="hero-title">Indian <span>Premier</span> League</div>
-    <div class="hero-sub">Ball-by-ball data · Cricsheet · 2008 – present</div>
+    <div class="hero-title">T20 <span style="color:var(--gold-light)">Across Leagues</span></div>
+    <div class="hero-sub">Choose tournaments and seasons below · Cricsheet data</div>
     <div class="kpi-strip" id="hero-kpis">
       <div class="kpi-card"><div class="k-label">Loading</div><div class="k-val">—</div></div>
     </div>
@@ -748,16 +804,25 @@ footer a { color: var(--blue); text-decoration: none; }
 <!-- TOOLBAR -->
 <div class="toolbar">
   <div class="toolbar-inner" id="toolbar-inner">
+    <div class="toolbar-sep" style="width:100%;height:0;flex-basis:100%;border:none;margin:0"></div>
+    <div class="filter-panel" style="flex-basis:100%;margin:0 0 4px 0">
+      <div class="filter-panel-title">Tournaments (multi-select)</div>
+      <div class="filter-actions">
+        <button type="button" onclick="selectAllTournaments()">All</button>
+        <button type="button" onclick="clearTournamentSelection()">Clear</button>
+      </div>
+      <div class="filter-chips" id="filter-tournaments"></div>
+    </div>
     <span class="toolbar-label">Season</span>
     <select class="season-select" id="season-select" onchange="onSeasonChange()">
       <option value="all">All Seasons</option>
     </select>
     <div class="toolbar-sep"></div>
-    <span class="toolbar-label">Range</span>
+    <span class="toolbar-label">Year range</span>
     <div class="year-range">
-      <input class="year-input" type="number" id="year-from" placeholder="2008" min="2008" max="2026" onchange="onYearRange()">
+      <input class="year-input" type="number" id="year-from" placeholder="From" min="1995" max="2035" onchange="onYearRange()">
       <span class="year-range-label">to</span>
-      <input class="year-input" type="number" id="year-to" placeholder="2026" min="2008" max="2026" onchange="onYearRange()">
+      <input class="year-input" type="number" id="year-to" placeholder="To" min="1995" max="2035" onchange="onYearRange()">
     </div>
     <div class="toolbar-sep"></div>
     <div class="pill-group" id="stat-pills">
@@ -773,32 +838,12 @@ footer a { color: var(--blue); text-decoration: none; }
 <!-- MAIN -->
 <div class="main">
 
-  <!-- IPL VIEW -->
-  <div id="view-ipl">
+  <div id="view-dashboard">
     <div id="season-banner" style="display:none" class="season-banner">
-      Showing season: <strong id="banner-season"></strong>
+      Filter: <strong id="banner-season"></strong>
     </div>
-    <div id="ipl-content">
-      <div class="loading"><div class="spinner"></div>Loading IPL data...</div>
-    </div>
-  </div>
-
-  <!-- INTERNATIONAL VIEW -->
-  <div id="view-international" style="display:none">
-    <div id="int-picker">
-      <p class="section-title">Select T20 competition</p>
-      <div class="comp-grid" id="int-comp-grid"></div>
-    </div>
-    <div id="int-stats" style="display:none">
-      <div class="stats-header">
-        <div class="stats-title-wrap">
-          <div class="comp-label" id="int-label"></div>
-          <h2 id="int-title"></h2>
-        </div>
-        <button class="back-btn" onclick="showIntPicker()">← Back</button>
-      </div>
-      <div id="int-kpis" class="kpi-strip" style="margin-bottom:20px"></div>
-      <div id="int-content"></div>
+    <div id="dash-content">
+      <div class="loading"><div class="spinner"></div>Loading T20 data…</div>
     </div>
   </div>
 
@@ -823,14 +868,219 @@ footer a { color: var(--blue); text-decoration: none; }
 <script>
 let index = null;
 let loadedData = {};
-let currentView = 'ipl';
+let currentView = 'dashboard';
 let currentStatTab = 'batting';
-let currentIntComp = null;
 let currentSort = {};
 let currentTableRows = {};
 let currentTableCols = {};
 let activeSeason = 'all';
 let yearFrom = null, yearTo = null;
+let selectedTournamentCodes = [];
+let currentMergedData = null;
+
+function getT20Competitions() {
+  return (index && index.competitions) ? index.competitions.filter(c => c.format === 'T20') : [];
+}
+
+function unionSeasonsForCodes(codes) {
+  const s = new Set();
+  (codes || []).forEach(code => {
+    const c = index.competitions.find(x => x.code === code);
+    if (c && c.seasons) c.seasons.forEach(x => s.add(x));
+  });
+  return [...s].sort((a, b) => b.localeCompare(a));
+}
+
+function renderTournamentFilters() {
+  const wrap = document.getElementById('filter-tournaments');
+  if (!wrap) return;
+  const comps = getT20Competitions();
+  if (!comps.length) {
+    wrap.innerHTML = '<span class="empty" style="font-size:12px">No T20 competitions in index.json</span>';
+    return;
+  }
+  wrap.innerHTML = comps.map(c => `
+    <label class="filter-chip">
+      <input type="checkbox" value="${c.code}" ${selectedTournamentCodes.includes(c.code) ? 'checked' : ''} onchange="onTournamentFilterChange()">
+      <span>${c.name}</span>
+    </label>`).join('');
+}
+
+function onTournamentFilterChange() {
+  const checked = [...document.querySelectorAll('#filter-tournaments input[type=checkbox]:checked')].map(i => i.value);
+  selectedTournamentCodes = checked.length ? checked : getT20Competitions().map(c => c.code);
+  if (!checked.length) renderTournamentFilters();
+  const prev = activeSeason;
+  populateSeasons(unionSeasonsForCodes(selectedTournamentCodes));
+  if (prev !== 'all' && ![...document.getElementById('season-select').options].some(o => o.value === prev)) {
+    activeSeason = 'all';
+    document.getElementById('season-select').value = 'all';
+  } else {
+    document.getElementById('season-select').value = prev;
+  }
+  refreshDashboard();
+}
+
+function selectAllTournaments() {
+  selectedTournamentCodes = getT20Competitions().map(c => c.code);
+  renderTournamentFilters();
+  populateSeasons(unionSeasonsForCodes(selectedTournamentCodes));
+  activeSeason = 'all';
+  document.getElementById('season-select').value = 'all';
+  yearFrom = yearTo = null;
+  document.getElementById('year-from').value = '';
+  document.getElementById('year-to').value = '';
+  updateSeasonBanner();
+  refreshDashboard();
+}
+
+function clearTournamentSelection() {
+  const comps = getT20Competitions();
+  selectedTournamentCodes = comps.length ? [comps[0].code] : [];
+  renderTournamentFilters();
+  populateSeasons(unionSeasonsForCodes(selectedTournamentCodes));
+  activeSeason = 'all';
+  document.getElementById('season-select').value = 'all';
+  updateSeasonBanner();
+  refreshDashboard();
+}
+
+function estDismissalsBat(p) {
+  const r = +p.runs || 0;
+  const a = p.avg;
+  if (!r) return 0;
+  if (a == null || a === '—' || a === '') return 0;
+  const av = +a;
+  if (!Number.isFinite(av) || av <= 0) return 0;
+  if (Math.abs(av - r) < 0.01) return 0;
+  return Math.max(1, Math.round(r / av));
+}
+
+function mergeBattingLists(lists) {
+  const m = {};
+  lists.forEach(list => {
+    (list || []).forEach(p => {
+      if (!m[p.name]) m[p.name] = { name: p.name, _d: 0, _piw: 0, matches: 0, runs: 0, balls: 0, fours: 0, sixes: 0, fifties: 0, hundreds: 0, mvp_pts: 0 };
+      const x = m[p.name];
+      x.matches += +p.matches || 0;
+      x.runs += +p.runs || 0;
+      x.balls += +p.balls || 0;
+      x.fours += +p.fours || 0;
+      x.sixes += +p.sixes || 0;
+      x.fifties += +p.fifties || 0;
+      x.hundreds += +p.hundreds || 0;
+      x.mvp_pts = +((parseFloat(x.mvp_pts) || 0) + (parseFloat(p.mvp_pts) || 0)).toFixed(1);
+      x._d += estDismissalsBat(p);
+      const pi = parseFloat(p.perf_index);
+      if (Number.isFinite(pi)) x._piw += pi * (+p.runs || 0);
+    });
+  });
+  return Object.values(m).map(p => {
+    const sr = p.balls ? +((p.runs / p.balls) * 100).toFixed(2) : 0;
+    const avg = p._d ? +((p.runs / p._d).toFixed(2)) : p.runs;
+    const perf_index = p.runs > 0 && p._piw ? +((p._piw / p.runs).toFixed(1)) : 0;
+    delete p._d;
+    delete p._piw;
+    return { ...p, avg, sr, perf_index };
+  }).filter(p => p.runs > 0).sort((a, b) => b.runs - a.runs);
+}
+
+function mergeBowlingLists(lists) {
+  const m = {};
+  lists.forEach(list => {
+    (list || []).forEach(p => {
+      if (!m[p.name]) m[p.name] = { name: p.name, matches: 0, wickets: 0, runs: 0, balls: 0, mvp_pts: 0 };
+      const x = m[p.name];
+      x.matches += +p.matches || 0;
+      x.wickets += +p.wickets || 0;
+      x.runs += +p.runs || 0;
+      x.balls += +p.balls || 0;
+      x.mvp_pts = +((parseFloat(x.mvp_pts) || 0) + (parseFloat(p.mvp_pts) || 0)).toFixed(1);
+    });
+  });
+  return Object.values(m).map(p => {
+    const economy = p.balls ? +((p.runs / p.balls) * 6).toFixed(2) : 0;
+    const avg = p.wickets ? +((p.runs / p.wickets).toFixed(2)) : null;
+    const overs = Math.floor(p.balls / 6) + (p.balls % 6) / 10;
+    const bowl_index = economy > 0 && p.matches > 0 ? +((p.wickets / p.matches) * (6 / economy)).toFixed(2) : 0;
+    return { ...p, overs: +overs.toFixed(1), economy, avg, bowl_index };
+  }).filter(p => p.balls > 0).sort((a, b) => b.wickets - a.wickets);
+}
+
+function mergeSixesLists(lists) {
+  const m = {};
+  lists.forEach(list => {
+    (list || []).forEach(p => {
+      if (!m[p.name]) m[p.name] = { name: p.name, sixes: 0, matches: 0 };
+      m[p.name].sixes += +p.sixes || 0;
+      m[p.name].matches += +p.matches || 0;
+    });
+  });
+  return Object.values(m).filter(p => p.sixes > 0).sort((a, b) => b.sixes - a.sixes);
+}
+
+function mergeTeamsLists(lists) {
+  const m = {};
+  lists.forEach(list => {
+    (list || []).forEach(t => {
+      const k = t.team;
+      if (!m[k]) m[k] = { team: k, matches: 0, wins: 0 };
+      m[k].matches += +t.matches || 0;
+      m[k].wins += +t.wins || 0;
+    });
+  });
+  return Object.values(m).map(t => ({
+    ...t,
+    win_pct: t.matches ? +((t.wins / t.matches) * 100).toFixed(1) : 0,
+  })).sort((a, b) => b.wins - a.wins);
+}
+
+function mergeDatasets(list) {
+  if (!list.length) return null;
+  return {
+    competition: 'Combined T20',
+    code: 'merged',
+    format: 'T20',
+    type: 'merged',
+    total_matches: list.reduce((s, d) => s + (+d.total_matches || 0), 0),
+    seasons: [...new Set(list.flatMap(d => d.seasons || []))].sort((a, b) => b.localeCompare(a)),
+    batting: mergeBattingLists(list.map(d => d.batting)),
+    bowling: mergeBowlingLists(list.map(d => d.bowling)),
+    sixes: mergeSixesLists(list.map(d => d.sixes)),
+    teams: mergeTeamsLists(list.map(d => d.teams)),
+  };
+}
+
+async function buildMergedDataset() {
+  const codes = selectedTournamentCodes.length ? selectedTournamentCodes : getT20Competitions().map(c => c.code);
+  const parts = [];
+  for (const code of codes) {
+    let d = await loadComp(code);
+    if (!d) continue;
+    if (activeSeason !== 'all' || yearFrom || yearTo) d = filterBySeason(d);
+    parts.push(d);
+  }
+  return mergeDatasets(parts);
+}
+
+async function refreshDashboard() {
+  document.getElementById('dash-content').innerHTML = '<div class="loading"><div class="spinner"></div>Processing…</div>';
+  updateSeasonBanner();
+  try {
+    currentMergedData = await buildMergedDataset();
+    if (!currentMergedData || (!currentMergedData.batting || !currentMergedData.batting.length)) {
+      document.getElementById('dash-content').innerHTML =
+        '<div class="empty">No data for this filter.<br><small>Select tournaments with stats JSON, or widen season / year range. Run <code>python fetch_all_cricket.py</code>.</small></div>';
+      updateHeroKPIs(null);
+      return;
+    }
+    updateHeroKPIs(currentMergedData);
+    await renderStatTab(currentMergedData, true);
+  } catch (e) {
+    console.error(e);
+    document.getElementById('dash-content').innerHTML = '<div class="empty">Error building view</div>';
+  }
+}
 
 async function boot() {
   try {
@@ -839,43 +1089,36 @@ async function boot() {
     index = await res.json();
     document.getElementById('header-updated').textContent = 'Updated: ' + index.last_updated;
     document.getElementById('footer-updated').textContent = 'Updated: ' + index.last_updated;
-    const iplData = await loadComp('ipl');
-    if (iplData) {
-      renderStatTab(iplData);
-    } else {
-      document.getElementById('ipl-content').innerHTML =
-        '<div class="empty">⚠️ Could not load stats/ipl.json<br><small>Run: python fetch_all_cricket.py --comp ipl</small></div>';
-    }
-    buildIntGrid();
-  } catch(e) {
+    const t20 = getT20Competitions();
+    selectedTournamentCodes = t20.map(c => c.code);
+    renderTournamentFilters();
+    populateSeasons(unionSeasonsForCodes(selectedTournamentCodes));
+    await refreshDashboard();
+  } catch (e) {
     console.error('Boot error:', e);
-    document.getElementById('ipl-content').innerHTML =
-      '<div class="empty">⚠️ Could not load data: ' + e.message + '<br><small>Make sure stats/ folder is pushed to GitHub. Run: python fetch_all_cricket.py then git add stats/ && git push</small></div>';
+    document.getElementById('dash-content').innerHTML =
+      '<div class="empty">⚠️ Could not load data: ' + e.message + '<br><small>Run <code>python fetch_all_cricket.py</code> and ensure <code>stats/</code> is present.</small></div>';
   }
 }
 
-// ── VIEW SWITCHING ────────────────────────────────────────────────────────────
 function setView(name, btn) {
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   currentView = name;
-  ['ipl','international','player'].forEach(v => {
-    document.getElementById('view-' + v).style.display = v === name ? '' : 'none';
-  });
-
+  document.getElementById('view-dashboard').style.display = name === 'dashboard' ? '' : 'none';
+  document.getElementById('view-player').style.display = name === 'player' ? '' : 'none';
   const toolbarEl = document.getElementById('toolbar-inner');
-  const isIpl = name === 'ipl';
   toolbarEl.style.display = (name === 'player') ? 'none' : '';
-
-  if (name === 'ipl') {
-    document.getElementById('hero-strip').querySelector('.hero-title').innerHTML = 'Indian <span style="color:var(--gold-light)">Premier</span> League';
-    document.getElementById('hero-strip').querySelector('.hero-sub').textContent = 'Ball-by-ball data · Cricsheet · 2008 – present';
-    if (loadedData['ipl']) renderStatTab(loadedData['ipl']);
-    else loadComp('ipl').then(d => { if(d) renderStatTab(d); });
-  } else if (name === 'international') {
-    document.getElementById('hero-strip').querySelector('.hero-title').innerHTML = 'T20 <span style="color:var(--gold-light)">Competitions</span>';
-    document.getElementById('hero-strip').querySelector('.hero-sub').textContent = 'BBL · PSL · CPL · T20 World Cups · internationals · Cricsheet';
-    updateHeroKPIs(null);
+  document.getElementById('hero-strip').style.display = name === 'player' ? 'none' : '';
+  if (name === 'dashboard') {
+    document.getElementById('hero-strip').querySelector('.hero-title').innerHTML = 'T20 <span style="color:var(--gold-light)">Across Leagues</span>';
+    document.getElementById('hero-strip').querySelector('.hero-sub').textContent = 'Choose tournaments and seasons below · Cricsheet data';
+    if (currentMergedData) {
+      updateHeroKPIs(currentMergedData);
+      renderStatTab(currentMergedData, true);
+    } else {
+      refreshDashboard();
+    }
   }
 }
 
@@ -896,7 +1139,7 @@ function onSeasonChange() {
   document.getElementById('year-from').value = '';
   document.getElementById('year-to').value = '';
   updateSeasonBanner();
-  refreshIPLView();
+  refreshDashboard();
 }
 
 function onYearRange() {
@@ -905,7 +1148,7 @@ function onYearRange() {
   activeSeason = 'all';
   document.getElementById('season-select').value = 'all';
   updateSeasonBanner();
-  refreshIPLView();
+  refreshDashboard();
 }
 
 function updateSeasonBanner() {
@@ -1043,38 +1286,26 @@ async function loadComp(code) {
   try {
     const res = await fetch('stats/' + code + '.json');
     loadedData[code] = await res.json();
-    if (code === 'ipl') {
-      populateSeasons(loadedData[code].seasons || []);
-      updateHeroKPIs(loadedData[code]);
-    }
     return loadedData[code];
-  } catch(e) {
+  } catch (e) {
     return null;
   }
 }
 
-// ── IPL VIEW ──────────────────────────────────────────────────────────────────
-function refreshIPLView() {
-  const d = loadedData['ipl'];
-  if (!d) return;
-  updateHeroKPIs(d);
-  renderStatTab(d);
-}
-
-async function renderStatTab(rawData) {
-  const d = (activeSeason !== 'all' || yearFrom || yearTo) ? filterBySeason(rawData) : rawData;
-  document.getElementById('ipl-content').innerHTML = '<div class="loading"><div class="spinner"></div>Processing...</div>';
+async function renderStatTab(rawData, skipSeasonFilter) {
+  const d = skipSeasonFilter ? rawData : ((activeSeason !== 'all' || yearFrom || yearTo) ? filterBySeason(rawData) : rawData);
+  document.getElementById('dash-content').innerHTML = '<div class="loading"><div class="spinner"></div>Processing…</div>';
   setTimeout(() => {
-    if (currentStatTab === 'batting')  renderBatting(d, 'ipl-content');
-    else if (currentStatTab === 'bowling') renderBowling(d, 'ipl-content');
-    else if (currentStatTab === 'sixes')   renderSixes(d, 'ipl-content');
-    else if (currentStatTab === 'teams')   renderTeams(d, 'ipl-content');
-    else if (currentStatTab === 'mvp')     renderMVP(d, 'ipl-content');
+    if (currentStatTab === 'batting') renderBatting(d, 'dash-content');
+    else if (currentStatTab === 'bowling') renderBowling(d, 'dash-content');
+    else if (currentStatTab === 'sixes') renderSixes(d, 'dash-content');
+    else if (currentStatTab === 'teams') renderTeams(d, 'dash-content');
+    else if (currentStatTab === 'mvp') renderMVP(d, 'dash-content');
   }, 50);
 }
 
 function renderMVP(d, target) {
-  const data = (activeSeason !== 'all' || yearFrom || yearTo) ? filterBySeason(d) : d;
+  const data = d && d.code === 'merged' ? d : ((activeSeason !== 'all' || yearFrom || yearTo) ? filterBySeason(d) : d);
   const batters = (data.batting || []).filter(p => p.matches >= 3);
   const bowlers = (data.bowling || []).filter(p => p.matches >= 3);
 
@@ -1140,7 +1371,7 @@ function renderMVP(d, target) {
 
   document.getElementById(target).innerHTML = `
     <div style="background:var(--blue-light);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-bottom:20px;font-size:12px;color:var(--blue)">
-      🏅 <strong>IPL Impact Rating</strong> — Based on IPL broadcaster formula:
+      🏅 <strong>T20 Impact Rating</strong> — Based on broadcaster-style formula:
       4s = 2.5 pts · 6s = 3.5 pts · Wickets = 3.5 pts · Dot balls = 1 pt.
       Impact = (bat pts + bowl pts per match) × matches played.
       <span style="color:#1A7A4A;font-weight:600"> ■ All-rounder</span>
@@ -1193,10 +1424,8 @@ function showStatTab(tab, btn) {
   currentStatTab = tab;
   document.querySelectorAll('#stat-pills .pill').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
-  if (currentView === 'ipl' && loadedData['ipl']) {
-    renderStatTab(loadedData['ipl']);
-  } else if (currentView === 'international' && currentIntComp && loadedData[currentIntComp]) {
-    renderIntStats(loadedData[currentIntComp]);
+  if (currentView === 'dashboard' && currentMergedData) {
+    renderStatTab(currentMergedData, true);
   }
 }
 
@@ -1221,80 +1450,6 @@ function updateHeroKPIs(d) {
 
 function kpi(label, val, name) {
   return `<div class="kpi-card"><div class="k-label">${label}</div><div class="k-val">${val}</div><div class="k-name">${name}</div></div>`;
-}
-
-// ── INTERNATIONAL ─────────────────────────────────────────────────────────────
-function buildIntGrid() {
-  if (!index) return;
-  // All T20 competitions except IPL (IPL has its own tab)
-  const intComps = index.competitions.filter(c => c.format === 'T20' && c.code !== 'ipl');
-  if (!intComps.length) {
-    document.getElementById('int-comp-grid').innerHTML =
-      '<div class="empty" style="padding:20px">No T20 competitions in <code>stats/index.json</code> besides IPL.<br><small>Run <code>python fetch_all_cricket.py</code> to download and build them.</small></div>';
-    return;
-  }
-  document.getElementById('int-comp-grid').innerHTML = intComps.map(c => `
-    <div class="comp-card" onclick="loadIntComp('${c.code}')">
-      <div>
-        <div class="comp-name">${c.name} <span class="format-badge ${c.format}">${c.format}</span></div>
-        <div class="comp-meta">${c.total_matches} matches</div>
-      </div>
-      <div class="comp-matches">${c.total_matches}</div>
-    </div>`).join('');
-}
-
-async function loadIntComp(code) {
-  currentIntComp = code;
-  document.getElementById('int-picker').style.display = 'none';
-  document.getElementById('int-stats').style.display = '';
-  document.getElementById('int-content').innerHTML = '<div class="loading"><div class="spinner"></div>Loading...</div>';
-
-  const d = await loadComp(code);
-  if (!d) {
-    document.getElementById('int-content').innerHTML = '<div class="empty">Failed to load data</div>';
-    return;
-  }
-
-  const comp = index.competitions.find(c => c.code === code);
-  const tier = comp.type === 'international' ? 'International' : (comp.type === 'league' ? 'League' : 'Domestic');
-  document.getElementById('int-label').textContent = (comp.format || 'T20') + ' · ' + tier;
-  document.getElementById('int-title').textContent = comp.name;
-
-  const topBat  = d.batting[0];
-  const topBowl = d.bowling[0];
-  const topTeam = [...d.teams].sort((a,b) => b.wins - a.wins)[0];
-  document.getElementById('int-kpis').innerHTML = `
-    ${topBat  ? intKpi('Most Runs',    topBat.runs.toLocaleString(),  topBat.name)  : ''}
-    ${topBowl ? intKpi('Most Wickets', topBowl.wickets, topBowl.name) : ''}
-    ${topTeam ? intKpi('Most Wins',    topTeam.wins,   topTeam.team) : ''}
-    <div style="background:var(--blue-light);border:1px solid var(--border);border-radius:8px;padding:14px 16px;">
-      <div style="font-size:10px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:4px;">Total Matches</div>
-      <div style="font-family:'Bebas Neue',sans-serif;font-size:28px;color:var(--blue);line-height:1;">${d.total_matches.toLocaleString()}</div>
-    </div>
-  `;
-
-  renderIntStats(d);
-}
-
-function intKpi(label, val, name) {
-  return `<div style="background:var(--blue-light);border:1px solid var(--border);border-radius:8px;padding:14px 16px;">
-    <div style="font-size:10px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:4px;">${label}</div>
-    <div style="font-family:'Bebas Neue',sans-serif;font-size:28px;color:var(--blue);line-height:1;">${val}</div>
-    <div style="font-size:11px;color:var(--muted);margin-top:2px;">${name}</div>
-  </div>`;
-}
-
-function renderIntStats(d) {
-  if (currentStatTab === 'batting')  renderBatting(d, 'int-content');
-  else if (currentStatTab === 'bowling') renderBowling(d, 'int-content');
-  else if (currentStatTab === 'sixes')   renderSixes(d, 'int-content');
-  else if (currentStatTab === 'teams')   renderTeams(d, 'int-content');
-}
-
-function showIntPicker() {
-  currentIntComp = null;
-  document.getElementById('int-picker').style.display = '';
-  document.getElementById('int-stats').style.display = 'none';
 }
 
 // ── RENDER TABLES ─────────────────────────────────────────────────────────────
@@ -1392,8 +1547,9 @@ function searchTable(input, target, type, _, defaultSort) {
 
 function sortTbl(target, type, key, dir, renderTarget) {
   currentSort[type] = { key, dir };
-  if (target === 'ipl-content') renderStatTab(loadedData['ipl']);
-  else if (target === 'int-content') renderIntStats(loadedData[currentIntComp]);
+  if (target === 'dash-content' && currentMergedData) {
+    renderStatTab(currentMergedData, true);
+  }
 }
 
 function filterRows(input, tbodyId, type, target) {
@@ -1413,10 +1569,13 @@ function filterRows(input, tbodyId, type, target) {
 }
 
 function expandTable(type, target, filterQ) {
-  const d = loadedData['ipl'];
-  if (!d) return;
-  if (type === 'batting')  renderBatting(d, target, true, filterQ);
-  else if (type === 'bowling') renderBowling(d, target, true, filterQ);
+  if (!currentMergedData) return;
+  if (type === 'batting') renderBatting(currentMergedData, target, true, filterQ);
+  else if (type === 'bowling') renderBowling(currentMergedData, target, true, filterQ);
+}
+
+function primaryCompForLinks() {
+  return (selectedTournamentCodes && selectedTournamentCodes.length) ? selectedTournamentCodes[0] : 'ipl';
 }
 
 function renderSixes(d, target) {
@@ -1473,7 +1632,7 @@ function renderTeams(d, target) {
   });
   const trs = withHonors.map((t,i) => `
     <tr>
-      <td><span class="rank ${i<3?'top3':''}">${i+1}</span> <a class="pname" href="team.html?comp=ipl&season=${encodeURIComponent(activeSeason||'all')}&team=${encodeURIComponent(t.team)}" style="text-decoration:none;color:var(--text);font-weight:500">${t.team}</a></td>
+      <td><span class="rank ${i<3?'top3':''}">${i+1}</span> <a class="pname" href="team.html?comp=${primaryCompForLinks()}&season=${encodeURIComponent(activeSeason||'all')}&team=${encodeURIComponent(t.team)}" style="text-decoration:none;color:var(--text);font-weight:500">${t.team}</a></td>
       <td>${t.matches}</td>
       <td class="hi">${t.wins}</td>
       <td>${t.win_pct}%</td>
@@ -1534,16 +1693,21 @@ function searchPlayer(query) {
   }
 
   const found = {};
-  for (const [code, data] of Object.entries(loadedData)) {
+  const codes = (selectedTournamentCodes && selectedTournamentCodes.length)
+    ? selectedTournamentCodes
+    : getT20Competitions().map(c => c.code);
+  for (const code of codes) {
+    const data = loadedData[code];
+    if (!data) continue;
     const compName = index?.competitions?.find(c => c.code === code)?.name || code;
-    data.batting?.forEach(p => {
+    (data.batting || []).forEach(p => {
       if (p.name.toLowerCase().includes(query)) {
         if (!found[p.name]) found[p.name] = [];
         const ex = found[p.name].find(x => x.code === code);
         if (ex) ex.batting = p; else found[p.name].push({ comp: compName, code, batting: p, bowling: null });
       }
     });
-    data.bowling?.forEach(p => {
+    (data.bowling || []).forEach(p => {
       if (p.name.toLowerCase().includes(query)) {
         if (!found[p.name]) found[p.name] = [];
         const ex = found[p.name].find(x => x.code === code);
@@ -1554,7 +1718,7 @@ function searchPlayer(query) {
 
   if (!Object.keys(found).length) {
     document.getElementById('player-results').innerHTML =
-      `<div class="empty">No results found<br><small>Searching ${Object.keys(loadedData).length} loaded competition(s)</small></div>`;
+      `<div class="empty">No results found<br><small>Searching ${codes.length} tournament(s) in your filter</small></div>`;
     return;
   }
 
