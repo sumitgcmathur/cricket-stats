@@ -952,7 +952,7 @@ let selectedTournamentCodes = [];
 let currentMergedData = null;
 
 function getT20Competitions() {
-  return (index && index.competitions) ? index.competitions.filter(c => c.format === 'T20') : [];
+  return (index && typeof t20GetT20Competitions === 'function') ? t20GetT20Competitions(index) : [];
 }
 
 function unionSeasonsForCodes(codes) {

@@ -357,7 +357,12 @@ async function boot(){
     console.warn('index.json',e);
     championshipIndex=null;
   }
-  if(!COMPS.length)COMPS=[{code:'ipl',name:'IPL',format:'T20'}];
+  if(!COMPS.length)COMPS=[
+    {code:'t20s',name:"Men's T20 Internationals",format:'T20'},
+    {code:'ipl',name:'IPL',format:'T20'},
+    {code:'bbl',name:'Big Bash League',format:'T20'},
+    {code:'cpl',name:'Caribbean Premier League',format:'T20'},
+  ];
 
   const fp=t20ReadFilterParams(location.search,championshipIndex);
   selectedTournamentCodes=fp.codes;

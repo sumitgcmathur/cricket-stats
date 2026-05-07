@@ -1,12 +1,12 @@
 {
-  "last_updated": "07 May 2026, 00:47",
+  "last_updated": "07 May 2026, 15:48",
   "competitions": [
     {
       "code": "t20s",
       "name": "Men's T20 Internationals",
       "format": "T20",
       "type": "international",
-      "total_matches": 3276,
+      "total_matches": 3278,
       "seasons": [
         "2004/05",
         "2005",
@@ -55,84 +55,11 @@
       ]
     },
     {
-      "code": "icc_mens_t20_world_cup",
-      "name": "ICC Men's T20 World Cup",
-      "format": "T20",
-      "type": "international",
-      "total_matches": 230,
-      "seasons": [
-        "2013/14",
-        "2015/16",
-        "2021/22",
-        "2022/23",
-        "2024",
-        "2025/26"
-      ]
-    },
-    {
-      "code": "t20s_female",
-      "name": "Women's T20 Internationals",
-      "format": "T20",
-      "type": "international",
-      "total_matches": 1931,
-      "seasons": [
-        "2009",
-        "2009/10",
-        "2010",
-        "2010/11",
-        "2011",
-        "2011/12",
-        "2012",
-        "2012/13",
-        "2013",
-        "2013/14",
-        "2014",
-        "2014/15",
-        "2015",
-        "2015/16",
-        "2016",
-        "2016/17",
-        "2017/18",
-        "2018",
-        "2018/19",
-        "2019",
-        "2019/20",
-        "2020",
-        "2020/21",
-        "2021",
-        "2021/22",
-        "2022",
-        "2022/23",
-        "2023",
-        "2023/24",
-        "2024",
-        "2024/25",
-        "2025",
-        "2025/26",
-        "2026"
-      ]
-    },
-    {
-      "code": "icc_womens_t20_world_cup",
-      "name": "ICC Women's T20 World Cup",
-      "format": "T20",
-      "type": "international",
-      "total_matches": 135,
-      "seasons": [
-        "2013/14",
-        "2015/16",
-        "2018/19",
-        "2019/20",
-        "2022/23",
-        "2024/25"
-      ]
-    },
-    {
       "code": "ipl",
       "name": "Indian Premier League",
       "format": "T20",
       "type": "league",
-      "total_matches": 1218,
+      "total_matches": 1219,
       "seasons": [
         "2007/08",
         "2009",
@@ -180,27 +107,6 @@
       ]
     },
     {
-      "code": "psl",
-      "name": "Pakistan Super League",
-      "format": "T20",
-      "type": "league",
-      "total_matches": 357,
-      "seasons": [
-        "2015/16",
-        "2016/17",
-        "2017/18",
-        "2018/19",
-        "2019/20",
-        "2020/21",
-        "2021",
-        "2021/22",
-        "2022/23",
-        "2023/24",
-        "2025",
-        "2026"
-      ]
-    },
-    {
       "code": "cpl",
       "name": "Caribbean Premier League",
       "format": "T20",
@@ -220,126 +126,6 @@
         "2023",
         "2024",
         "2025"
-      ]
-    },
-    {
-      "code": "msl",
-      "name": "Mzansi Super League",
-      "format": "T20",
-      "type": "league",
-      "total_matches": 56,
-      "seasons": [
-        "2018/19",
-        "2019/20"
-      ]
-    },
-    {
-      "code": "bpl",
-      "name": "Bangladesh Premier League",
-      "format": "T20",
-      "type": "league",
-      "total_matches": 469,
-      "seasons": [
-        "2011/12",
-        "2012/13",
-        "2015/16",
-        "2016/17",
-        "2017/18",
-        "2018/19",
-        "2019/20",
-        "2021/22",
-        "2022/23",
-        "2023/24",
-        "2024/25",
-        "2025/26"
-      ]
-    },
-    {
-      "code": "npl",
-      "name": "Nepal Premier League",
-      "format": "T20",
-      "type": "league",
-      "total_matches": 64,
-      "seasons": [
-        "2024/25",
-        "2025/26"
-      ]
-    },
-    {
-      "code": "lpl",
-      "name": "Lanka Premier League",
-      "format": "T20",
-      "type": "league",
-      "total_matches": 119,
-      "seasons": [
-        "2020/21",
-        "2021/22",
-        "2022/23",
-        "2023",
-        "2024"
-      ]
-    },
-    {
-      "code": "mlc",
-      "name": "Major League Cricket",
-      "format": "T20",
-      "type": "league",
-      "total_matches": 75,
-      "seasons": [
-        "2023",
-        "2024",
-        "2025"
-      ]
-    },
-    {
-      "code": "sma",
-      "name": "Syed Mushtaq Ali Trophy",
-      "format": "T20",
-      "type": "league",
-      "total_matches": 695,
-      "seasons": [
-        "2015/16",
-        "2017/18",
-        "2018/19",
-        "2019/20",
-        "2020/21",
-        "2021/22",
-        "2022/23",
-        "2023/24",
-        "2024/25"
-      ]
-    },
-    {
-      "code": "wpl",
-      "name": "Women's Premier League (India)",
-      "format": "T20",
-      "type": "league",
-      "total_matches": 88,
-      "seasons": [
-        "2022/23",
-        "2023/24",
-        "2024/25",
-        "2025/26"
-      ]
-    },
-    {
-      "code": "wbb",
-      "name": "Women's Big Bash League",
-      "format": "T20",
-      "type": "league",
-      "total_matches": 519,
-      "seasons": [
-        "2015/16",
-        "2016/17",
-        "2017/18",
-        "2018/19",
-        "2019/20",
-        "2020/21",
-        "2021/22",
-        "2022/23",
-        "2023/24",
-        "2024/25",
-        "2025/26"
       ]
     }
   ]

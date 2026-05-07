@@ -1,7 +1,9 @@
 """
 Cricket Stats Fetcher — T20 only (Cricsheet)
 ==========================================
-Downloads ball-by-ball CSV data for T20 competitions from cricsheet.org
+Downloads ball-by-ball CSV data for T20 competitions from cricsheet.org.
+Default run fetches only: men's T20 internationals (t20s), IPL, BBL, CPL.
+Use --comp with one or more codes from the full catalog to fetch others.
 Generates:
   stats/index.json              — master competition list
   stats/{code}.json             — aggregated player/team stats (player "matches" = Cricsheet playing squad, info,player)
@@ -9,8 +11,8 @@ Generates:
   stats/matches/{code}/index.json — match list for competition
 
 Usage:
-  python fetch_all_cricket.py              # fetch all T20 competitions below
-  python fetch_all_cricket.py --comp ipl  # fetch one competition only (e.g. t20s, bbl, icc_mens_t20_world_cup)
+  python fetch_all_cricket.py                    # default: t20s, ipl, bbl, cpl only
+  python fetch_all_cricket.py --comp ipl wpl     # explicit list from full catalog above
 """
 
 import urllib.request
@@ -53,6 +55,9 @@ COMPETITIONS = [
     {"code": "wpl", "name": "Women's Premier League (India)", "format": "T20", "type": "league", "zip_name": "wpl_csv2.zip"},
     {"code": "wbb", "name": "Women's Big Bash League", "format": "T20", "type": "league", "zip_name": "wbb_female_csv2.zip"},
 ]
+
+# Default bundle for this site (men's T20I + IPL + BBL + CPL). Override with --comp <code> ...
+DEFAULT_FETCH_CODES = ("t20s", "ipl", "bbl", "cpl")
 
 DOWNLOAD_BASE = "https://cricsheet.org/downloads/"
 BASE_URL = DOWNLOAD_BASE + "{code}_male_csv2.zip"
@@ -895,7 +900,10 @@ def main():
         idx = sys.argv.index("--comp")
         filter_codes = sys.argv[idx+1:]
 
-    comps = [c for c in COMPETITIONS if not filter_codes or c["code"] in filter_codes]
+    if filter_codes:
+        comps = [c for c in COMPETITIONS if c["code"] in filter_codes]
+    else:
+        comps = [c for c in COMPETITIONS if c["code"] in DEFAULT_FETCH_CODES]
     print(f"🚀 Fetching {len(comps)} competition(s) ...")
 
     results = [fetch_competition(c) for c in comps]

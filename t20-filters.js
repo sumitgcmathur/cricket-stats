@@ -5,6 +5,9 @@
 (function (g) {
   'use strict';
 
+  /** Site scope: men's T20 internationals + IPL + BBL + CPL only (order preserved). */
+  var FOCUS_MENS_T20_CODES = ['t20s', 'ipl', 'bbl', 'cpl'];
+
   var T20_INDEX_CACHE = null;
 
   function t20FetchIndex() {
@@ -32,9 +35,17 @@
   function t20GetT20Competitions(index) {
     var idx = index || T20_INDEX_CACHE;
     if (!idx || !idx.competitions) return [];
-    return idx.competitions.filter(function (c) {
-      return c.format === 'T20';
+    var allow = {};
+    FOCUS_MENS_T20_CODES.forEach(function (c) {
+      allow[c] = true;
     });
+    var out = idx.competitions.filter(function (c) {
+      return c.format === 'T20' && allow[c.code];
+    });
+    out.sort(function (a, b) {
+      return FOCUS_MENS_T20_CODES.indexOf(a.code) - FOCUS_MENS_T20_CODES.indexOf(b.code);
+    });
+    return out;
   }
 
   function t20UnionSeasonsForCodes(index, codes) {
@@ -357,4 +368,5 @@
   g.t20FilterQS = t20FilterQS;
   g.t20FilterBySeason = t20FilterBySeason;
   g.t20MatchPassesFilters = t20MatchPassesFilters;
+  g.FOCUS_MENS_T20_CODES = FOCUS_MENS_T20_CODES;
 })(typeof window !== 'undefined' ? window : globalThis);

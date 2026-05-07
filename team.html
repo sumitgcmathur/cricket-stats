@@ -266,7 +266,12 @@ async function boot(){
     console.warn(e);
     championshipIndex=null;
   }
-  if(!COMPS.length)COMPS=[{code:'ipl',name:'IPL'}];
+  if(!COMPS.length)COMPS=[
+    {code:'t20s',name:"Men's T20 Internationals"},
+    {code:'ipl',name:'IPL'},
+    {code:'bbl',name:'Big Bash League'},
+    {code:'cpl',name:'Caribbean Premier League'},
+  ];
 
   let fp=t20ReadFilterParams(location.search,championshipIndex);
   const legacy=qs('comp');
