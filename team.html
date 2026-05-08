@@ -74,7 +74,7 @@
         <div class="filter-panel-title">Tournaments (multi-select)</div>
         <div class="filter-actions">
           <button type="button" onclick="teamSelectAllTournaments()">All</button>
-          <button type="button" onclick="teamClearTournaments()">Clear</button>
+          <button type="button" onclick="teamClearTournaments()">IPL only</button>
         </div>
         <div class="filter-chips" id="team-filter-tournaments"></div>
       </div>
@@ -179,7 +179,7 @@ async function loadAllMatchIndices(){
 
 function onTeamTournamentChange(){
   const checked=[...document.querySelectorAll('#team-filter-tournaments input:checked')].map(i=>i.value);
-  selectedTournamentCodes=checked.length?checked:COMPS.map(c=>c.code);
+  selectedTournamentCodes=checked.length?checked:(typeof t20DefaultFilterCodes==='function'?t20DefaultFilterCodes(COMPS.map(c=>c.code)):['ipl']);
   if(!checked.length)renderTeamFilterChips();
   const prev=activeSeason;
   fillTeamSeasonSelect();
@@ -216,7 +216,7 @@ function teamSelectAllTournaments(){
 }
 
 function teamClearTournaments(){
-  selectedTournamentCodes=COMPS.length?[COMPS[0].code]:[];
+  selectedTournamentCodes=typeof t20DefaultFilterCodes==='function'?t20DefaultFilterCodes(COMPS.map(c=>c.code)):(COMPS.length?[COMPS[0].code]:[]);
   renderTeamFilterChips();
   fillTeamSeasonSelect();
   activeSeason='all';
@@ -283,7 +283,9 @@ async function boot(){
   activeSeason=fp.activeSeason;
   yearFrom=fp.yearFrom;
   yearTo=fp.yearTo;
-  if(!selectedTournamentCodes.length)selectedTournamentCodes=COMPS.map(c=>c.code);
+  if(!selectedTournamentCodes.length){
+    selectedTournamentCodes=typeof t20DefaultFilterCodes==='function'?t20DefaultFilterCodes(COMPS.map(c=>c.code)):['ipl'];
+  }
 
   renderTeamFilterChips();
   fillTeamSeasonSelect();

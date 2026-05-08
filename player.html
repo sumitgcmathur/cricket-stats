@@ -43,6 +43,9 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-
 .profile-tabs-inner{max-width:1200px;margin:0 auto;display:flex;gap:0;overflow-x:auto;scrollbar-width:none;}
 .profile-tabs-inner::-webkit-scrollbar{display:none;}
 .ptab{background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);font-family:'Inter',sans-serif;font-size:13px;font-weight:500;padding:0 18px;height:44px;cursor:pointer;transition:all 0.15s;white-space:nowrap;margin-bottom:-1px;}
+.matchup-phase-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+@media(max-width:720px){.matchup-phase-cards{grid-template-columns:1fr;}.matchup-charts-row{grid-template-columns:1fr!important;}}
+.player-career-section{margin-bottom:8px;}
 .ptab:hover{color:var(--text);}
 .ptab.active{color:var(--blue);border-bottom-color:var(--blue);}
 
@@ -118,7 +121,7 @@ footer a{color:var(--blue);text-decoration:none;}
       <div class="filter-panel-title">Tournaments (multi-select)</div>
       <div class="filter-actions">
         <button type="button" onclick="playerSelectAllTournaments()">All</button>
-        <button type="button" onclick="playerClearTournaments()">Clear</button>
+        <button type="button" onclick="playerClearTournaments()">IPL only</button>
       </div>
       <div class="filter-chips" id="player-filter-tournaments"></div>
     </div>
@@ -151,19 +154,15 @@ footer a{color:var(--blue);text-decoration:none;}
 
 <div class="profile-tabs">
   <div class="profile-tabs-inner">
-    <button class="ptab active" onclick="showTab('batting',this)">Batting</button>
-    <button class="ptab" onclick="showTab('bowling',this)">Bowling</button>
+    <button class="ptab active" onclick="showTab('career',this)">Career</button>
     <button class="ptab" onclick="showTab('overview',this)">By Competition</button>
     <button class="ptab" onclick="showTab('matchups',this)">⚔️ Matchups</button>
   </div>
 </div>
 
 <div class="main">
-  <div id="tab-batting" class="tab-panel active">
-    <div id="batting-content"><div class="loading"><div class="spinner"></div>Loading...</div></div>
-  </div>
-  <div id="tab-bowling" class="tab-panel">
-    <div id="bowling-content"><div class="no-data">Loading...</div></div>
+  <div id="tab-career" class="tab-panel active">
+    <div id="career-content"><div class="loading"><div class="spinner"></div>Loading...</div></div>
   </div>
   <div id="tab-overview" class="tab-panel">
     <div id="overview-content"><div class="no-data">Loading...</div></div>
@@ -187,7 +186,7 @@ let charts=[];
 let selectedTournamentCodes=[];
 let activeSeason='all';
 let yearFrom=null,yearTo=null;
-let activePlayerTab='batting';
+let activePlayerTab='career';
 
 function visibleComps(){
   return COMPS.filter(c=>selectedTournamentCodes.includes(c.code));
@@ -218,8 +217,8 @@ function fillPlayerSeasonOptions(seasons){
 
 function onPlayerTournamentChange(){
   const checked=[...document.querySelectorAll('#player-filter-tournaments input:checked')].map(i=>i.value);
-  selectedTournamentCodes=checked.length?checked:COMPS.map(c=>c.code);
-  if(!checked.length)renderPlayerFilterChips();
+  selectedTournamentCodes=checked.length?checked:(typeof t20DefaultFilterCodes==='function'?t20DefaultFilterCodes(COMPS.map(c=>c.code)):['ipl']);
+  if(!checked.length) renderPlayerFilterChips();
   const prev=activeSeason;
   fillPlayerSeasonOptions(t20UnionSeasonsForCodes(championshipIndex,selectedTournamentCodes));
   if(prev!=='all'&&![...document.getElementById('player-season-select').options].some(o=>o.value===prev)){
@@ -252,7 +251,7 @@ function playerSelectAllTournaments(){
 }
 
 function playerClearTournaments(){
-  selectedTournamentCodes=COMPS.length?[COMPS[0].code]:[];
+  selectedTournamentCodes=typeof t20DefaultFilterCodes==='function'?t20DefaultFilterCodes(COMPS.map(c=>c.code)):(COMPS.length?[COMPS[0].code]:[]);
   renderPlayerFilterChips();
   fillPlayerSeasonOptions(t20UnionSeasonsForCodes(championshipIndex,selectedTournamentCodes));
   activeSeason='all';
@@ -324,8 +323,7 @@ function renderCurrentPlayerTab(){
   killCharts();
   setTimeout(()=>{
     try{
-      if(activePlayerTab==='batting')renderBatting();
-      else if(activePlayerTab==='bowling')renderBowling();
+      if(activePlayerTab==='career')renderCareer();
       else if(activePlayerTab==='overview')renderOverview();
       else if(activePlayerTab==='matchups')renderMatchups();
     }catch(e){console.error(e);}
@@ -342,7 +340,7 @@ async function boot(){
   playerName=readPlayerNameFromQs();
   if(!playerName){
     document.getElementById('hero-name').textContent='No player specified';
-    document.getElementById('batting-content').innerHTML='<div class="no-data">No player name provided in URL</div>';
+    document.getElementById('career-content').innerHTML='<div class="no-data">No player name provided in URL</div>';
     return;
   }
   document.getElementById('hero-name').textContent=playerName;
@@ -370,7 +368,10 @@ async function boot(){
   activeSeason=fp.activeSeason;
   yearFrom=fp.yearFrom;
   yearTo=fp.yearTo;
-  if(!selectedTournamentCodes.length)selectedTournamentCodes=COMPS.map(c=>c.code);
+  if(!selectedTournamentCodes.length){
+    const allC=COMPS.map(c=>c.code);
+    selectedTournamentCodes=typeof t20DefaultFilterCodes==='function'?t20DefaultFilterCodes(allC):['ipl'];
+  }
 
   renderPlayerFilterChips();
   fillPlayerSeasonOptions(t20UnionSeasonsForCodes(championshipIndex,selectedTournamentCodes));
@@ -386,22 +387,14 @@ async function boot(){
   }
 
   renderHero();
-  const compsList=visibleComps();
-  const hasBatting=compsList.some(comp=>getPlayerBatting(comp.code));
-  const hasBowling=compsList.some(comp=>getPlayerBowling(comp.code));
-  if(!hasBatting&&hasBowling){
-    document.querySelectorAll('.ptab').forEach(b=>b.classList.remove('active'));
-    document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
-    document.querySelector('.ptab:nth-child(2)').classList.add('active');
-    document.getElementById('tab-bowling').classList.add('active');
-    activePlayerTab='bowling';
-    renderBowling();
-  }else{
-    activePlayerTab='batting';
-    renderBatting();
-  }
-  renderBowling();
-  renderOverview();
+  activePlayerTab='career';
+  document.querySelectorAll('.ptab').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  const firstP=document.querySelector('.ptab');
+  if(firstP) firstP.classList.add('active');
+  const tabC=document.getElementById('tab-career');
+  if(tabC) tabC.classList.add('active');
+  renderCareer();
 }
 
 function showInitials(){
@@ -839,16 +832,26 @@ function showTab(name,btn){
   renderCurrentPlayerTab();
 }
 
-// ── BATTING TAB ──────────────────────────────────────────────────────────────
-function renderBatting(){
-  killCharts();
+function renderCareer(){
+  const host=document.getElementById('career-content');
+  if(!host) return;
+  host.innerHTML='<div class="section-title" style="margin-top:0">Batting</div><div id="career-batting" class="player-career-section"></div><div class="section-title" style="margin-top:8px">Bowling</div><div id="career-bowling" class="player-career-section"></div>';
+  renderBatting('career-batting');
+  renderBowling('career-bowling');
+}
+
+// ── BATTING (Career tab) ─────────────────────────────────────────────────────
+function renderBatting(containerId){
+  const mountId=containerId||'batting-content';
+  const mount=document.getElementById(mountId);
+  if(!mount) return;
   const rows=visibleComps().map(c=>{
     const bat=getPlayerBatting(c.code);
     if(!bat) return null;
     const bowl=getPlayerBowling(c.code);
     return {comp:c,bat,bowl};
   }).filter(Boolean);
-  if(!rows.length){document.getElementById('batting-content').innerHTML='<div class="no-data">No batting data for this player in the current filter</div>';return;}
+  if(!rows.length){mount.innerHTML='<div class="no-data">No batting data for this player in the current filter</div>';return;}
 
   const milestoneBat=rows.length?rows.reduce((best,r)=>r.bat.runs>(best.bat.runs||0)?r:best,rows[0]):null;
   const mergedSeason=mergedBattingBySeasonForPlayerRows(rows);
@@ -907,7 +910,7 @@ function renderBatting(){
     </tr>`).join('')}</tbody></table>
   </div>`;
 
-  document.getElementById('batting-content').innerHTML=html;
+  mount.innerHTML=html;
 
   setTimeout(()=>{
     // Runs by competition bar
@@ -968,15 +971,18 @@ function renderBatting(){
   },100);
 }
 
-// ── BOWLING TAB ───────────────────────────────────────────────────────────────
-function renderBowling(){
+// ── BOWLING (Career tab) ─────────────────────────────────────────────────────
+function renderBowling(containerId){
+  const mountId=containerId||'bowling-content';
+  const mount=document.getElementById(mountId);
+  if(!mount) return;
   const rows=visibleComps().map(c=>{
     const bowl=getPlayerBowling(c.code);
     if(!bowl) return null;
     const bat=getPlayerBatting(c.code);
     return {comp:c,bowl,bat};
   }).filter(Boolean);
-  if(!rows.length){document.getElementById('bowling-content').innerHTML='<div class="no-data">No bowling data for this player in the current filter</div>';return;}
+  if(!rows.length){mount.innerHTML='<div class="no-data">No bowling data for this player in the current filter</div>';return;}
 
   let html=`
     <div class="stat-cards">
@@ -1007,7 +1013,7 @@ function renderBowling(){
     </tr>`).join('')}</tbody></table>
   </div>`;
 
-  document.getElementById('bowling-content').innerHTML=html;
+  mount.innerHTML=html;
 
   setTimeout(()=>{
     const ctx1=document.getElementById('ch-bowl-comp')?.getContext('2d');
@@ -1091,119 +1097,102 @@ function renderOverview(){
 }
 
 function renderMatchups(){
-  let muse=null;
-  for(const c of visibleComps()){
+  const phases=[
+    {key:'powerplay',label:'Powerplay',sub:'Overs 1-6',color:'#2E5A8F'},
+    {key:'middle',label:'Middle',sub:'Overs 7-15',color:'#DAA520'},
+    {key:'death',label:'Death',sub:'Overs 16-20',color:'#C0392B'},
+  ];
+  const blocks=[];
+  visibleComps().forEach(c=>{
     const d=allData[c.code];
-    if(!d)continue;
+    if(!d) return;
     const batP=d.batting?.find(p=>samePlayerName(p.name,playerName));
     const bowlP=d.bowling?.find(p=>samePlayerName(p.name,playerName));
-    if(batP?.phase_stats||bowlP?.phase_stats){
-      muse={batP,bowlP,compName:c.name};
-      break;
-    }
-  }
-  if(!muse){
-    document.getElementById('matchups-content').innerHTML='<div class="no-data">No phase breakdown in the current filter<br><small>Phase stats are built for some competitions only (rebuild with fetch_all_cricket.py).</small></div>';
+    if(batP?.phase_stats||bowlP?.phase_stats) blocks.push({compName:c.name,batP,bowlP});
+  });
+  if(!blocks.length){
+    document.getElementById('matchups-content').innerHTML='<div class="no-data">No phase breakdown in the current filter<br><small>Phase stats are built per competition (rebuild with <code>python fetch_all_cricket.py</code>).</small></div>';
     return;
   }
-  const batPlayer=muse.batP;
-  const bowlPlayer=muse.bowlP;
-  const phases = [
-    {key:'powerplay', label:'Powerplay', sub:'Overs 1-6',  color:'#2E5A8F'},
-    {key:'middle',    label:'Middle',    sub:'Overs 7-15', color:'#DAA520'},
-    {key:'death',     label:'Death',     sub:'Overs 16-20',color:'#C0392B'},
-  ];
-
-  let html = '';
-
-  // BATTING phase breakdown
-  if(batPlayer?.phase_stats && Object.keys(batPlayer.phase_stats).length){
-    const ps = batPlayer.phase_stats;
-    html += `<div class="section-title" style="margin-top:0">🏏 Batting by Innings Phase</div>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px">
-      ${phases.map(ph=>{
-        const s=ps[ph.key]||{runs:0,balls:0,sr:0};
-        return `<div class="stat-card" style="border-top:3px solid ${ph.color}">
-          <div class="sc-label">${ph.label} <span style="font-weight:400">(${ph.sub})</span></div>
-          <div class="sc-val" style="color:${ph.color}">${s.runs}</div>
-          <div class="sc-sub">${s.balls} balls · SR ${s.sr}</div>
-        </div>`;
-      }).join('')}
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:28px">
-      <div class="chart-card"><h3>Runs by Phase</h3><div class="chart-wrap-sm"><canvas id="mu-bat-runs"></canvas></div></div>
-      <div class="chart-card"><h3>Strike Rate by Phase</h3><div class="chart-wrap-sm"><canvas id="mu-bat-sr"></canvas></div></div>
-    </div>`;
-  }
-
-  // Season-by-season batting trend
-  if(batPlayer?.by_season && Object.keys(batPlayer.by_season).length > 1){
-    const seasons = Object.keys(batPlayer.by_season).sort();
-    html += `<div class="section-title">📈 Season-by-Season Batting</div>
-    <div class="chart-card" style="margin-bottom:28px">
-      <h3>Runs &amp; Strike Rate by Season</h3>
-      <div class="chart-wrap"><canvas id="mu-bat-season"></canvas></div>
-    </div>`;
-  }
-
-  // BOWLING phase breakdown
-  if(bowlPlayer?.phase_stats && Object.keys(bowlPlayer.phase_stats).length){
-    const ps = bowlPlayer.phase_stats;
-    html += `<div class="section-title">🎳 Bowling by Innings Phase</div>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px">
-      ${phases.map(ph=>{
-        const s=ps[ph.key]||{runs:0,balls:0,wickets:0,economy:0};
-        const ov=+(Math.floor(s.balls/6)+(s.balls%6)/10).toFixed(1);
-        return `<div class="stat-card" style="border-top:3px solid ${ph.color}">
-          <div class="sc-label">${ph.label} <span style="font-weight:400">(${ph.sub})</span></div>
-          <div class="sc-val" style="color:${ph.color}">${s.wickets}W</div>
-          <div class="sc-sub">${ov} ov · Econ ${s.economy} · ${s.runs}R</div>
-        </div>`;
-      }).join('')}
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:28px">
-      <div class="chart-card"><h3>Economy by Phase</h3><div class="chart-wrap-sm"><canvas id="mu-bowl-econ"></canvas></div></div>
-      <div class="chart-card"><h3>Wickets by Phase</h3><div class="chart-wrap-sm"><canvas id="mu-bowl-wkts"></canvas></div></div>
-    </div>`;
-  }
-
-  // Season-by-season bowling trend
-  if(bowlPlayer?.by_season && Object.keys(bowlPlayer.by_season).length > 1){
-    const seasons = Object.keys(bowlPlayer.by_season).sort();
-    html += `<div class="section-title">📈 Season-by-Season Bowling</div>
-    <div class="chart-card" style="margin-bottom:28px">
-      <h3>Wickets &amp; Economy by Season</h3>
-      <div class="chart-wrap"><canvas id="mu-bowl-season"></canvas></div>
-    </div>`;
-  }
-
-  if(!html) html=`<div class="no-data">No matchup data yet<br>
-    <small>Run <code>python fetch_all_cricket.py --comp ipl</code> to generate phase data</small></div>`;
-
+  let html='';
+  blocks.forEach((blk,i)=>{
+    html+=`<div class="matchup-comp-block" style="margin-bottom:36px;padding-bottom:8px;border-bottom:1px solid var(--border)">`;
+    html+=`<div class="section-title" style="margin-top:${i?24:0}">${blk.compName}</div>`;
+    if(blk.batP?.phase_stats&&Object.keys(blk.batP.phase_stats).length){
+      const ps=blk.batP.phase_stats;
+      html+=`<div class="section-title" style="font-size:12px;margin-top:12px">🏏 Batting by phase</div>
+      <div class="matchup-phase-cards" style="margin-bottom:16px">
+        ${phases.map(ph=>{
+          const s=ps[ph.key]||{runs:0,balls:0,sr:0};
+          return `<div class="stat-card" style="border-top:3px solid ${ph.color}">
+            <div class="sc-label">${ph.label} <span style="font-weight:400">(${ph.sub})</span></div>
+            <div class="sc-val" style="color:${ph.color}">${s.runs}</div>
+            <div class="sc-sub">${s.balls} balls · SR ${s.sr}</div>
+          </div>`;
+        }).join('')}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px" class="matchup-charts-row">
+        <div class="chart-card"><h3>Runs by phase</h3><div class="chart-wrap-sm"><canvas id="mu-bat-runs-${i}"></canvas></div></div>
+        <div class="chart-card"><h3>SR by phase</h3><div class="chart-wrap-sm"><canvas id="mu-bat-sr-${i}"></canvas></div></div>
+      </div>`;
+    }
+    if(blk.batP?.by_season&&Object.keys(blk.batP.by_season).length>1){
+      html+=`<div class="section-title" style="font-size:12px">📈 Batting by season</div>
+      <div class="chart-card" style="margin-bottom:24px">
+        <h3>Runs &amp; SR</h3>
+        <div class="chart-wrap"><canvas id="mu-bat-season-${i}"></canvas></div>
+      </div>`;
+    }
+    if(blk.bowlP?.phase_stats&&Object.keys(blk.bowlP.phase_stats).length){
+      const ps=blk.bowlP.phase_stats;
+      html+=`<div class="section-title" style="font-size:12px;margin-top:8px">🎳 Bowling by phase</div>
+      <div class="matchup-phase-cards" style="margin-bottom:16px">
+        ${phases.map(ph=>{
+          const s=ps[ph.key]||{runs:0,balls:0,wickets:0,economy:0};
+          const ov=+(Math.floor(s.balls/6)+(s.balls%6)/10).toFixed(1);
+          return `<div class="stat-card" style="border-top:3px solid ${ph.color}">
+            <div class="sc-label">${ph.label} <span style="font-weight:400">(${ph.sub})</span></div>
+            <div class="sc-val" style="color:${ph.color}">${s.wickets}W</div>
+            <div class="sc-sub">${ov} ov · Econ ${s.economy} · ${s.runs}R</div>
+          </div>`;
+        }).join('')}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px" class="matchup-charts-row">
+        <div class="chart-card"><h3>Economy by phase</h3><div class="chart-wrap-sm"><canvas id="mu-bowl-econ-${i}"></canvas></div></div>
+        <div class="chart-card"><h3>Wickets by phase</h3><div class="chart-wrap-sm"><canvas id="mu-bowl-wkts-${i}"></canvas></div></div>
+      </div>`;
+    }
+    if(blk.bowlP?.by_season&&Object.keys(blk.bowlP.by_season).length>1){
+      html+=`<div class="section-title" style="font-size:12px">📈 Bowling by season</div>
+      <div class="chart-card" style="margin-bottom:8px">
+        <h3>Wickets &amp; economy</h3>
+        <div class="chart-wrap"><canvas id="mu-bowl-season-${i}"></canvas></div>
+      </div>`;
+    }
+    html+='</div>';
+  });
   document.getElementById('matchups-content').innerHTML=html;
-  setTimeout(()=>drawMatchupCharts(batPlayer,bowlPlayer),100);
+  setTimeout(()=>{blocks.forEach((blk,i)=>drawMatchupCharts(blk.batP,blk.bowlP,i));},100);
 }
 
-function drawMatchupCharts(batArg, bowlArg){
+function drawMatchupCharts(batArg,bowlArg,idx){
   const phases=['Powerplay','Middle','Death'];
   const phKeys=['powerplay','middle','death'];
   const colors=['#2E5A8F','#DAA520','#C0392B'];
   const bopts={responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
     scales:{x:{grid:{display:false},ticks:{font:{size:11}}},y:{grid:{color:'#E2E6EA'},ticks:{font:{size:11}}}}};
+  const suf=String(idx);
 
-  // Batting phase charts
   if(batArg?.phase_stats){
-    const runsCtx=document.getElementById('mu-bat-runs')?.getContext('2d');
+    const runsCtx=document.getElementById('mu-bat-runs-'+suf)?.getContext('2d');
     if(runsCtx) charts.push(new Chart(runsCtx,{type:'bar',data:{labels:phases,
       datasets:[{data:phKeys.map(k=>batArg.phase_stats[k]?.runs||0),backgroundColor:colors,borderRadius:6}]},options:bopts}));
-    const srCtx=document.getElementById('mu-bat-sr')?.getContext('2d');
+    const srCtx=document.getElementById('mu-bat-sr-'+suf)?.getContext('2d');
     if(srCtx) charts.push(new Chart(srCtx,{type:'bar',data:{labels:phases,
       datasets:[{data:phKeys.map(k=>batArg.phase_stats[k]?.sr||0),backgroundColor:colors,borderRadius:6}]},options:bopts}));
   }
-
-  // Batting season trend
   if(batArg?.by_season){
-    const ctx=document.getElementById('mu-bat-season')?.getContext('2d');
+    const ctx=document.getElementById('mu-bat-season-'+suf)?.getContext('2d');
     if(ctx){
       const seasons=Object.keys(batArg.by_season).sort();
       charts.push(new Chart(ctx,{type:'bar',data:{labels:seasons,datasets:[
@@ -1216,20 +1205,16 @@ function drawMatchupCharts(batArg, bowlArg){
           y2:{position:'right',grid:{display:false},ticks:{font:{size:10}},title:{display:true,text:'SR',font:{size:9}}}}}}));
     }
   }
-
-  // Bowling phase charts
   if(bowlArg?.phase_stats){
-    const econCtx=document.getElementById('mu-bowl-econ')?.getContext('2d');
+    const econCtx=document.getElementById('mu-bowl-econ-'+suf)?.getContext('2d');
     if(econCtx) charts.push(new Chart(econCtx,{type:'bar',data:{labels:phases,
       datasets:[{data:phKeys.map(k=>bowlArg.phase_stats[k]?.economy||0),backgroundColor:colors,borderRadius:6}]},options:bopts}));
-    const wktsCtx=document.getElementById('mu-bowl-wkts')?.getContext('2d');
+    const wktsCtx=document.getElementById('mu-bowl-wkts-'+suf)?.getContext('2d');
     if(wktsCtx) charts.push(new Chart(wktsCtx,{type:'bar',data:{labels:phases,
       datasets:[{data:phKeys.map(k=>bowlArg.phase_stats[k]?.wickets||0),backgroundColor:colors,borderRadius:6}]},options:bopts}));
   }
-
-  // Bowling season trend
   if(bowlArg?.by_season){
-    const ctx=document.getElementById('mu-bowl-season')?.getContext('2d');
+    const ctx=document.getElementById('mu-bowl-season-'+suf)?.getContext('2d');
     if(ctx){
       const seasons=Object.keys(bowlArg.by_season).sort();
       charts.push(new Chart(ctx,{type:'bar',data:{labels:seasons,datasets:[
@@ -1242,7 +1227,6 @@ function drawMatchupCharts(batArg, bowlArg){
           y2:{position:'right',grid:{display:false},ticks:{font:{size:10}},title:{display:true,text:'Economy',font:{size:9}}}}}}));
     }
   }
-
 }
 
 function killCharts(){charts.forEach(c=>{try{c.destroy();}catch(e){}});charts=[];}

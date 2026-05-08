@@ -133,7 +133,7 @@ footer a{color:var(--blue);text-decoration:none;}
       <div class="filter-panel-title">Tournaments (multi-select)</div>
       <div class="filter-actions">
         <button type="button" onclick="matchesSelectAllTournaments()">All</button>
-        <button type="button" onclick="matchesClearTournaments()">Clear</button>
+        <button type="button" onclick="matchesClearTournaments()">IPL only</button>
       </div>
       <div class="filter-chips" id="matches-filter-tournaments"></div>
     </div>
@@ -225,7 +225,7 @@ async function loadMergedMatchIndices(){
 
 function onMatchesTournamentChange(){
   const checked=[...document.querySelectorAll('#matches-filter-tournaments input:checked')].map(i=>i.value);
-  selectedTournamentCodes=checked.length?checked:COMPS.map(c=>c.code);
+  selectedTournamentCodes=checked.length?checked:(typeof t20DefaultFilterCodes==='function'?t20DefaultFilterCodes(COMPS.map(c=>c.code)):['ipl']);
   if(!checked.length)renderMatchesFilterChips();
   const prev=activeSeason;
   fillMatchesSeasonSelect();
@@ -256,7 +256,7 @@ function matchesSelectAllTournaments(){
 }
 
 function matchesClearTournaments(){
-  selectedTournamentCodes=COMPS.length?[COMPS[0].code]:[];
+  selectedTournamentCodes=typeof t20DefaultFilterCodes==='function'?t20DefaultFilterCodes(COMPS.map(c=>c.code)):(COMPS.length?[COMPS[0].code]:[]);
   renderMatchesFilterChips();
   fillMatchesSeasonSelect();
   activeSeason='all';
@@ -314,7 +314,9 @@ async function boot(){
   activeSeason=fp.activeSeason;
   yearFrom=fp.yearFrom;
   yearTo=fp.yearTo;
-  if(!selectedTournamentCodes.length)selectedTournamentCodes=COMPS.map(c=>c.code);
+  if(!selectedTournamentCodes.length){
+    selectedTournamentCodes=typeof t20DefaultFilterCodes==='function'?t20DefaultFilterCodes(COMPS.map(c=>c.code)):['ipl'];
+  }
 
   renderMatchesFilterChips();
   fillMatchesSeasonSelect();

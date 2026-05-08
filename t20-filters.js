@@ -64,9 +64,16 @@
     });
   }
 
+  /** Default tournament selection: IPL only when available. */
+  function t20DefaultFilterCodes(allCodes) {
+    if (!allCodes || !allCodes.length) return [];
+    var i = allCodes.indexOf('ipl');
+    return i >= 0 ? ['ipl'] : [allCodes[0]];
+  }
+
   function t20ResolveCodesFromQS(qs, allCodes) {
     var raw = qs.get('comps');
-    if (!raw || !String(raw).trim()) return allCodes.slice();
+    if (!raw || !String(raw).trim()) return t20DefaultFilterCodes(allCodes);
     var parts = String(raw).split(',').map(function (x) {
       return x.trim();
     }).filter(Boolean);
@@ -77,7 +84,7 @@
     var picked = parts.filter(function (c) {
       return valid[c];
     });
-    return picked.length ? picked : allCodes.slice();
+    return picked.length ? picked : t20DefaultFilterCodes(allCodes);
   }
 
   function t20ReadFilterParams(searchString, index) {
@@ -368,5 +375,6 @@
   g.t20FilterQS = t20FilterQS;
   g.t20FilterBySeason = t20FilterBySeason;
   g.t20MatchPassesFilters = t20MatchPassesFilters;
+  g.t20DefaultFilterCodes = t20DefaultFilterCodes;
   g.FOCUS_MENS_T20_CODES = FOCUS_MENS_T20_CODES;
 })(typeof window !== 'undefined' ? window : globalThis);

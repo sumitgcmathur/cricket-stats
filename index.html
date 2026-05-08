@@ -191,10 +191,10 @@ body {
   padding: 0;
 }
 
-.tournament-details {
+.tournament-details-wrap {
   border-bottom: 1px solid var(--border);
 }
-.tournament-details summary {
+.tournament-summary {
   list-style: none;
   cursor: pointer;
   display: flex;
@@ -202,8 +202,18 @@ body {
   gap: 12px;
   padding: 10px 0;
   user-select: none;
+  width: 100%;
+  border: none;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
-.tournament-details summary::-webkit-details-marker { display: none; }
+.tournament-summary:focus-visible {
+  outline: 2px solid var(--blue-mid);
+  outline-offset: 2px;
+}
 .ts-label {
   font-size: 11px;
   font-weight: 600;
@@ -236,7 +246,7 @@ body {
   text-align: center;
 }
 .ts-chev::before { content: '▸'; }
-.tournament-details[open] .ts-chev::before { content: '▾'; }
+.tournament-summary.is-open .ts-chev::before { content: '▾'; }
 .tournament-panel {
   padding: 0 0 14px;
 }
@@ -852,7 +862,7 @@ footer a { color: var(--blue); text-decoration: none; }
   .season-select, .year-input { font-size: 12px; padding: 4px 6px; max-width: 90px; }
   .year-range-label { display: none; }
   .ts-hint { display: none; }
-  .tournament-details summary { padding: 8px 0; }
+  .tournament-summary { padding: 8px 0; }
   .pill { font-size: 10px; padding: 3px 8px; }
   .pill-group { gap: 4px; width: 100%; }
   td:nth-child(n+6) { display: none; }
@@ -885,7 +895,7 @@ footer a { color: var(--blue); text-decoration: none; }
 <div class="hero-strip" id="hero-strip">
   <div class="hero-inner">
     <div class="hero-title">T20 <span style="color:var(--gold-light)">Across Leagues</span></div>
-    <div class="hero-sub">Pick a season or year range, then open <strong>Leagues</strong> if you want fewer tournaments · Cricsheet data</div>
+    <div class="hero-sub">Defaults to <strong>IPL</strong>; open <strong>Leagues</strong> to add BBL, CPL, or T20Is · Cricsheet data</div>
     <div class="kpi-strip" id="hero-kpis">
       <div class="kpi-card"><div class="k-label">Loading</div><div class="k-val">—</div></div>
     </div>
@@ -896,21 +906,21 @@ footer a { color: var(--blue); text-decoration: none; }
 <div class="toolbar">
   <div class="toolbar-inner" id="toolbar-inner">
     <div class="toolbar-stack">
-      <details class="tournament-details" id="tournament-details">
-        <summary class="tournament-summary">
+      <div class="tournament-details-wrap" id="tournament-details-wrap">
+        <button type="button" class="tournament-summary" id="tournament-toggle" aria-expanded="true" aria-controls="tournament-panel" onclick="toggleTournamentLeaguesPanel(event)">
           <span class="ts-label">Leagues</span>
           <span class="ts-value" id="tournament-summary-text">Loading…</span>
           <span class="ts-hint">tap to change</span>
           <span class="ts-chev" aria-hidden="true"></span>
-        </summary>
-        <div class="tournament-panel">
+        </button>
+        <div class="tournament-panel" id="tournament-panel">
           <div class="filter-actions">
             <button type="button" onclick="selectAllTournaments()">Select all</button>
-            <button type="button" onclick="clearTournamentSelection()">Reset to one</button>
+            <button type="button" onclick="clearTournamentSelection()">IPL only</button>
           </div>
           <div class="filter-chips" id="filter-tournaments"></div>
         </div>
-      </details>
+      </div>
       <div class="toolbar-main-row">
         <div class="toolbar-filters">
           <span class="inline-lab">Season</span>
@@ -1039,9 +1049,37 @@ function renderTournamentFilters() {
   updateTournamentSummaryText();
 }
 
+function toggleTournamentLeaguesPanel(e) {
+  if (e) e.preventDefault();
+  const panel = document.getElementById('tournament-panel');
+  const btn = document.getElementById('tournament-toggle');
+  if (!panel || !btn) return;
+  panel.hidden = !panel.hidden;
+  const open = !panel.hidden;
+  btn.classList.toggle('is-open', open);
+  btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+
+function syncTournamentLeaguesPanelForViewport() {
+  const panel = document.getElementById('tournament-panel');
+  const btn = document.getElementById('tournament-toggle');
+  if (!panel || !btn) return;
+  const narrow = window.matchMedia('(max-width: 700px)').matches;
+  if (narrow) {
+    panel.hidden = true;
+    btn.classList.remove('is-open');
+    btn.setAttribute('aria-expanded', 'false');
+  } else {
+    panel.hidden = false;
+    btn.classList.add('is-open');
+    btn.setAttribute('aria-expanded', 'true');
+  }
+}
+
 function onTournamentFilterChange() {
   const checked = [...document.querySelectorAll('#filter-tournaments input[type=checkbox]:checked')].map(i => i.value);
-  selectedTournamentCodes = checked.length ? checked : getT20Competitions().map(c => c.code);
+  const allC = getT20Competitions().map(c => c.code);
+  selectedTournamentCodes = checked.length ? checked : (typeof t20DefaultFilterCodes === 'function' ? t20DefaultFilterCodes(allC) : ['ipl']);
   if (!checked.length) renderTournamentFilters();
   else updateTournamentSummaryText();
   const prev = activeSeason;
@@ -1072,7 +1110,8 @@ function selectAllTournaments() {
 
 function clearTournamentSelection() {
   const comps = getT20Competitions();
-  selectedTournamentCodes = comps.length ? [comps[0].code] : [];
+  const codes = comps.map(c => c.code);
+  selectedTournamentCodes = typeof t20DefaultFilterCodes === 'function' ? t20DefaultFilterCodes(codes) : (comps.length ? [comps[0].code] : []);
   renderTournamentFilters();
   populateSeasons(unionSeasonsForCodes(selectedTournamentCodes));
   activeSeason = 'all';
@@ -1259,7 +1298,10 @@ async function boot() {
     activeSeason = fp.activeSeason;
     yearFrom = fp.yearFrom;
     yearTo = fp.yearTo;
-    if (!selectedTournamentCodes.length) selectedTournamentCodes = getT20Competitions().map(c => c.code);
+    if (!selectedTournamentCodes.length) {
+      const allC = getT20Competitions().map(c => c.code);
+      selectedTournamentCodes = typeof t20DefaultFilterCodes === 'function' ? t20DefaultFilterCodes(allC) : allC;
+    }
     renderTournamentFilters();
     populateSeasons(unionSeasonsForCodes(selectedTournamentCodes));
     document.getElementById('season-select').value = activeSeason;
@@ -1267,6 +1309,11 @@ async function boot() {
     document.getElementById('year-to').value = yearTo || '';
     updateSeasonBanner();
     updateMatchesNavLinkOnly();
+    syncTournamentLeaguesPanelForViewport();
+    if (!window._t20LeaguesResizeBound) {
+      window._t20LeaguesResizeBound = true;
+      window.addEventListener('resize', () => { syncTournamentLeaguesPanelForViewport(); });
+    }
     await refreshDashboard();
   } catch (e) {
     console.error('Boot error:', e);
@@ -1284,13 +1331,19 @@ function setView(name, btn) {
   const toolbarEl = document.getElementById('toolbar-inner');
   toolbarEl.style.display = (name === 'player') ? 'none' : '';
   if (name === 'player') {
-    const td = document.getElementById('tournament-details');
-    if (td) td.removeAttribute('open');
+    const panel = document.getElementById('tournament-panel');
+    const btn = document.getElementById('tournament-toggle');
+    if (panel) panel.hidden = true;
+    if (btn) {
+      btn.classList.remove('is-open');
+      btn.setAttribute('aria-expanded', 'false');
+    }
   }
+  if (name === 'dashboard') syncTournamentLeaguesPanelForViewport();
   document.getElementById('hero-strip').style.display = name === 'player' ? 'none' : '';
   if (name === 'dashboard') {
     document.getElementById('hero-strip').querySelector('.hero-title').innerHTML = 'T20 <span style="color:var(--gold-light)">Across Leagues</span>';
-    document.getElementById('hero-strip').querySelector('.hero-sub').textContent = 'Pick a season or year range, then open Leagues if you want fewer tournaments · Cricsheet data';
+    document.getElementById('hero-strip').querySelector('.hero-sub').textContent = 'Defaults to IPL; open Leagues to add more tournaments · Cricsheet data';
     if (currentMergedData) {
       updateHeroKPIs(currentMergedData);
       renderStatTab(currentMergedData, true);
