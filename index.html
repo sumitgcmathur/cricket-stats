@@ -476,6 +476,16 @@ td:first-child { text-align: left; }
   white-space: nowrap;
 }
 
+.mvp-subgrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  align-items: stretch;
+}
+@media (max-width: 768px) {
+  .mvp-subgrid { grid-template-columns: 1fr; }
+}
+
 .hi {
   color: var(--blue);
   font-weight: 600;
@@ -969,6 +979,12 @@ let activeSeason = 'all';
 let yearFrom = null, yearTo = null;
 let selectedTournamentCodes = [];
 let currentMergedData = null;
+let mvpDashboardCharts = [];
+
+function destroyMvpDashboardCharts() {
+  mvpDashboardCharts.forEach(c => { try { c.destroy(); } catch (e) {} });
+  mvpDashboardCharts = [];
+}
 
 function getT20Competitions() {
   return (index && typeof t20GetT20Competitions === 'function') ? t20GetT20Competitions(index) : [];
@@ -1380,6 +1396,7 @@ async function loadComp(code) {
 }
 
 async function renderStatTab(rawData, skipSeasonFilter) {
+  destroyMvpDashboardCharts();
   const d = skipSeasonFilter ? rawData : ((activeSeason !== 'all' || yearFrom || yearTo) ? filterBySeason(rawData) : rawData);
   document.getElementById('dash-content').innerHTML = '<div class="loading"><div class="spinner"></div>Processing…</div>';
   setTimeout(() => {
@@ -1391,7 +1408,80 @@ async function renderStatTab(rawData, skipSeasonFilter) {
   }, 50);
 }
 
+function mvpNormName(s) {
+  return String(s || '').trim().toLowerCase();
+}
+function mvpFindRow(arr, name) {
+  const n = mvpNormName(name);
+  return (arr || []).find(p => mvpNormName(p.name) === n) || null;
+}
+function mvpSeasonKeyOk(sn) {
+  if (!sn) return false;
+  const yr = parseInt(sn, 10);
+  if (activeSeason !== 'all') return String(sn) === String(activeSeason);
+  if (yearFrom && yr < yearFrom) return false;
+  if (yearTo && yr > yearTo) return false;
+  return true;
+}
+function getMvpFilteredComp(code) {
+  const raw = loadedData[code];
+  if (!raw) return null;
+  if (activeSeason !== 'all' || yearFrom || yearTo) return filterBySeason(raw);
+  return raw;
+}
+/** Per-season bat/bowl MVP totals for one player across selected comps (uses by_season rows). */
+function mvpImpactBySeasonForPlayer(playerName) {
+  const codes = selectedTournamentCodes.length ? selectedTournamentCodes : getT20Competitions().map(c => c.code);
+  const agg = {};
+  for (const code of codes) {
+    const dc = getMvpFilteredComp(code);
+    if (!dc) continue;
+    const bat = mvpFindRow(dc.batting, playerName);
+    const bowl = mvpFindRow(dc.bowling, playerName);
+    const ingest = (by, key) => {
+      if (!by) return;
+      Object.entries(by).forEach(([sn, row]) => {
+        if (!mvpSeasonKeyOk(sn)) return;
+        if (!agg[sn]) agg[sn] = { bat: 0, bowl: 0 };
+        agg[sn][key] += +(row.mvp_pts || 0);
+      });
+    };
+    ingest(bat?.by_season, 'bat');
+    ingest(bowl?.by_season, 'bowl');
+  }
+  return Object.keys(agg)
+    .filter(mvpSeasonKeyOk)
+    .sort()
+    .map(sn => ({
+      season: sn,
+      bat: +agg[sn].bat.toFixed(1),
+      bowl: +agg[sn].bowl.toFixed(1),
+      total: +(agg[sn].bat + agg[sn].bowl).toFixed(1),
+    }));
+}
+function mvpLeagueSplitForTopNames(names) {
+  const codes = selectedTournamentCodes.length ? selectedTournamentCodes : getT20Competitions().map(c => c.code);
+  const comps = getT20Competitions();
+  const labels = codes.map(c => {
+    const meta = comps.find(x => x.code === c);
+    const nm = meta?.name || c;
+    return nm.length > 12 ? nm.slice(0, 10) + '…' : nm;
+  });
+  const rows = names.map(name => ({
+    name,
+    perComp: codes.map(code => {
+      const dc = getMvpFilteredComp(code);
+      if (!dc) return 0;
+      const bat = mvpFindRow(dc.batting, name);
+      const bowl = mvpFindRow(dc.bowling, name);
+      return Math.round((bat?.mvp_pts || 0) + (bowl?.mvp_pts || 0));
+    }),
+  }));
+  return { codes, labels, rows };
+}
+
 function renderMVP(d, target) {
+  destroyMvpDashboardCharts();
   const data = d && d.code === 'merged' ? d : ((activeSeason !== 'all' || yearFrom || yearTo) ? filterBySeason(d) : d);
   const batters = (data.batting || []).filter(p => p.matches >= 3);
   const bowlers = (data.bowling || []).filter(p => p.matches >= 3);
@@ -1454,6 +1544,24 @@ function renderMVP(d, target) {
     </td>
   </tr>`).join('');
 
+  const codesLen = selectedTournamentCodes.length ? selectedTournamentCodes.length : getT20Competitions().length;
+  const leader = players[0];
+  const seasonPts = leader ? mvpImpactBySeasonForPlayer(leader.name) : [];
+  const seasonChartBlock = seasonPts.length
+    ? `<div class="chart-card" style="width:100%;max-width:100%;box-sizing:border-box;padding:14px 16px">
+        <h3 style="font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:10px">#1 MVP by season — ${leader.name}</h3>
+        <div style="position:relative;height:220px;width:100%"><canvas id="mvp-season-chart"></canvas></div>
+      </div>`
+    : `<div class="chart-card" style="padding:20px;color:var(--muted);font-size:13px;line-height:1.55;width:100%;box-sizing:border-box">
+        Per-season MVP for the leader needs multiple seasons in view. ${leader ? 'Try <strong>All seasons</strong> or widen the year range.' : ''}</div>`;
+  const leagueBlock = codesLen >= 2
+    ? `<div class="chart-card" style="width:100%;max-width:100%;box-sizing:border-box;padding:14px 16px">
+        <h3 style="font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:10px">Top 5 — impact by league</h3>
+        <div style="position:relative;height:240px;width:100%"><canvas id="mvp-league-chart"></canvas></div>
+      </div>`
+    : `<div class="chart-card" style="padding:20px;color:var(--muted);font-size:13px;line-height:1.55;width:100%;box-sizing:border-box">
+        Select <strong>two or more leagues</strong> to see how MVP impact splits by competition (stacked bars).</div>`;
+
   document.getElementById(target).innerHTML = `
     <div style="background:var(--blue-light);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-bottom:20px;font-size:12px;color:var(--blue);line-height:1.55">
       🏅 <strong>MVP points</strong> — Same simple add-up as broadcast tables (each ball/event adds points; <strong>no per‑match averaging</strong>).<br>
@@ -1466,9 +1574,23 @@ function renderMVP(d, target) {
       <span style="color:#B8860B;font-weight:600"> ■ Bowler</span>
     </div>
     <div style="display:flex;flex-direction:column;gap:20px;margin-bottom:20px;align-items:stretch">
-      <div class="chart-card" style="width:100%;max-width:100%;box-sizing:border-box">
+      <div class="chart-card" style="width:100%;max-width:100%;box-sizing:border-box;padding:14px 16px">
         <h3 style="font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:14px">Top 10 Impact</h3>
         <div style="position:relative;height:260px;width:100%"><canvas id="mvp-chart"></canvas></div>
+      </div>
+      <div class="mvp-subgrid">
+        ${seasonChartBlock}
+        ${leagueBlock}
+      </div>
+      <div class="mvp-subgrid">
+        <div class="chart-card" style="width:100%;max-width:100%;box-sizing:border-box;padding:14px 16px">
+          <h3 style="font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:10px">Top 10 — bat vs bowl MVP</h3>
+          <div style="position:relative;height:220px;width:100%"><canvas id="mvp-compose-chart"></canvas></div>
+        </div>
+        <div class="chart-card" style="width:100%;max-width:100%;box-sizing:border-box;padding:14px 16px">
+          <h3 style="font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:10px">Top 30 — matches vs impact</h3>
+          <div style="position:relative;height:260px;width:100%"><canvas id="mvp-scatter-chart"></canvas></div>
+        </div>
       </div>
       <div class="tbl-wrap animate" style="width:100%;max-width:100%">
         <table>
@@ -1489,20 +1611,108 @@ function renderMVP(d, target) {
       </div>
     </div>`;
 
-  setTimeout(()=>{
-    const ctx=document.getElementById('mvp-chart')?.getContext('2d');
-    if(!ctx) return;
-    new Chart(ctx,{type:'bar',data:{
-      labels:top10.map(p=>p.name.split(' ').pop()),
-      datasets:[{
-        data:top10.map(p=>p.impact),
-        backgroundColor:top10.map(p=>roleColor(p.role)),
-        borderRadius:4,
-      }]
-    },options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>' Impact: '+c.raw}}},
-      scales:{x:{grid:{color:'#E2E6EA'},ticks:{font:{size:10}}},y:{grid:{display:false},ticks:{font:{size:11}}}}
-    }});
+  setTimeout(() => {
+    const push = ch => { if (ch) mvpDashboardCharts.push(ch); };
+    const ctx = document.getElementById('mvp-chart')?.getContext('2d');
+    if (ctx && top10.length) {
+      push(new Chart(ctx, { type: 'bar', data: {
+        labels: top10.map(p => (p.name.length > 14 ? p.name.split(' ').pop() : p.name)),
+        datasets: [{
+          data: top10.map(p => p.impact),
+          backgroundColor: top10.map(p => roleColor(p.role)),
+          borderRadius: 4,
+        }],
+      }, options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ' Impact: ' + c.raw } } },
+        scales: { x: { grid: { color: '#E2E6EA' }, ticks: { font: { size: 10 } } }, y: { grid: { display: false }, ticks: { font: { size: 11 } } } },
+      } }));
+    }
+    const sctx = document.getElementById('mvp-season-chart')?.getContext('2d');
+    if (sctx && seasonPts.length) {
+      push(new Chart(sctx, { type: 'bar', data: {
+        labels: seasonPts.map(x => x.season),
+        datasets: [
+          { label: 'Bat MVP', data: seasonPts.map(x => x.bat), backgroundColor: '#1E3A5F', stack: 'mvp' },
+          { label: 'Bowl MVP', data: seasonPts.map(x => x.bowl), backgroundColor: '#B8860B', stack: 'mvp' },
+        ],
+      }, options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'top', labels: { font: { size: 10 }, boxWidth: 12 } } },
+        scales: {
+          x: { stacked: true, grid: { display: false }, ticks: { font: { size: 9 }, maxRotation: 45 } },
+          y: { stacked: true, grid: { color: '#E2E6EA' }, ticks: { font: { size: 10 } } },
+        },
+      } }));
+    }
+    const top5names = players.slice(0, 5).map(p => p.name);
+    const split = mvpLeagueSplitForTopNames(top5names);
+    const lctx = document.getElementById('mvp-league-chart')?.getContext('2d');
+    if (lctx && split.codes.length >= 2 && split.rows.some(r => r.perComp.some(v => v > 0))) {
+      const palette = ['#1E3A5F', '#E85D04', '#2D9648', '#7B2FBE', '#D4A017', '#1A7A9A', '#C0392B', '#4A4A8A'];
+      push(new Chart(lctx, { type: 'bar', data: {
+        labels: split.rows.map(r => (r.name.length > 16 ? r.name.split(' ').pop() : r.name)),
+        datasets: split.codes.map((_, i) => ({
+          label: split.labels[i],
+          data: split.rows.map(r => r.perComp[i]),
+          backgroundColor: palette[i % palette.length],
+          stack: 'L',
+        })),
+      }, options: {
+        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom', labels: { font: { size: 9 }, boxWidth: 10 } } },
+        scales: {
+          x: { stacked: true, grid: { color: '#E2E6EA' }, ticks: { font: { size: 10 } } },
+          y: { stacked: true, grid: { display: false }, ticks: { font: { size: 10 } } },
+        },
+      } }));
+    }
+    const t10 = players.slice(0, 10);
+    const cctx = document.getElementById('mvp-compose-chart')?.getContext('2d');
+    if (cctx && t10.length) {
+      push(new Chart(cctx, { type: 'bar', data: {
+        labels: t10.map(p => (p.name.length > 16 ? p.name.split(' ').pop() : p.name)),
+        datasets: [
+          { label: 'Bat MVP', data: t10.map(p => p.bat_pts), backgroundColor: '#1E3A5F', stack: 'c' },
+          { label: 'Bowl MVP', data: t10.map(p => p.bowl_pts), backgroundColor: '#B8860B', stack: 'c' },
+        ],
+      }, options: {
+        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: true, position: 'top', labels: { font: { size: 10 }, boxWidth: 12 } } },
+        scales: {
+          x: { stacked: true, grid: { color: '#E2E6EA' }, ticks: { font: { size: 10 } } },
+          y: { stacked: true, grid: { display: false }, ticks: { font: { size: 10 } } },
+        },
+      } }));
+    }
+    const sc30 = players.slice(0, 30);
+    const scCtx = document.getElementById('mvp-scatter-chart')?.getContext('2d');
+    if (scCtx && sc30.length) {
+      push(new Chart(scCtx, { type: 'scatter', data: {
+        datasets: [{
+          label: 'Players',
+          data: sc30.map(p => ({ x: p.matches, y: p.impact })),
+          pointBackgroundColor: sc30.map(p => roleColor(p.role)),
+          pointRadius: 5,
+        }],
+      }, options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label(ctx) {
+                const p = sc30[ctx.dataIndex];
+                return p ? (p.name + ': ' + p.impact + ' pts · ' + p.matches + ' mat') : '';
+              },
+            },
+          },
+        },
+        scales: {
+          x: { title: { display: true, text: 'Matches', font: { size: 11 } }, grid: { color: '#E2E6EA' }, ticks: { font: { size: 10 } } },
+          y: { title: { display: true, text: 'Impact (MVP)', font: { size: 11 } }, grid: { color: '#E2E6EA' }, ticks: { font: { size: 10 } } },
+        },
+      } }));
+    }
   }, 100);
 }
 
