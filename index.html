@@ -1002,6 +1002,7 @@ function getT20Competitions() {
 
 function unionSeasonsForCodes(codes) {
   const s = new Set();
+  if (!index || !index.competitions) return [];
   (codes || []).forEach(code => {
     const c = index.competitions.find(x => x.code === code);
     if (c && c.seasons) c.seasons.forEach(x => s.add(x));
@@ -1044,7 +1045,7 @@ function renderTournamentFilters() {
   wrap.innerHTML = comps.map(c => `
     <label class="filter-chip">
       <input type="checkbox" value="${c.code}" ${selectedTournamentCodes.includes(c.code) ? 'checked' : ''} onchange="onTournamentFilterChange()">
-      <span>${c.name}</span>
+      <span>${t20EscapeHtml(c.name)}</span>
     </label>`).join('');
   updateTournamentSummaryText();
 }
@@ -1116,6 +1117,9 @@ function clearTournamentSelection() {
   populateSeasons(unionSeasonsForCodes(selectedTournamentCodes));
   activeSeason = 'all';
   document.getElementById('season-select').value = 'all';
+  yearFrom = yearTo = null;
+  document.getElementById('year-from').value = '';
+  document.getElementById('year-to').value = '';
   updateSeasonBanner();
   syncIndexFiltersToURL();
   refreshDashboard();
@@ -1577,7 +1581,7 @@ function renderMVP(d, target) {
   const rows = players.map((p,i) => `<tr>
     <td style="padding:10px 18px">
       <span class="rank ${i<3?'top3':''}">${i+1}</span>
-      <a href="${playerHref(p.name)}" class="pname" style="text-decoration:none;color:var(--text);font-weight:500">${p.name}</a>
+      <a href="${playerHref(p.name)}" class="pname" style="text-decoration:none;color:var(--text);font-weight:500">${t20EscapeHtml(p.name)}</a>
     </td>
     <td style="padding:10px 18px"><span class="role-pill" style="font-size:10px;padding:2px 8px;border-radius:3px;background:${roleColor(p.role)}20;color:${roleColor(p.role)};font-weight:600">${p.role}</span></td>
     <td style="padding:10px 18px;text-align:right">${p.matches}</td>
@@ -1602,7 +1606,7 @@ function renderMVP(d, target) {
   const seasonPts = leader ? mvpImpactBySeasonForPlayer(leader.name) : [];
   const seasonChartBlock = seasonPts.length
     ? `<div class="chart-card" style="width:100%;max-width:100%;box-sizing:border-box;padding:14px 16px">
-        <h3 style="font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:10px">#1 MVP by season — ${leader.name}</h3>
+        <h3 style="font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:10px">#1 MVP by season — ${t20EscapeHtml(leader.name)}</h3>
         <div style="position:relative;height:220px;width:100%"><canvas id="mvp-season-chart"></canvas></div>
       </div>`
     : `<div class="chart-card" style="padding:20px;color:var(--muted);font-size:13px;line-height:1.55;width:100%;box-sizing:border-box">
@@ -1854,7 +1858,7 @@ function renderTable(target, type, rows, cols, defaultSort, filterQ, showAllRows
   const trs = visRows.map((r, i) => {
     const rank = showAll ? i+1 : sorted.indexOf(r)+1;
     return `<tr>
-      <td><span class="rank ${rank<=3?'top3':''}">${rank}</span> <a href="${playerHref(r.name)}" class="pname" style="text-decoration:none;color:var(--text);font-weight:500">${r.name}</a></td>
+      <td><span class="rank ${rank<=3?'top3':''}">${rank}</span> <a href="${playerHref(r.name)}" class="pname" style="text-decoration:none;color:var(--text);font-weight:500">${t20EscapeHtml(r.name)}</a></td>
       ${cols.map(col => `<td class="${col.hi?'hi':''}">${r[col.k] ?? '—'}</td>`).join('')}
     </tr>`;
   }).join('');
@@ -1930,7 +1934,7 @@ function renderSixes(d, target) {
       <div class="six-num ${i<3?'top3':''}">${i+1}</div>
       <div>
         <div class="six-count">${p.sixes}</div>
-        <div class="six-name">${p.name}</div>
+        <div class="six-name">${t20EscapeHtml(p.name)}</div>
         <div class="six-sub">${p.matches} matches</div>
       </div>
     </div>`).join('');
@@ -1978,7 +1982,7 @@ function renderTeams(d, target) {
   });
   const trs = withHonors.map((t,i) => `
     <tr>
-      <td><span class="rank ${i<3?'top3':''}">${i+1}</span> <a class="pname" href="${teamHref(t.team)}" style="text-decoration:none;color:var(--text);font-weight:500">${t.team}</a></td>
+      <td><span class="rank ${i<3?'top3':''}">${i+1}</span> <a class="pname" href="${teamHref(t.team)}" style="text-decoration:none;color:var(--text);font-weight:500">${t20EscapeHtml(t.team)}</a></td>
       <td>${t.matches}</td>
       <td class="hi">${t.wins}</td>
       <td>${t.win_pct}%</td>
@@ -2070,12 +2074,12 @@ function searchPlayer(query) {
 
   document.getElementById('player-results').innerHTML = Object.entries(found).map(([name, comps]) => `
     <div class="player-result-card animate">
-      <h3>${name}</h3>
+      <h3>${t20EscapeHtml(name)}</h3>
       <a href="${playerHref(name)}" style="display:inline-block;margin-bottom:12px;background:var(--blue);color:#fff;font-size:12px;font-weight:500;padding:6px 14px;border-radius:6px;text-decoration:none">View Full Profile →</a>
       <div class="player-comps">
         ${comps.map(c => `
           <div class="player-comp-row">
-            <div class="player-comp-name">${c.comp}</div>
+            <div class="player-comp-name">${t20EscapeHtml(c.comp)}</div>
             <div class="player-comp-stats">
               ${c.batting  ? `<span>Runs <strong>${c.batting.runs}</strong></span><span>SR <strong>${c.batting.sr}</strong></span>` : ''}
               ${c.bowling  ? `<span>Wkts <strong>${c.bowling.wickets}</strong></span><span>Econ <strong>${c.bowling.economy}</strong></span>` : ''}

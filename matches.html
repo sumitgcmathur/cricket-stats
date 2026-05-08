@@ -168,6 +168,8 @@ let selectedTournamentCodes=[];
 let activeSeason='all';
 let yearFrom=null,yearTo=null;
 let charts=[];
+/** True when every selected competition failed to load stats/matches/<code>/index.json (HTTP or network). */
+let matchesIndexLoadFailedAll=false;
 let currentScorecardComp='ipl';
 
 function matchesPlayerHref(name){
@@ -188,7 +190,7 @@ function renderMatchesFilterChips(){
   wrap.innerHTML=COMPS.map(c=>`
     <label class="filter-chip">
       <input type="checkbox" value="${c.code}" ${selectedTournamentCodes.includes(c.code)?'checked':''} onchange="onMatchesTournamentChange()">
-      <span>${c.name}</span>
+      <span>${typeof t20EscapeHtml==='function'?t20EscapeHtml(c.name):c.name}</span>
     </label>`).join('');
 }
 
@@ -212,14 +214,17 @@ function applyMatchesToolbarFilter(){
 
 async function loadMergedMatchIndices(){
   mergedMatchesRaw=[];
+  let okCount=0;
   for(const code of selectedTournamentCodes){
     try{
       const r=await fetch('stats/matches/'+code+'/index.json');
       if(!r.ok)continue;
+      okCount++;
       const j=await r.json();
       (j.matches||[]).forEach(m=>{mergedMatchesRaw.push(Object.assign({},m,{_comp:code}));});
     }catch(e){}
   }
+  matchesIndexLoadFailedAll=selectedTournamentCodes.length>0&&okCount===0;
   applyMatchesToolbarFilter();
 }
 
@@ -261,6 +266,9 @@ function matchesClearTournaments(){
   fillMatchesSeasonSelect();
   activeSeason='all';
   document.getElementById('matches-season-select').value='all';
+  yearFrom=yearTo=null;
+  document.getElementById('matches-year-from').value='';
+  document.getElementById('matches-year-to').value='';
   loadMergedMatchIndices().then(()=>{
     t20WriteFilterParams({codes:selectedTournamentCodes,activeSeason,yearFrom,yearTo});
     renderList();
@@ -352,7 +360,11 @@ function renderList(){
 
   if(!f.length){
     if(!wrap.innerHTML.trim()){
-      wrap.innerHTML='<div class="empty-msg">No matches found</div>';
+      const esc=typeof t20EscapeHtml==='function'?t20EscapeHtml:function(s){return String(s||'');};
+      const loadErr=matchesIndexLoadFailedAll&&mergedMatchesRaw.length===0;
+      wrap.innerHTML='<div class="empty-msg">'+(loadErr
+        ? esc('Could not load match index files (stats/matches/<league>/index.json). Run python fetch_all_cricket.py or check your deployment includes match indices.')
+        : 'No matches found')+'</div>';
     }else{
       const d=document.createElement('div');
       d.className='empty-msg';
@@ -381,7 +393,8 @@ function renderList(){
 
     const left=document.createElement('div');
     const teams=document.createElement('div');teams.className='match-teams';
-    teams.innerHTML = `<a class="tlink" href="${matchesTeamHref(t1)}" onclick="event.stopPropagation()">${t1}</a> vs <a class="tlink" href="${matchesTeamHref(t2)}" onclick="event.stopPropagation()">${t2}</a>`;
+    const esc=typeof t20EscapeHtml==='function'?t20EscapeHtml:function(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');};
+    teams.innerHTML = `<a class="tlink" href="${matchesTeamHref(t1)}" onclick="event.stopPropagation()">${esc(t1)}</a> vs <a class="tlink" href="${matchesTeamHref(t2)}" onclick="event.stopPropagation()">${esc(t2)}</a>`;
     const scores=document.createElement('div');scores.className='match-scores';scores.textContent=s1+(s2?' | '+s2:'');
     const meta=document.createElement('div');meta.className='match-meta';
 

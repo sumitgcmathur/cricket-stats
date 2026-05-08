@@ -188,6 +188,10 @@ let activeSeason='all';
 let yearFrom=null,yearTo=null;
 let activePlayerTab='career';
 
+function escHtml(s){
+  return typeof t20EscapeHtml==='function'?t20EscapeHtml(s):String(s==null?'':s);
+}
+
 function visibleComps(){
   return COMPS.filter(c=>selectedTournamentCodes.includes(c.code));
 }
@@ -198,7 +202,7 @@ function renderPlayerFilterChips(){
   wrap.innerHTML=COMPS.map(c=>`
     <label class="filter-chip">
       <input type="checkbox" value="${c.code}" ${selectedTournamentCodes.includes(c.code)?'checked':''} onchange="onPlayerTournamentChange()">
-      <span>${c.name}</span>
+      <span>${escHtml(c.name)}</span>
     </label>`).join('');
 }
 
@@ -256,6 +260,9 @@ function playerClearTournaments(){
   fillPlayerSeasonOptions(t20UnionSeasonsForCodes(championshipIndex,selectedTournamentCodes));
   activeSeason='all';
   document.getElementById('player-season-select').value='all';
+  yearFrom=yearTo=null;
+  document.getElementById('player-year-from').value='';
+  document.getElementById('player-year-to').value='';
   Promise.all(selectedTournamentCodes.map(loadCompRaw)).then(()=>{
     applyPlayerFilters();
     t20WriteFilterParams({codes:selectedTournamentCodes,activeSeason,yearFrom,yearTo},{name:playerName});
@@ -797,7 +804,7 @@ function buildHeroRankLine(name){
   if (rw && rw.total) parts.push(`Wickets <strong>#${rw.rank}</strong> / ${rw.total}`);
   if (ri && ri.total) parts.push(`MVP impact <strong>#${ri.rank}</strong> / ${ri.total}`);
   const sp = srPercentileAmongComp();
-  if (sp) parts.push(`SR ~<strong>${sp.pct}th</strong> pct in ${sp.comp} (≥5 mat)`);
+  if (sp) parts.push(`SR ~<strong>${sp.pct}th</strong> pct in ${escHtml(sp.comp)} (≥5 mat)`);
   if (!parts.length) return '';
   return '<strong>Leaderboard (this filter)</strong> · ' + parts.join(' · ');
 }
@@ -853,7 +860,7 @@ function renderHero(){
     }
   });
   if(tags.length>6) tags.length=6;
-  document.getElementById('hero-tags').innerHTML=tags.map(t=>`<span class="player-tag">${t}</span>`).join('');
+  document.getElementById('hero-tags').innerHTML=tags.map(t=>`<span class="player-tag">${escHtml(t)}</span>`).join('');
 
   const kpis=[];
   if(bat){
@@ -921,7 +928,7 @@ function renderBatting(containerId){
     <div class="stat-cards">
       ${rows.map(r=>`
         <div class="stat-card">
-          <div class="sc-label">${r.comp.name} Runs</div>
+          <div class="sc-label">${escHtml(r.comp.name)} Runs</div>
           <div class="sc-val">${r.bat.runs.toLocaleString()}</div>
           <div class="sc-sub">${r.bat.matches} matches · avg ${r.bat.avg}</div>
         </div>`).join('')}
@@ -941,7 +948,7 @@ function renderBatting(containerId){
       </div>
       ${milestoneBat?`
       <div class="chart-card">
-        <h3>Milestones (${milestoneBat.comp.name})</h3>
+        <h3>Milestones (${escHtml(milestoneBat.comp.name)})</h3>
         <div class="chart-wrap"><canvas id="ch-bat-milestones"></canvas></div>
       </div>`:''}
       ${showSeasonMerge?`
@@ -960,7 +967,7 @@ function renderBatting(containerId){
   html+=`<div class="card"><div class="card-title">Career Batting Stats</div>
     <table><thead><tr><th>Competition</th><th title="Matches in official squad list (Cricsheet)">Mat</th><th>Runs</th><th>Avg</th><th>SR</th><th>4s</th><th>6s</th><th>50s</th><th>100s</th></tr></thead>
     <tbody>${rows.map(r=>`<tr>
-      <td>${r.comp.name} <span style="font-size:10px;color:var(--muted)">(${r.comp.format})</span></td>
+      <td>${escHtml(r.comp.name)} <span style="font-size:10px;color:var(--muted)">(${escHtml(r.comp.format)})</span></td>
       <td>${r.bat.matches}</td><td class="hi">${r.bat.runs.toLocaleString()}</td>
       <td>${r.bat.avg}</td><td>${r.bat.sr}</td>
       <td>${r.bat.fours||'—'}</td><td>${r.bat.sixes||'—'}</td>
@@ -1045,7 +1052,7 @@ function renderBowling(containerId){
   let html=`
     <div class="stat-cards">
       ${rows.map(r=>`<div class="stat-card">
-        <div class="sc-label">${r.comp.name} Wickets</div>
+        <div class="sc-label">${escHtml(r.comp.name)} Wickets</div>
         <div class="sc-val">${r.bowl.wickets}</div>
         <div class="sc-sub">${r.bowl.matches} matches · econ ${r.bowl.economy}</div>
       </div>`).join('')}
@@ -1064,7 +1071,7 @@ function renderBowling(containerId){
   html+=`<div class="card"><div class="card-title">Career Bowling Stats</div>
     <table><thead><tr><th>Competition</th><th title="Matches in official squad list (Cricsheet)">Mat</th><th>Wkts</th><th>Avg</th><th>Econ</th><th>Overs</th><th>Runs</th></tr></thead>
     <tbody>${rows.map(r=>`<tr>
-      <td>${r.comp.name} <span style="font-size:10px;color:var(--muted)">(${r.comp.format})</span></td>
+      <td>${escHtml(r.comp.name)} <span style="font-size:10px;color:var(--muted)">(${escHtml(r.comp.format)})</span></td>
       <td>${r.bowl.matches}</td><td class="hi">${r.bowl.wickets}</td>
       <td>${r.bowl.avg||'—'}</td><td>${r.bowl.economy}</td>
       <td>${r.bowl.overs}</td><td>${r.bowl.runs.toLocaleString()}</td>
@@ -1118,8 +1125,8 @@ function renderOverview(){
   html+=`<div class="card"><div class="card-title">All-Format Summary</div>
     <table><thead><tr><th>Competition</th><th>Format</th><th title="Official squad appearances (Cricsheet)">Mat</th><th>Runs</th><th>Bat Avg</th><th>SR</th><th>Wkts</th><th>Economy</th></tr></thead>
     <tbody>${batRows.map(r=>`<tr>
-      <td>${r.comp.name}</td>
-      <td><span style="font-size:10px;padding:2px 6px;border-radius:3px;background:var(--blue-light);color:var(--blue);font-weight:600">${r.comp.format}</span></td>
+      <td>${escHtml(r.comp.name)}</td>
+      <td><span style="font-size:10px;padding:2px 6px;border-radius:3px;background:var(--blue-light);color:var(--blue);font-weight:600">${escHtml(r.comp.format)}</span></td>
       <td>${r.bat?.matches ?? r.bowl?.matches ?? '—'}</td>
       <td class="hi">${r.bat?.runs?.toLocaleString()||'—'}</td>
       <td>${r.bat?.avg||'—'}</td>
@@ -1175,7 +1182,7 @@ function renderMatchups(){
   let html='';
   blocks.forEach((blk,i)=>{
     html+=`<div class="matchup-comp-block" style="margin-bottom:36px;padding-bottom:8px;border-bottom:1px solid var(--border)">`;
-    html+=`<div class="section-title" style="margin-top:${i?24:0}">${blk.compName}</div>`;
+    html+=`<div class="section-title" style="margin-top:${i?24:0}">${escHtml(blk.compName)}</div>`;
     if(blk.batP?.phase_stats&&Object.keys(blk.batP.phase_stats).length){
       const ps=blk.batP.phase_stats;
       html+=`<div class="section-title" style="font-size:12px;margin-top:12px">🏏 Batting by phase</div>

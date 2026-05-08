@@ -10,6 +10,17 @@
 
   var T20_INDEX_CACHE = null;
 
+  /** Escape text for safe insertion into HTML (stats names, team labels, etc.). */
+  function t20EscapeHtml(s) {
+    if (s == null) return '';
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
   function t20FetchIndex() {
     if (T20_INDEX_CACHE) return Promise.resolve(T20_INDEX_CACHE);
     return fetch('stats/index.json')
@@ -221,7 +232,8 @@
             dismissals: 0,
           }
         );
-        if (!agg.runs) return null;
+        /* Keep row if any batting activity in window (e.g. 0 runs but balls faced). */
+        if (!agg.matches && !agg.balls && !agg.runs) return null;
         return Object.assign({}, p, {
           matches: agg.matches,
           runs: agg.runs,
@@ -377,5 +389,6 @@
   g.t20FilterBySeason = t20FilterBySeason;
   g.t20MatchPassesFilters = t20MatchPassesFilters;
   g.t20DefaultFilterCodes = t20DefaultFilterCodes;
+  g.t20EscapeHtml = t20EscapeHtml;
   g.FOCUS_MENS_T20_CODES = FOCUS_MENS_T20_CODES;
 })(typeof window !== 'undefined' ? window : globalThis);

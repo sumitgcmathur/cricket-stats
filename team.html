@@ -121,7 +121,7 @@ function renderTeamFilterChips(){
   wrap.innerHTML=COMPS.map(c=>`
     <label class="filter-chip">
       <input type="checkbox" value="${c.code}" ${selectedTournamentCodes.includes(c.code)?'checked':''} onchange="onTeamTournamentChange()">
-      <span>${c.name}</span>
+      <span>${typeof t20EscapeHtml==='function'?t20EscapeHtml(c.name):c.name}</span>
     </label>`).join('');
 }
 
@@ -221,6 +221,9 @@ function teamClearTournaments(){
   fillTeamSeasonSelect();
   activeSeason='all';
   document.getElementById('team-season-select').value='all';
+  yearFrom=yearTo=null;
+  document.getElementById('team-year-from').value='';
+  document.getElementById('team-year-to').value='';
   loadAllMatchIndices().then(()=>{
     buildTeamDropdown();
     t20WriteFilterParams({codes:selectedTournamentCodes,activeSeason,yearFrom,yearTo},{team:document.getElementById('team-sel').value||''});

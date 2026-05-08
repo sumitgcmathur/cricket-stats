@@ -1,0 +1,105 @@
+'use strict';
+
+const { test, expect } = require('@playwright/test');
+
+/**
+ * Collect hard failures (uncaught exceptions). Console errors from third-party
+ * CDNs are ignored when they are network-only (fonts / chart).
+ */
+function attachSoftErrorListeners(page, bucket) {
+  page.on('pageerror', (err) => {
+    bucket.push(`pageerror: ${err.message}`);
+  });
+  page.on('console', (msg) => {
+    if (msg.type() !== 'error') return;
+    const t = msg.text();
+    if (/fonts\.googleapis|googleapis\.com\/css|ERR_ABORTED|Failed to load resource/i.test(t)) return;
+    bucket.push(`console: ${t}`);
+  });
+}
+
+test.describe('post-deploy smoke', () => {
+  test('home loads and shared filters script exposes t20EscapeHtml', async ({ page }) => {
+    const errors = [];
+    attachSoftErrorListeners(page, errors);
+
+    await page.goto('/index.html');
+    await expect(page.locator('.logo')).toContainText('T20');
+    const hasEsc = await page.evaluate(() => typeof window.t20EscapeHtml === 'function');
+    expect(hasEsc, 't20-filters must export t20EscapeHtml').toBe(true);
+    expect(errors, errors.join('\n')).toEqual([]);
+  });
+
+  test('index: IPL only clears year range inputs', async ({ page }) => {
+    const errors = [];
+    attachSoftErrorListeners(page, errors);
+
+    await page.goto('/index.html');
+    await page.waitForFunction(() => {
+      const d = document.getElementById('dash-content');
+      if (!d) return false;
+      const t = d.textContent || '';
+      return !t.includes('Processing') && !t.includes('Could not load data');
+    }, { timeout: 120_000 });
+
+    await page.locator('#year-from').fill('2019');
+    await page.locator('#year-to').fill('2024');
+    await page.getByRole('button', { name: 'IPL only' }).click();
+
+    await expect(page.locator('#year-from')).toHaveValue('');
+    await expect(page.locator('#year-to')).toHaveValue('');
+    expect(errors, errors.join('\n')).toEqual([]);
+  });
+
+  test('matches: IPL only clears year range', async ({ page }) => {
+    const errors = [];
+    attachSoftErrorListeners(page, errors);
+
+    await page.goto('/matches.html');
+    await page.waitForSelector('#matches-filter-tournaments input', { state: 'attached' });
+
+    await page.locator('#matches-year-from').fill('2018');
+    await page.locator('#matches-year-to').fill('2023');
+    await page.getByRole('button', { name: 'IPL only' }).click();
+
+    await expect(page.locator('#matches-year-from')).toHaveValue('');
+    await expect(page.locator('#matches-year-to')).toHaveValue('');
+    expect(errors, errors.join('\n')).toEqual([]);
+  });
+
+  test('team: IPL only clears year range', async ({ page }) => {
+    const errors = [];
+    attachSoftErrorListeners(page, errors);
+
+    await page.goto('/team.html');
+    await page.waitForSelector('#team-sel option:nth-child(2)', { timeout: 60_000 });
+
+    await page.locator('#team-year-from').fill('2017');
+    await page.locator('#team-year-to').fill('2022');
+    await page.getByRole('button', { name: 'IPL only' }).click();
+
+    await expect(page.locator('#team-year-from')).toHaveValue('');
+    await expect(page.locator('#team-year-to')).toHaveValue('');
+    expect(errors, errors.join('\n')).toEqual([]);
+  });
+
+  test('player profile loads for sample IPL batter', async ({ page }) => {
+    const errors = [];
+    attachSoftErrorListeners(page, errors);
+
+    const name = 'V Kohli';
+    await page.goto(`/player.html?name=${encodeURIComponent(name)}`);
+    await expect(page.locator('#hero-name')).toContainText(name, { timeout: 60_000 });
+    await page.getByRole('button', { name: 'IPL only' }).click();
+    await expect(page.locator('#player-year-from')).toHaveValue('');
+    await expect(page.locator('#player-year-to')).toHaveValue('');
+    expect(errors, errors.join('\n')).toEqual([]);
+  });
+
+  test('stats index.json is reachable', async ({ request, baseURL }) => {
+    const res = await request.get(new URL('/stats/index.json', baseURL).toString());
+    expect(res.ok()).toBeTruthy();
+    const j = await res.json();
+    expect(Array.isArray(j.competitions)).toBeTruthy();
+  });
+});
