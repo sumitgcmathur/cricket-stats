@@ -1087,6 +1087,33 @@ function mergeBattingLists(lists) {
   }).filter(p => p.runs > 0).sort((a, b) => b.runs - a.runs);
 }
 
+/** Cricket overs as float (e.g. 683.1 = 683 overs + 1 ball) → legal balls bowled. */
+function oversNotationToBalls(overs) {
+  if (overs == null || overs === '') return 0;
+  const o = +overs;
+  if (!Number.isFinite(o) || o < 0) return 0;
+  const whole = Math.floor(o + 1e-9);
+  const frac = +(o - whole).toFixed(3);
+  const partial = Math.min(5, Math.max(0, Math.round(frac * 10 + 1e-9)));
+  return whole * 6 + partial;
+}
+
+function bowlingBallsFromRow(p) {
+  const b = +p.balls;
+  if (Number.isFinite(b) && b > 0) return b;
+  const fromOvers = oversNotationToBalls(p.overs);
+  if (fromOvers > 0) return fromOvers;
+  if (p.by_season && typeof p.by_season === 'object') {
+    let s = 0;
+    for (const v of Object.values(p.by_season)) {
+      const bb = v && +v.balls;
+      if (Number.isFinite(bb)) s += bb;
+    }
+    return s;
+  }
+  return 0;
+}
+
 function mergeBowlingLists(lists) {
   const m = {};
   lists.forEach(list => {
@@ -1096,7 +1123,7 @@ function mergeBowlingLists(lists) {
       x.matches += +p.matches || 0;
       x.wickets += +p.wickets || 0;
       x.runs += +p.runs || 0;
-      x.balls += +p.balls || 0;
+      x.balls += bowlingBallsFromRow(p);
       x.mvp_pts = +((parseFloat(x.mvp_pts) || 0) + (parseFloat(p.mvp_pts) || 0)).toFixed(1);
     });
   });
