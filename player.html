@@ -412,49 +412,275 @@ function showInitials(){
   document.getElementById('player-initials').textContent = initials.toUpperCase();
 }
 
-async function loadPhoto(name){
-  // Show initials first as placeholder
-  showInitials();
+/** Browser cache for resolved photo URLs (local JSON, Wikipedia, Wikidata→Commons). */
+const PLAYER_PHOTO_CACHE_KEY = 't20_player_photo_v2';
+const PLAYER_PHOTO_POS_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const PLAYER_PHOTO_NEG_TTL_MS = 6 * 60 * 60 * 1000;
 
-  // Build name variants to try
-  const parts = name.trim().split(' ');
-  const attempts = [
-    name.replace(/ /g,'_'),
-    parts[parts.length-1]+'_'+parts[0],  // surname_firstname
-    name.replace(/ /g,'_')+'_(cricketer)',
-    name.replace(/ /g,'_')+'_(Indian_cricketer)',
-    parts[parts.length-1],  // just surname
-  ];
-  for(const query of attempts){
+function normalizeWikiImgSrc(src){
+  let s = src;
+  if(s.startsWith('//')) s = 'https:' + s;
+  else if(/^http:\/\//i.test(s)) s = 'https://' + s.slice(7);
+  return s;
+}
+
+function readPlayerPhotoCache(){
+  try{
+    const raw = localStorage.getItem(PLAYER_PHOTO_CACHE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  }catch(e){ return {}; }
+}
+
+function writePlayerPhotoCacheEntry(key, payload){
+  try{
+    const o = readPlayerPhotoCache();
+    o[key] = payload;
+    localStorage.setItem(PLAYER_PHOTO_CACHE_KEY, JSON.stringify(o));
+  }catch(e){ /* quota / private mode */ }
+}
+
+let localPhotoOverridesPromise = null;
+
+/** Optional stats/player_photos.json: { "Player Name": "https://..." } — URLs you are allowed to serve. */
+async function getLocalPhotoOverrides(){
+  if(localPhotoOverridesPromise) return localPhotoOverridesPromise;
+  localPhotoOverridesPromise = fetch('stats/player_photos.json')
+    .then(r => (r.ok ? r.json() : {}))
+    .catch(() => ({}));
+  return localPhotoOverridesPromise;
+}
+
+function photoUrlFromLocalOverrides(map, displayName){
+  if(!map || typeof map !== 'object') return null;
+  const want = String(displayName).trim().toLowerCase();
+  if(!want) return null;
+  const exact = map[displayName.trim()];
+  if(typeof exact === 'string' && /^https?:\/\//i.test(exact)) return exact;
+  for(const [k, v] of Object.entries(map)){
+    if(typeof v !== 'string' || !/^https?:\/\//i.test(v)) continue;
+    if(String(k).trim().toLowerCase() === want) return v;
+  }
+  return null;
+}
+
+const WD_CRICKETER_Q = 'Q122998';
+
+function wikidataP18Filename(claims){
+  const p18 = claims?.P18;
+  if(!p18 || !p18.length) return null;
+  for(const stmt of p18){
+    const sn = stmt?.mainsnak;
+    if(sn?.snaktype !== 'value') continue;
+    const dv = sn.datavalue;
+    if(dv?.type === 'string' && dv.value) return dv.value;
+    if(dv?.type === 'commonsMedia' && dv.value) return dv.value;
+  }
+  return null;
+}
+
+function wikidataIsCricketer(claims){
+  const p106 = claims?.P106;
+  if(!p106) return false;
+  for(const stmt of p106){
+    const id = stmt?.mainsnak?.datavalue?.value?.id;
+    if(id === WD_CRICKETER_Q) return true;
+  }
+  return false;
+}
+
+async function commonsThumbFromFilename(commonsFileName){
+  const fn = String(commonsFileName).replace(/^File:/i, '').trim();
+  if(!fn) return null;
+  const title = 'File:' + fn;
+  const api = 'https://commons.wikimedia.org/w/api.php?action=query&titles=' +
+    encodeURIComponent(title) +
+    '&prop=imageinfo&iiprop=url|thumburl&iiurlwidth=320&format=json&origin=*';
+  const r = await fetch(api);
+  if(!r.ok) return null;
+  const d = await r.json();
+  const page = Object.values(d.query?.pages || {})[0];
+  if(!page || page.missing != null) return null;
+  const ii = page.imageinfo && page.imageinfo[0];
+  const u = ii?.thumburl || ii?.url;
+  return u ? normalizeWikiImgSrc(u) : null;
+}
+
+/** Wikidata (P18) + Wikimedia Commons thumbnail; prefer items with occupation cricketer. */
+async function wikidataPhotoForPlayer(displayName){
+  const key = displayName.trim();
+  const parts = key.split(/\s+/).filter(Boolean);
+  const searches = [
+    key + ' cricketer',
+    parts.length >= 2 ? parts[parts.length - 1] + ' ' + parts.slice(0, -1).join(' ') + ' cricketer' : null,
+    key,
+  ].filter(Boolean);
+
+  const tried = new Set();
+  for(const q of searches){
+    const api = 'https://www.wikidata.org/w/api.php?action=wbsearchentities&search=' +
+      encodeURIComponent(q) + '&language=en&type=item&format=json&origin=*&limit=12';
+    let r;
+    try{ r = await fetch(api); }catch(e){ continue; }
+    if(!r.ok) continue;
+    let d;
+    try{ d = await r.json(); }catch(e){ continue; }
+    const hits = d.search || [];
+    const ids = [];
+    for(const h of hits){
+      if(!h?.id || tried.has(h.id)) continue;
+      const desc = (h.description || '').toLowerCase();
+      if(desc && !/cricket/.test(desc) && /cricketer/i.test(q)) continue;
+      tried.add(h.id);
+      ids.push(h.id);
+      if(ids.length >= 8) break;
+    }
+    if(!ids.length) continue;
+
+    const entUrl = 'https://www.wikidata.org/w/api.php?action=wbgetentities&ids=' +
+      ids.join('|') + '&props=claims&format=json&origin=*';
+    let er;
+    try{ er = await fetch(entUrl); }catch(e){ continue; }
+    if(!er.ok) continue;
+    let ed;
+    try{ ed = await er.json(); }catch(e){ continue; }
+    const entities = ed.entities || {};
+    const withP18 = [];
+    for(const id of ids){
+      const ent = entities[id];
+      const claims = ent?.claims;
+      if(!claims) continue;
+      const fn = wikidataP18Filename(claims);
+      if(!fn) continue;
+      withP18.push({ fn, cricket: wikidataIsCricketer(claims) });
+    }
+    withP18.sort((a, b) => (b.cricket ? 1 : 0) - (a.cricket ? 1 : 0));
+    for(const row of withP18){
+      const src = await commonsThumbFromFilename(row.fn);
+      if(src) return src;
+    }
+  }
+  return null;
+}
+
+/** Thumbnail URL for an exact article title, or null (skips disambiguation pages). */
+async function wikiThumbnailForTitle(title){
+  const api = 'https://en.wikipedia.org/w/api.php?action=query&titles=' +
+    encodeURIComponent(title) +
+    '&prop=pageimages|pageprops&ppprop=disambiguation&format=json&pithumbsize=300&redirects=1&origin=*';
+  const r = await fetch(api);
+  if(!r.ok) return null;
+  const d = await r.json();
+  const page = Object.values(d.query?.pages || {})[0];
+  if(!page || page.missing != null) return null;
+  if(page.pageprops && Object.prototype.hasOwnProperty.call(page.pageprops, 'disambiguation')) return null;
+  const src = page.thumbnail?.source;
+  return src ? normalizeWikiImgSrc(src) : null;
+}
+
+async function wikiSearchArticleTitles(query, limit){
+  const api = 'https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=' +
+    encodeURIComponent(query) + '&srlimit=' + limit + '&srnamespace=0&format=json&origin=*';
+  const r = await fetch(api);
+  if(!r.ok) return [];
+  const d = await r.json();
+  return (d.query?.search || []).map(x => x.title).filter(Boolean);
+}
+
+function applyPlayerPhotoFromUrl(src, debugLabel){
+  const img = document.getElementById('player-photo');
+  const initialsEl = document.getElementById('player-initials');
+  img.removeAttribute('src');
+  img.onload = () => {
+    img.style.display = 'block';
+    initialsEl.style.display = 'none';
+  };
+  img.onerror = () => {
+    img.style.display = 'none';
+    showInitials();
+    initialsEl.style.display = '';
+  };
+  img.referrerPolicy = 'no-referrer';
+  img.src = src;
+  if(debugLabel) console.log('Photo candidate', debugLabel, src);
+}
+
+async function loadPhoto(name){
+  showInitials();
+  const key = name.trim();
+  const now = Date.now();
+  const cached = readPlayerPhotoCache()[key];
+  if(cached){
+    if(cached.u && cached.exp > now){
+      applyPlayerPhotoFromUrl(cached.u, '(cache)');
+      return;
+    }
+    if(cached.u === false && cached.exp > now) return;
+  }
+
+  try{
+    const overrides = await getLocalPhotoOverrides();
+    const localUrl = photoUrlFromLocalOverrides(overrides, key);
+    if(localUrl){
+      writePlayerPhotoCacheEntry(key, { u: localUrl, exp: now + PLAYER_PHOTO_POS_TTL_MS });
+      applyPlayerPhotoFromUrl(localUrl, 'stats/player_photos.json');
+      return;
+    }
+  }catch(e){ /* ignore */ }
+
+  const parts = key.split(/\s+/).filter(Boolean);
+  const titleAttempts = [];
+  const add = t => { const s = String(t).trim(); if(s && !titleAttempts.includes(s)) titleAttempts.push(s); };
+  add(key);
+  add(key.replace(/ /g, '_'));
+  if(parts.length >= 2){
+    add(parts[parts.length - 1] + '_' + parts[0]);
+    add(parts[parts.length - 1] + ', ' + parts[0]);
+  }
+  add(key + ' (cricketer)');
+  add(key + ' (Indian cricketer)');
+  if(parts.length) add(parts[parts.length - 1]);
+
+  for(const title of titleAttempts){
     try{
-      // Use action API with origin=* for CORS support
-      const url = 'https://en.wikipedia.org/w/api.php?action=query&titles='+
-        encodeURIComponent(query.replace(/_/g,' '))+
-        '&prop=pageimages&format=json&pithumbsize=300&origin=*';
-      const r = await fetch(url);
-      if(!r.ok) continue;
-      const d = await r.json();
-      const pages = d.query?.pages;
-      if(!pages) continue;
-      const page = Object.values(pages)[0];
-      if(page.missing !== undefined) continue; // page not found
-      if(page.thumbnail?.source){
-        const img = document.getElementById('player-photo');
-        let src=page.thumbnail.source;
-        if(src.startsWith('//'))src='https:'+src;
-        else if(/^http:\/\//i.test(src))src='https://'+src.slice(7);
-        img.referrerPolicy='no-referrer';
-        img.onload = () => {
-          img.style.display='block';
-          document.getElementById('player-initials').style.display='none';
-        };
-        img.onerror = () => { img.style.display='none';showInitials(); };
-        img.src = src;
-        console.log('Photo loaded for', name, 'via', query);
+      const src = await wikiThumbnailForTitle(title.replace(/_/g, ' '));
+      if(src){
+        writePlayerPhotoCacheEntry(key, { u: src, exp: now + PLAYER_PHOTO_POS_TTL_MS });
+        applyPlayerPhotoFromUrl(src, title);
         return;
       }
-    }catch(e){ continue; }
+    }catch(e){ /* network */ }
   }
+
+  const searchQueries = [
+    key + ' cricketer',
+    parts.length >= 2 ? parts[parts.length - 1] + ' ' + parts.slice(0, -1).join(' ') + ' cricketer' : null,
+  ].filter(Boolean);
+
+  for(const q of searchQueries){
+    try{
+      const titles = await wikiSearchArticleTitles(q, 8);
+      for(const t of titles){
+        if(/disambiguation/i.test(t)) continue;
+        const src = await wikiThumbnailForTitle(t);
+        if(src){
+          writePlayerPhotoCacheEntry(key, { u: src, exp: now + PLAYER_PHOTO_POS_TTL_MS });
+          applyPlayerPhotoFromUrl(src, 'search:' + t);
+          return;
+        }
+      }
+    }catch(e){ /* network */ }
+  }
+
+  try{
+    const wd = await wikidataPhotoForPlayer(key);
+    if(wd){
+      writePlayerPhotoCacheEntry(key, { u: wd, exp: now + PLAYER_PHOTO_POS_TTL_MS });
+      applyPlayerPhotoFromUrl(wd, 'wikidata/commons');
+      return;
+    }
+  }catch(e){ /* network */ }
+
+  writePlayerPhotoCacheEntry(key, { u: false, exp: now + PLAYER_PHOTO_NEG_TTL_MS });
   console.log('No photo found for', name);
 }
 
