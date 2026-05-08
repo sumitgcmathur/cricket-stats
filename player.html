@@ -687,6 +687,63 @@ function getPlayerBowling(code){
   return allData[code]?.bowling?.find(p=>samePlayerName(p.name,playerName))||null;
 }
 
+function dismissalsFromBatRow(b){
+  const r = +(b.runs) || 0;
+  const a = +(b.avg);
+  if (!r || !Number.isFinite(a) || a <= 0) return 0;
+  if (Math.abs(a - r) < 0.01) return 0;
+  return Math.max(1, Math.round(r / a));
+}
+
+/** Overs as 683.1 → balls (same convention as dashboard). */
+function heroBowlingBallsFromRow(p){
+  const b = +(p.balls);
+  if (Number.isFinite(b) && b > 0) return b;
+  const o = +(p.overs);
+  if (!Number.isFinite(o) || o < 0) return 0;
+  const whole = Math.floor(o + 1e-9);
+  const frac = +(o - whole).toFixed(3);
+  const partial = Math.min(5, Math.max(0, Math.round(frac * 10 + 1e-9)));
+  return whole * 6 + partial;
+}
+
+/** Sum batting across all visible comps (hero must not use only the first list). */
+function aggregateHeroBatting(){
+  let runs = 0, balls = 0, matches = 0, fours = 0, sixes = 0, fifties = 0, hundreds = 0, dismissals = 0;
+  visibleComps().forEach(c => {
+    const b = getPlayerBatting(c.code);
+    if (!b) return;
+    runs += +(b.runs) || 0;
+    balls += +(b.balls) || 0;
+    matches += +(b.matches) || 0;
+    fours += +(b.fours) || 0;
+    sixes += +(b.sixes) || 0;
+    fifties += +(b.fifties) || 0;
+    hundreds += +(b.hundreds) || 0;
+    dismissals += dismissalsFromBatRow(b);
+  });
+  if (!runs && !balls) return null;
+  const avg = dismissals > 0 ? +((runs / dismissals).toFixed(2)) : runs;
+  const sr = balls ? +((runs / balls) * 100).toFixed(2) : 0;
+  return { runs, balls, matches, fours, sixes, fifties, hundreds, avg, sr };
+}
+
+function aggregateHeroBowling(){
+  let wickets = 0, runsConc = 0, balls = 0, matches = 0;
+  visibleComps().forEach(c => {
+    const w = getPlayerBowling(c.code);
+    if (!w) return;
+    wickets += +(w.wickets) || 0;
+    runsConc += +(w.runs) || 0;
+    balls += heroBowlingBallsFromRow(w);
+    matches += +(w.matches) || 0;
+  });
+  if (!wickets && !balls) return null;
+  const economy = balls ? +((runsConc / balls) * 6).toFixed(2) : 0;
+  const avg = wickets ? +((runsConc / wickets).toFixed(2)) : null;
+  return { wickets, economy, avg, matches };
+}
+
 function buildMergedLeaderboardForRanks(){
   const m = {};
   visibleComps().forEach(c => {
@@ -717,13 +774,14 @@ function rankMeta(list, name, key){
 }
 
 function srPercentileAmongComp(){
+  const agg = aggregateHeroBatting();
   const rows = visibleComps().map(c => ({ c, bat: getPlayerBatting(c.code) })).filter(x => x.bat && (x.bat.balls || 0) > 0);
-  if (!rows.length) return null;
+  if (!rows.length || !agg || !(agg.balls > 0)) return null;
   const pick = rows.reduce((a, b) => ((b.bat.runs || 0) > (a.bat.runs || 0) ? b : a));
   const pool = (allData[pick.c.code]?.batting || []).filter(p => (p.matches || 0) >= 5 && (p.balls || 0) > 0);
   if (pool.length < 8) return null;
   const srs = pool.map(p => +p.sr || 0).sort((a, b) => a - b);
-  const mine = +pick.bat.sr || 0;
+  const mine = +agg.sr || 0;
   const below = srs.filter(s => s <= mine).length;
   return { pct: Math.round((below / srs.length) * 100), comp: pick.c.name };
 }
@@ -784,7 +842,8 @@ function mergedVsTypeFromRows(rows){
 
 function renderHero(){
   const vc=visibleComps();
-  const bowl=vc.map(c=>getPlayerBowling(c.code)).find(Boolean)||null;
+  const bat=aggregateHeroBatting();
+  const bowl=aggregateHeroBowling();
 
   const tags=[];
   vc.forEach(c=>{
@@ -796,7 +855,6 @@ function renderHero(){
   if(tags.length>6) tags.length=6;
   document.getElementById('hero-tags').innerHTML=tags.map(t=>`<span class="player-tag">${t}</span>`).join('');
 
-  const bat=vc.map(c=>getPlayerBatting(c.code)).find(Boolean)||null;
   const kpis=[];
   if(bat){
     kpis.push({label:'Runs',val:bat.runs.toLocaleString()});

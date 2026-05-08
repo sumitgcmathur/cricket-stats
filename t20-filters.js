@@ -181,6 +181,7 @@
     function seasonMatches(season) {
       if (!season) return false;
       var yr = parseInt(season, 10);
+      if (!Number.isFinite(yr)) return false;
       if (activeSeason !== 'all') return season === activeSeason;
       if (yearFrom && yr < yearFrom) return false;
       if (yearTo && yr > yearTo) return false;
