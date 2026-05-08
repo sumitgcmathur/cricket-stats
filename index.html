@@ -1350,8 +1350,7 @@ function renderMVP(d, target) {
   const batters = (data.batting || []).filter(p => p.matches >= 3);
   const bowlers = (data.bowling || []).filter(p => p.matches >= 3);
 
-  // Use IPL broadcaster formula: 4s=2.5, 6s=3.5, wickets=3.5, dot balls=1
-  // Combined impact = bat_mvp_pts + bowl_mvp_pts per match (normalised)
+  // MVP pts from stats JSON: simple ball-by-ball sums (no per-match averaging).
   const playerMap = {};
   batters.forEach(p => {
     if (!playerMap[p.name]) playerMap[p.name] = {name:p.name,bat:null,bowl:null};
@@ -1363,18 +1362,17 @@ function renderMVP(d, target) {
   });
 
   const players = Object.values(playerMap).map(p => {
-    const matches = p.bat?.matches || p.bowl?.matches || 1;
-    // Points per match (to normalise across different number of games)
-    const batPPM  = p.bat  ? (p.bat.mvp_pts  || 0) / matches : 0;
-    const bowlPPM = p.bowl ? (p.bowl.mvp_pts || 0) / matches : 0;
-    // Total impact = combined points per match × matches played (capped)
-    const impact = Math.round((batPPM + bowlPPM) * Math.min(matches, 100));
+    const batPts = Math.round(p.bat?.mvp_pts || 0);
+    const bowlPts = Math.round(p.bowl?.mvp_pts || 0);
+    // Total MVP points = batting row + bowling row (batting row includes boundary + fielding pts from fetcher).
+    const impact = batPts + bowlPts;
+    const matches = Math.max(p.bat?.matches || 0, p.bowl?.matches || 0) || 1;
     const role = p.bat && p.bowl ? 'All-rounder' : p.bat ? 'Batter' : 'Bowler';
     return {
       name: p.name, role, matches,
       impact,
-      bat_pts: p.bat  ? Math.round(p.bat.mvp_pts  || 0) : 0,
-      bowl_pts: p.bowl ? Math.round(p.bowl.mvp_pts || 0) : 0,
+      bat_pts: batPts,
+      bowl_pts: bowlPts,
       runs:    p.bat?.runs    || 0,
       fours:   p.bat?.fours   || 0,
       sixes:   p.bat?.sixes   || 0,
@@ -1411,10 +1409,12 @@ function renderMVP(d, target) {
   </tr>`).join('');
 
   document.getElementById(target).innerHTML = `
-    <div style="background:var(--blue-light);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-bottom:20px;font-size:12px;color:var(--blue)">
-      🏅 <strong>T20 Impact Rating</strong> — Based on broadcaster-style formula:
-      4s = 2.5 pts · 6s = 3.5 pts · Wickets = 3.5 pts · Dot balls = 1 pt.
-      Impact = (bat pts + bowl pts per match) × matches played.
+    <div style="background:var(--blue-light);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-bottom:20px;font-size:12px;color:var(--blue);line-height:1.55">
+      🏅 <strong>MVP points</strong> — Same simple add-up as broadcast tables (each ball/event adds points; <strong>no per‑match averaging</strong>).<br>
+      <strong>Batting:</strong> four = 2.5 · six = 3.5 &nbsp;·&nbsp;
+      <strong>Bowling:</strong> wicket = 3.5 · legal dot = 1 &nbsp;·&nbsp;
+      <strong>Fielding:</strong> catch = 2.5 · stumping = 2.5<br>
+      <strong>Bat Pts</strong> / <strong>Bowl Pts</strong> columns are those totals from merged stats. <strong>Impact</strong> = Bat Pts + Bowl Pts.
       <span style="color:#1A7A4A;font-weight:600"> ■ All-rounder</span>
       <span style="color:#1E3A5F;font-weight:600"> ■ Batter</span>
       <span style="color:#B8860B;font-weight:600"> ■ Bowler</span>

@@ -567,6 +567,39 @@ def parse_zip(zip_bytes, comp):
                         batters[player_out]["dismissals"] += 1
                         if season and season in batters[player_out]["by_season"]:
                             batters[player_out]["by_season"][season]["dismissals"] += 1
+                        # Fielding MVP (same scale as IPL broadcast table): catch / stumping = 2.5 pts
+                        fld_raw = (row.get("fielders") or row.get("fielder") or "").strip()
+                        wt_low = (wicket_t or "").strip().lower()
+                        if fld_raw and wt_low in ("caught", "stumped"):
+                            fname = fld_raw.split("|")[0].strip()
+                            bowln = (bowler or "").strip().lower()
+                            if fname:
+                                fnamel = fname.lower()
+                                # Caught by bowler (incl. caught & bowled): wicket already +3.5 to bowler — skip extra catch
+                                if wt_low == "caught" and fnamel == bowln:
+                                    pass
+                                else:
+                                    bf = batters[fname]
+                                    if "mvp_pts" not in bf:
+                                        bf["mvp_pts"] = 0.0
+                                    bf["mvp_pts"] += 2.5
+                                    bf["matches"].add(match_id)
+                                    if season:
+                                        if season not in bf["by_season"]:
+                                            bf["by_season"][season] = {
+                                                "runs": 0,
+                                                "balls": 0,
+                                                "fours": 0,
+                                                "sixes": 0,
+                                                "fifties": 0,
+                                                "hundreds": 0,
+                                                "mvp_pts": 0.0,
+                                                "matches": set(),
+                                                "dismissals": 0,
+                                            }
+                                        bs = bf["by_season"][season]
+                                        bs["mvp_pts"] = bs.get("mvp_pts", 0) + 2.5
+                                        bs["matches"].add(match_id)
                         # Track wickets per season and phase for bowling filter
                         if bowler and wicket_t not in ("run out","retired hurt","obstructing the field"):
                             if season and season in bowlers[bowler]["by_season"]:
