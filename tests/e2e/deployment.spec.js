@@ -72,7 +72,8 @@ test.describe('post-deploy smoke', () => {
     attachSoftErrorListeners(page, errors);
 
     await page.goto('/team.html');
-    await page.waitForSelector('#team-sel option:nth-child(2)', { timeout: 60_000 });
+    /* <option> inside <select> is not "visible" to Playwright; wait for attached + populated. */
+    await page.waitForSelector('#team-sel option:nth-child(2)', { state: 'attached', timeout: 60_000 });
 
     await page.locator('#team-year-from').fill('2017');
     await page.locator('#team-year-to').fill('2022');
@@ -83,12 +84,15 @@ test.describe('post-deploy smoke', () => {
     expect(errors, errors.join('\n')).toEqual([]);
   });
 
-  test('player profile loads for sample IPL batter', async ({ page }) => {
+  test('player profile loads for sample IPL batter', async ({ page, baseURL }) => {
     const errors = [];
     attachSoftErrorListeners(page, errors);
 
     const name = 'V Kohli';
-    await page.goto(`/player.html?name=${encodeURIComponent(name)}`);
+    const target = new URL('/player.html', baseURL);
+    target.searchParams.set('name', name);
+    await page.goto(target.toString());
+    await expect(page).toHaveURL(/[?&]name=/);
     await expect(page.locator('#hero-name')).toContainText(name, { timeout: 60_000 });
     await page.getByRole('button', { name: 'IPL only' }).click();
     await expect(page.locator('#player-year-from')).toHaveValue('');
