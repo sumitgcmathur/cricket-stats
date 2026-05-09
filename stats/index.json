@@ -1,5 +1,5 @@
 {
-  "last_updated": "08 May 2026, 21:32",
+  "last_updated": "08 May 2026, 23:30",
   "competitions": [
     {
       "code": "t20s",
@@ -126,6 +126,19 @@
         "2023",
         "2024",
         "2025"
+      ]
+    },
+    {
+      "code": "sa20",
+      "name": "SA20",
+      "format": "T20",
+      "type": "league",
+      "total_matches": 130,
+      "seasons": [
+        "2022/23",
+        "2023/24",
+        "2024/25",
+        "2025/26"
       ]
     }
   ]

@@ -85,18 +85,60 @@
     T20_INDEX_CACHE = idx || null;
   }
 
+  /**
+   * Build chip list for site.focusCompetitionCodes order.
+   * Prefer stats/index.json rows when present; otherwise use config.json cricsheet/site fallback
+   * so new leagues (e.g. sa20) appear before the next fetch run.
+   */
+  function t20SyntheticCompetition(code) {
+    var cfg = T20_SITE_CONFIG;
+    if (!cfg || !code) return null;
+    var cr = (cfg.cricsheet && cfg.cricsheet.competitions) || [];
+    var i;
+    for (i = 0; i < cr.length; i++) {
+      if (cr[i].code === code && String(cr[i].format || 'T20') === 'T20') {
+        return {
+          code: cr[i].code,
+          name: cr[i].name,
+          format: cr[i].format || 'T20',
+          type: cr[i].type || 'league',
+          total_matches: 0,
+          seasons: [],
+        };
+      }
+    }
+    var fb = (cfg.site && cfg.site.fallbackCompetitions) || [];
+    for (i = 0; i < fb.length; i++) {
+      if (fb[i].code === code) {
+        return {
+          code: fb[i].code,
+          name: fb[i].name,
+          format: fb[i].format || 'T20',
+          type: 'league',
+          total_matches: 0,
+          seasons: [],
+        };
+      }
+    }
+    return null;
+  }
+
   function t20GetT20Competitions(index) {
     var idx = index || T20_INDEX_CACHE;
-    if (!idx || !idx.competitions) return [];
-    var allow = {};
-    FOCUS_MENS_T20_CODES.forEach(function (c) {
-      allow[c] = true;
-    });
-    var out = idx.competitions.filter(function (c) {
-      return c.format === 'T20' && allow[c.code];
-    });
-    out.sort(function (a, b) {
-      return FOCUS_MENS_T20_CODES.indexOf(a.code) - FOCUS_MENS_T20_CODES.indexOf(b.code);
+    var byCode = {};
+    if (idx && idx.competitions) {
+      idx.competitions.forEach(function (c) {
+        if (c.format === 'T20') byCode[c.code] = c;
+      });
+    }
+    var out = [];
+    FOCUS_MENS_T20_CODES.forEach(function (code) {
+      if (byCode[code]) {
+        out.push(byCode[code]);
+        return;
+      }
+      var syn = t20SyntheticCompetition(code);
+      if (syn) out.push(syn);
     });
     return out;
   }
