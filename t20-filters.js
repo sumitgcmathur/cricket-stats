@@ -5,8 +5,50 @@
 (function (g) {
   'use strict';
 
-  /** Site scope: men's T20 internationals + IPL + BBL + CPL only (order preserved). */
-  var FOCUS_MENS_T20_CODES = ['t20s', 'ipl', 'bbl', 'cpl'];
+  /** Populated from config.json (site.focusCompetitionCodes); order preserved. */
+  var FOCUS_MENS_T20_CODES = [];
+  var T20_SITE_CONFIG_PROMISE = null;
+  var T20_SITE_CONFIG = null;
+  /** IPL fallback until config loads */
+  var T20_PREFERRED_DEFAULT_LEAGUE = 'ipl';
+
+  function t20EnsureSiteConfig() {
+    if (T20_SITE_CONFIG_PROMISE) return T20_SITE_CONFIG_PROMISE;
+    var href =
+      typeof location !== 'undefined' && location.href ? location.href : 'http://localhost/';
+    T20_SITE_CONFIG_PROMISE = fetch(new URL('config.json', href).href)
+      .then(function (res) {
+        if (!res.ok) throw new Error('config.json HTTP ' + res.status);
+        return res.json();
+      })
+      .then(function (cfg) {
+        T20_SITE_CONFIG = cfg;
+        var site = cfg.site || {};
+        FOCUS_MENS_T20_CODES.length = 0;
+        (site.focusCompetitionCodes || []).forEach(function (c) {
+          FOCUS_MENS_T20_CODES.push(c);
+        });
+        if (site.preferredDefaultLeagueCode) {
+          T20_PREFERRED_DEFAULT_LEAGUE = String(site.preferredDefaultLeagueCode);
+        }
+        return cfg;
+      });
+    return T20_SITE_CONFIG_PROMISE;
+  }
+
+  function t20GetFallbackCompetitions() {
+    var fb =
+      T20_SITE_CONFIG && T20_SITE_CONFIG.site && T20_SITE_CONFIG.site.fallbackCompetitions
+        ? T20_SITE_CONFIG.site.fallbackCompetitions
+        : [];
+    return fb.map(function (c) {
+      return {
+        code: c.code,
+        name: c.name,
+        format: c.format || 'T20',
+      };
+    });
+  }
 
   var T20_INDEX_CACHE = null;
 
@@ -75,11 +117,12 @@
     });
   }
 
-  /** Default tournament selection: IPL only when available. */
+  /** Default tournament reset uses site.preferredDefaultLeagueCode from config.json when loaded. */
   function t20DefaultFilterCodes(allCodes) {
     if (!allCodes || !allCodes.length) return [];
-    var i = allCodes.indexOf('ipl');
-    return i >= 0 ? ['ipl'] : [allCodes[0]];
+    var pref = T20_PREFERRED_DEFAULT_LEAGUE || 'ipl';
+    var i = allCodes.indexOf(pref);
+    return i >= 0 ? [pref] : [allCodes[0]];
   }
 
   function t20ResolveCodesFromQS(qs, allCodes) {
@@ -378,6 +421,8 @@
     return true;
   }
 
+  g.t20EnsureSiteConfig = t20EnsureSiteConfig;
+  g.t20GetFallbackCompetitions = t20GetFallbackCompetitions;
   g.t20FetchIndex = t20FetchIndex;
   g.t20GetCachedIndex = t20GetCachedIndex;
   g.t20PrimeIndexCache = t20PrimeIndexCache;

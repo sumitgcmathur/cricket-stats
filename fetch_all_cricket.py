@@ -2,17 +2,11 @@
 Cricket Stats Fetcher — T20 only (Cricsheet)
 ==========================================
 Downloads ball-by-ball CSV data for T20 competitions from cricsheet.org.
-Default run fetches only: men's T20 internationals (t20s), IPL, BBL, CPL.
-Use --comp with one or more codes from the full catalog to fetch others.
-Generates:
-  stats/index.json              — master competition list
-  stats/{code}.json             — aggregated player/team stats (player "matches" = Cricsheet playing squad, info,player)
-  stats/matches/{code}/         — one JSON per match (scorecard)
-  stats/matches/{code}/index.json — match list for competition
+Competition list, defaults, team aliases, and paths live in config.json (repository root).
 
 Usage:
-  python fetch_all_cricket.py                    # default: t20s, ipl, bbl, cpl only
-  python fetch_all_cricket.py --comp ipl wpl     # explicit list from full catalog above
+  python fetch_all_cricket.py                    # uses site.defaultFetchCodes from config.json
+  python fetch_all_cricket.py --comp ipl wpl     # explicit codes from cricsheet.competitions in config.json
 """
 
 import urllib.request
@@ -32,55 +26,45 @@ try:
 except Exception:
     pass
 
-# Cricsheet zips: most use {code}_male_csv2.zip — see https://cricsheet.org/downloads/
-# Use "zip_name" when the archive name does not follow that pattern.
-COMPETITIONS = [
-    # Men's T20 internationals (Cricsheet file is t20s_male_csv2.zip, code is t20s)
-    {"code": "t20s", "name": "Men's T20 Internationals", "format": "T20", "type": "international"},
-    {"code": "icc_mens_t20_world_cup", "name": "ICC Men's T20 World Cup", "format": "T20", "type": "international"},
-    {"code": "t20s_female", "name": "Women's T20 Internationals", "format": "T20", "type": "international", "zip_name": "t20s_female_csv2.zip"},
-    {"code": "icc_womens_t20_world_cup", "name": "ICC Women's T20 World Cup", "format": "T20", "type": "international", "zip_name": "icc_womens_t20_world_cup_female_csv2.zip"},
-    # Men's T20 leagues
-    {"code": "ipl", "name": "Indian Premier League", "format": "T20", "type": "league"},
-    {"code": "bbl", "name": "Big Bash League", "format": "T20", "type": "league"},
-    {"code": "psl", "name": "Pakistan Super League", "format": "T20", "type": "league"},
-    {"code": "cpl", "name": "Caribbean Premier League", "format": "T20", "type": "league"},
-    {"code": "msl", "name": "Mzansi Super League", "format": "T20", "type": "league"},
-    {"code": "bpl", "name": "Bangladesh Premier League", "format": "T20", "type": "league"},
-    {"code": "npl", "name": "Nepal Premier League", "format": "T20", "type": "league"},
-    {"code": "lpl", "name": "Lanka Premier League", "format": "T20", "type": "league"},
-    {"code": "mlc", "name": "Major League Cricket", "format": "T20", "type": "league"},
-    {"code": "sma", "name": "Syed Mushtaq Ali Trophy", "format": "T20", "type": "league"},
-    # Women's T20 leagues (non-_male_csv2 archives on Cricsheet)
-    {"code": "wpl", "name": "Women's Premier League (India)", "format": "T20", "type": "league", "zip_name": "wpl_csv2.zip"},
-    {"code": "wbb", "name": "Women's Big Bash League", "format": "T20", "type": "league", "zip_name": "wbb_female_csv2.zip"},
-]
+_ROOT = os.path.dirname(os.path.abspath(__file__))
+_CONFIG_PATH = os.path.join(_ROOT, "config.json")
 
-# Default bundle for this site (men's T20I + IPL + BBL + CPL). Override with --comp <code> ...
-DEFAULT_FETCH_CODES = ("t20s", "ipl", "bbl", "cpl")
 
-DOWNLOAD_BASE = "https://cricsheet.org/downloads/"
-BASE_URL = DOWNLOAD_BASE + "{code}_male_csv2.zip"
-STATS_DIR = "stats"
+def _load_project_config():
+    if not os.path.isfile(_CONFIG_PATH):
+        raise FileNotFoundError(f"Missing {_CONFIG_PATH} — create it or restore from the repo.")
+    with open(_CONFIG_PATH, encoding="utf-8") as f:
+        return json.load(f)
 
-# Normalise historical team name variants.
-# Keep these stable across ALL outputs (scorecards, match index, team stats).
-TEAM_ALIASES = {
-    "Delhi Daredevils": "Delhi Capitals",
-    "Deccan Chargers": "Sunrisers Hyderabad",
-    "Rising Pune Supergiant": "Rising Pune Supergiants",
-    "Rising Pune Supergiants": "Rising Pune Supergiants",
-    "Pune Warriors": "Pune Warriors India",
-    "Pune Warriors India": "Pune Warriors India",
-    "Royal Challengers Bangalore": "Royal Challengers Bengaluru",
-    "Royal Challengers Bengaluru": "Royal Challengers Bengaluru",
-    "Kings XI Punjab": "Punjab Kings",
-    # Collapse older Gujarat/Pune franchises into latest names (per project convention)
-    "Gujarat Lions": "Gujarat Titans",
-    "Gujarat Titans": "Gujarat Titans",
-    "Pune Warriors India": "Rising Pune Supergiants",
-    "Pune Warriors": "Rising Pune Supergiants",
-}
+
+def _build_fetch_globals(cfg):
+    """Derive COMPETITIONS, paths, and aliases from config.json."""
+    site = cfg.get("site") or {}
+    cr = cfg.get("cricsheet") or {}
+    competitions = []
+    for c in cr.get("competitions") or []:
+        row = {
+            "code": c["code"],
+            "name": c["name"],
+            "format": c["format"],
+            "type": c["type"],
+        }
+        zf = c.get("zipFile")
+        if zf:
+            row["zip_name"] = zf
+        competitions.append(row)
+    download_base = (cr.get("downloadBase") or "https://cricsheet.org/downloads/").rstrip("/") + "/"
+    pattern = cr.get("maleCsvZipPattern") or "{code}_male_csv2.zip"
+    stats_dir = site.get("statsOutputDirectory") or "stats"
+    default_fetch = tuple(site.get("defaultFetchCodes") or ("t20s", "ipl", "bbl", "cpl"))
+    aliases = dict(cfg.get("teamAliases") or {})
+    base_url_template = download_base + pattern
+    return competitions, download_base, base_url_template, stats_dir, default_fetch, aliases
+
+
+_cfg = _load_project_config()
+COMPETITIONS, DOWNLOAD_BASE, BASE_URL, STATS_DIR, DEFAULT_FETCH_CODES, TEAM_ALIASES = _build_fetch_globals(_cfg)
+
 
 def norm_team(name: str) -> str:
     n = (name or "").strip()

@@ -106,4 +106,13 @@ test.describe('post-deploy smoke', () => {
     const j = await res.json();
     expect(Array.isArray(j.competitions)).toBeTruthy();
   });
+
+  test('config.json is reachable and defines site scope', async ({ request, baseURL }) => {
+    const res = await request.get(new URL('/config.json', baseURL).toString());
+    expect(res.ok()).toBeTruthy();
+    const j = await res.json();
+    expect(Array.isArray(j.site.focusCompetitionCodes)).toBeTruthy();
+    expect(Array.isArray(j.site.fallbackCompetitions)).toBeTruthy();
+    expect(Array.isArray(j.cricsheet.competitions)).toBeTruthy();
+  });
 });

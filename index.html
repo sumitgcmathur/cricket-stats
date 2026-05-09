@@ -1291,6 +1291,7 @@ async function refreshDashboard() {
 
 async function boot() {
   try {
+    if (typeof t20EnsureSiteConfig === 'function') await t20EnsureSiteConfig();
     const res = await fetch('stats/index.json');
     if (!res.ok) throw new Error('stats/index.json not found (HTTP ' + res.status + ')');
     index = await res.json();

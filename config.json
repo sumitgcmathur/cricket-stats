@@ -1,0 +1,51 @@
+{
+  "site": {
+    "statsOutputDirectory": "stats",
+    "focusCompetitionCodes": ["t20s", "ipl", "bbl", "cpl", "sa20"],
+    "defaultFetchCodes": ["t20s", "ipl", "bbl", "cpl", "sa20"],
+    "preferredDefaultLeagueCode": "ipl",
+    "fallbackCompetitions": [
+      {"code": "t20s", "name": "Men's T20 Internationals", "format": "T20"},
+      {"code": "ipl", "name": "IPL", "format": "T20"},
+      {"code": "bbl", "name": "Big Bash League", "format": "T20"},
+      {"code": "cpl", "name": "Caribbean Premier League", "format": "T20"},
+      {"code": "sa20", "name": "SA20", "format": "T20"}
+    ]
+  },
+  "cricsheet": {
+    "downloadBase": "https://cricsheet.org/downloads/",
+    "maleCsvZipPattern": "{code}_male_csv2.zip",
+    "competitions": [
+      {"code": "t20s", "name": "Men's T20 Internationals", "format": "T20", "type": "international"},
+      {"code": "icc_mens_t20_world_cup", "name": "ICC Men's T20 World Cup", "format": "T20", "type": "international"},
+      {"code": "t20s_female", "name": "Women's T20 Internationals", "format": "T20", "type": "international", "zipFile": "t20s_female_csv2.zip"},
+      {"code": "icc_womens_t20_world_cup", "name": "ICC Women's T20 World Cup", "format": "T20", "type": "international", "zipFile": "icc_womens_t20_world_cup_female_csv2.zip"},
+      {"code": "ipl", "name": "Indian Premier League", "format": "T20", "type": "league"},
+      {"code": "bbl", "name": "Big Bash League", "format": "T20", "type": "league"},
+      {"code": "psl", "name": "Pakistan Super League", "format": "T20", "type": "league"},
+      {"code": "cpl", "name": "Caribbean Premier League", "format": "T20", "type": "league"},
+      {"code": "sa20", "name": "SA20", "format": "T20", "type": "league", "zipFile": "sat_male_csv2.zip"},
+      {"code": "msl", "name": "Mzansi Super League", "format": "T20", "type": "league"},
+      {"code": "bpl", "name": "Bangladesh Premier League", "format": "T20", "type": "league"},
+      {"code": "npl", "name": "Nepal Premier League", "format": "T20", "type": "league"},
+      {"code": "lpl", "name": "Lanka Premier League", "format": "T20", "type": "league"},
+      {"code": "mlc", "name": "Major League Cricket", "format": "T20", "type": "league"},
+      {"code": "sma", "name": "Syed Mushtaq Ali Trophy", "format": "T20", "type": "league"},
+      {"code": "wpl", "name": "Women's Premier League (India)", "format": "T20", "type": "league", "zipFile": "wpl_csv2.zip"},
+      {"code": "wbb", "name": "Women's Big Bash League", "format": "T20", "type": "league", "zipFile": "wbb_female_csv2.zip"}
+    ]
+  },
+  "teamAliases": {
+    "Delhi Daredevils": "Delhi Capitals",
+    "Deccan Chargers": "Sunrisers Hyderabad",
+    "Rising Pune Supergiant": "Rising Pune Supergiants",
+    "Rising Pune Supergiants": "Rising Pune Supergiants",
+    "Royal Challengers Bangalore": "Royal Challengers Bengaluru",
+    "Royal Challengers Bengaluru": "Royal Challengers Bengaluru",
+    "Kings XI Punjab": "Punjab Kings",
+    "Gujarat Lions": "Gujarat Titans",
+    "Gujarat Titans": "Gujarat Titans",
+    "Pune Warriors India": "Rising Pune Supergiants",
+    "Pune Warriors": "Rising Pune Supergiants"
+  }
+}

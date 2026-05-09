@@ -262,6 +262,7 @@ function onTeamPick(){
 }
 
 async function boot(){
+  if(typeof t20EnsureSiteConfig==='function')await t20EnsureSiteConfig();
   try{
     championshipIndex=await t20FetchIndex();
     COMPS=t20GetT20Competitions(championshipIndex).map(c=>({code:c.code,name:c.name}));
@@ -269,12 +270,10 @@ async function boot(){
     console.warn(e);
     championshipIndex=null;
   }
-  if(!COMPS.length)COMPS=[
-    {code:'t20s',name:"Men's T20 Internationals"},
-    {code:'ipl',name:'IPL'},
-    {code:'bbl',name:'Big Bash League'},
-    {code:'cpl',name:'Caribbean Premier League'},
-  ];
+  if(!COMPS.length){
+    const fb=typeof t20GetFallbackCompetitions==='function'?t20GetFallbackCompetitions():[];
+    COMPS=fb.map(c=>({code:c.code,name:c.name}));
+  }
 
   let fp=t20ReadFilterParams(location.search,championshipIndex);
   const legacy=qs('comp');
