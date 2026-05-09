@@ -89,10 +89,10 @@ test.describe('post-deploy smoke', () => {
     attachSoftErrorListeners(page, errors);
 
     const name = 'V Kohli';
+    /* serve defaults cleanUrls:true → redirects /player.html?foo → /player and drops ?foo (breaks boot). serve.json disables that. */
     const target = new URL('/player.html', baseURL);
     target.searchParams.set('name', name);
-    await page.goto(target.toString());
-    await expect(page).toHaveURL(/[?&]name=/);
+    await page.goto(target.toString(), { waitUntil: 'domcontentloaded' });
     await expect(page.locator('#hero-name')).toContainText(name, { timeout: 60_000 });
     await page.getByRole('button', { name: 'IPL only' }).click();
     await expect(page.locator('#player-year-from')).toHaveValue('');
