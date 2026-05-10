@@ -8,6 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Bebas+Neue&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="t20-filters.js"></script>
+<script src="t20-merge-dataset.js"></script>
 <style>
 :root {
   --gold: #B8860B;
@@ -885,6 +886,7 @@ footer a { color: var(--blue); text-decoration: none; }
     <nav class="nav">
       <button class="nav-btn active" onclick="setView('dashboard', this)">Stats</button>
       <button class="nav-btn" onclick="setView('player', this)">Player Search</button>
+      <a href="compare.html" class="nav-btn" id="nav-compare-link" style="text-decoration:none;display:flex;align-items:center;">Compare</a>
       <a href="matches.html" class="nav-btn" id="nav-matches-link" style="text-decoration:none;display:flex;align-items:center;">Matches</a>
     </nav>
     <div class="header-meta" id="header-updated">Loading...</div>
@@ -1125,139 +1127,6 @@ function clearTournamentSelection() {
   refreshDashboard();
 }
 
-function estDismissalsBat(p) {
-  const r = +p.runs || 0;
-  const a = p.avg;
-  if (!r) return 0;
-  if (a == null || a === '—' || a === '') return 0;
-  const av = +a;
-  if (!Number.isFinite(av) || av <= 0) return 0;
-  if (Math.abs(av - r) < 0.01) return 0;
-  return Math.max(1, Math.round(r / av));
-}
-
-function mergeBattingLists(lists) {
-  const m = {};
-  lists.forEach(list => {
-    (list || []).forEach(p => {
-      if (!m[p.name]) m[p.name] = { name: p.name, _d: 0, _piw: 0, matches: 0, runs: 0, balls: 0, fours: 0, sixes: 0, fifties: 0, hundreds: 0, mvp_pts: 0 };
-      const x = m[p.name];
-      x.matches += +p.matches || 0;
-      x.runs += +p.runs || 0;
-      x.balls += +p.balls || 0;
-      x.fours += +p.fours || 0;
-      x.sixes += +p.sixes || 0;
-      x.fifties += +p.fifties || 0;
-      x.hundreds += +p.hundreds || 0;
-      x.mvp_pts = +((parseFloat(x.mvp_pts) || 0) + (parseFloat(p.mvp_pts) || 0)).toFixed(1);
-      x._d += estDismissalsBat(p);
-      const pi = parseFloat(p.perf_index);
-      if (Number.isFinite(pi)) x._piw += pi * (+p.runs || 0);
-    });
-  });
-  return Object.values(m).map(p => {
-    const sr = p.balls ? +((p.runs / p.balls) * 100).toFixed(2) : 0;
-    const avg = p._d ? +((p.runs / p._d).toFixed(2)) : p.runs;
-    const perf_index = p.runs > 0 && p._piw ? +((p._piw / p.runs).toFixed(1)) : 0;
-    delete p._d;
-    delete p._piw;
-    return { ...p, avg, sr, perf_index };
-  }).filter(p => p.runs > 0).sort((a, b) => b.runs - a.runs);
-}
-
-/** Cricket overs as float (e.g. 683.1 = 683 overs + 1 ball) → legal balls bowled. */
-function oversNotationToBalls(overs) {
-  if (overs == null || overs === '') return 0;
-  const o = +overs;
-  if (!Number.isFinite(o) || o < 0) return 0;
-  const whole = Math.floor(o + 1e-9);
-  const frac = +(o - whole).toFixed(3);
-  const partial = Math.min(5, Math.max(0, Math.round(frac * 10 + 1e-9)));
-  return whole * 6 + partial;
-}
-
-function bowlingBallsFromRow(p) {
-  const b = +p.balls;
-  if (Number.isFinite(b) && b > 0) return b;
-  const fromOvers = oversNotationToBalls(p.overs);
-  if (fromOvers > 0) return fromOvers;
-  if (p.by_season && typeof p.by_season === 'object') {
-    let s = 0;
-    for (const v of Object.values(p.by_season)) {
-      const bb = v && +v.balls;
-      if (Number.isFinite(bb)) s += bb;
-    }
-    return s;
-  }
-  return 0;
-}
-
-function mergeBowlingLists(lists) {
-  const m = {};
-  lists.forEach(list => {
-    (list || []).forEach(p => {
-      if (!m[p.name]) m[p.name] = { name: p.name, matches: 0, wickets: 0, runs: 0, balls: 0, mvp_pts: 0 };
-      const x = m[p.name];
-      x.matches += +p.matches || 0;
-      x.wickets += +p.wickets || 0;
-      x.runs += +p.runs || 0;
-      x.balls += bowlingBallsFromRow(p);
-      x.mvp_pts = +((parseFloat(x.mvp_pts) || 0) + (parseFloat(p.mvp_pts) || 0)).toFixed(1);
-    });
-  });
-  return Object.values(m).map(p => {
-    const economy = p.balls ? +((p.runs / p.balls) * 6).toFixed(2) : 0;
-    const avg = p.wickets ? +((p.runs / p.wickets).toFixed(2)) : null;
-    const overs = Math.floor(p.balls / 6) + (p.balls % 6) / 10;
-    const bowl_index = economy > 0 && p.matches > 0 ? +((p.wickets / p.matches) * (6 / economy)).toFixed(2) : 0;
-    return { ...p, overs: +overs.toFixed(1), economy, avg, bowl_index };
-  }).filter(p => p.balls > 0).sort((a, b) => b.wickets - a.wickets);
-}
-
-function mergeSixesLists(lists) {
-  const m = {};
-  lists.forEach(list => {
-    (list || []).forEach(p => {
-      if (!m[p.name]) m[p.name] = { name: p.name, sixes: 0, matches: 0 };
-      m[p.name].sixes += +p.sixes || 0;
-      m[p.name].matches += +p.matches || 0;
-    });
-  });
-  return Object.values(m).filter(p => p.sixes > 0).sort((a, b) => b.sixes - a.sixes);
-}
-
-function mergeTeamsLists(lists) {
-  const m = {};
-  lists.forEach(list => {
-    (list || []).forEach(t => {
-      const k = t.team;
-      if (!m[k]) m[k] = { team: k, matches: 0, wins: 0 };
-      m[k].matches += +t.matches || 0;
-      m[k].wins += +t.wins || 0;
-    });
-  });
-  return Object.values(m).map(t => ({
-    ...t,
-    win_pct: t.matches ? +((t.wins / t.matches) * 100).toFixed(1) : 0,
-  })).sort((a, b) => b.wins - a.wins);
-}
-
-function mergeDatasets(list) {
-  if (!list.length) return null;
-  return {
-    competition: 'Combined T20',
-    code: 'merged',
-    format: 'T20',
-    type: 'merged',
-    total_matches: list.reduce((s, d) => s + (+d.total_matches || 0), 0),
-    seasons: [...new Set(list.flatMap(d => d.seasons || []))].sort((a, b) => b.localeCompare(a)),
-    batting: mergeBattingLists(list.map(d => d.batting)),
-    bowling: mergeBowlingLists(list.map(d => d.bowling)),
-    sixes: mergeSixesLists(list.map(d => d.sixes)),
-    teams: mergeTeamsLists(list.map(d => d.teams)),
-  };
-}
-
 async function buildMergedDataset() {
   const codes = selectedTournamentCodes.length ? selectedTournamentCodes : getT20Competitions().map(c => c.code);
   const parts = [];
@@ -1267,7 +1136,7 @@ async function buildMergedDataset() {
     if (activeSeason !== 'all' || yearFrom || yearTo) d = filterBySeason(d);
     parts.push(d);
   }
-  return mergeDatasets(parts);
+  return typeof t20MergeDatasets === 'function' ? t20MergeDatasets(parts) : null;
 }
 
 async function refreshDashboard() {
@@ -1418,6 +1287,12 @@ function playerHref(name) {
   return 'player.html?' + q.toString();
 }
 
+function compareHrefWithP1(name) {
+  const q = t20FilterQS(currentT20FilterState(), index);
+  q.set('p1', name);
+  return 'compare.html?' + q.toString();
+}
+
 function teamHref(teamName) {
   const q = t20FilterQS(currentT20FilterState(), index);
   q.set('team', teamName);
@@ -1428,9 +1303,15 @@ function matchesNavHref() {
   return 'matches.html?' + t20FilterQS(currentT20FilterState(), index).toString();
 }
 
+function compareNavHref() {
+  return 'compare.html?' + t20FilterQS(currentT20FilterState(), index).toString();
+}
+
 function updateMatchesNavLinkOnly() {
   const nm = document.getElementById('nav-matches-link');
   if (nm && index) nm.href = matchesNavHref();
+  const nc = document.getElementById('nav-compare-link');
+  if (nc && index) nc.href = compareNavHref();
 }
 
 function syncIndexFiltersToURL() {
@@ -2076,7 +1957,10 @@ function searchPlayer(query) {
   document.getElementById('player-results').innerHTML = Object.entries(found).map(([name, comps]) => `
     <div class="player-result-card animate">
       <h3>${t20EscapeHtml(name)}</h3>
-      <a href="${playerHref(name)}" style="display:inline-block;margin-bottom:12px;background:var(--blue);color:#fff;font-size:12px;font-weight:500;padding:6px 14px;border-radius:6px;text-decoration:none">View Full Profile →</a>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+        <a href="${playerHref(name)}" style="display:inline-block;background:var(--blue);color:#fff;font-size:12px;font-weight:500;padding:6px 14px;border-radius:6px;text-decoration:none">View Full Profile →</a>
+        <a href="${compareHrefWithP1(name)}" style="display:inline-block;background:var(--surface2);color:var(--blue);border:1px solid var(--border);font-size:12px;font-weight:500;padding:6px 14px;border-radius:6px;text-decoration:none">Compare (set 2nd on page) →</a>
+      </div>
       <div class="player-comps">
         ${comps.map(c => `
           <div class="player-comp-row">

@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Compare players — T20 Stats</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Bebas+Neue&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="t20-toolbar.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="t20-filters.js"></script>
+<script src="t20-merge-dataset.js"></script>
+<style>
+:root{--gold:#B8860B;--gold-light:#DAA520;--blue:#1E3A5F;--blue-mid:#2E5A8F;--blue-light:#EBF3FF;--bg:#F5F7FA;--surface:#FFF;--surface2:#F0F2F5;--border:#E2E6EA;--text:#1A2332;--muted:#6B7A8D;--green:#1A7A4A;--shadow:0 1px 3px rgba(0,0,0,.08);}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-size:14px;line-height:1.5;}
+.header{background:var(--blue);padding:0 24px;position:sticky;top:0;z-index:200;box-shadow:0 2px 8px rgba(0,0,0,.15);}
+.header-inner{max-width:1200px;margin:0 auto;display:flex;align-items:center;height:56px;gap:16px;}
+.logo{font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:3px;color:#fff;text-decoration:none;}
+.logo span{color:var(--gold-light);}
+.breadcrumb{display:flex;align-items:center;gap:8px;font-size:13px;color:rgba(255,255,255,.6);flex-wrap:wrap;}
+.breadcrumb a{color:rgba(255,255,255,.6);text-decoration:none;}
+.breadcrumb a:hover{color:#fff;}
+.breadcrumb .sep{opacity:.4;}
+.breadcrumb .current{color:#fff;font-weight:500;}
+.main{max-width:1200px;margin:0 auto;padding:24px;}
+.hero{background:linear-gradient(135deg,var(--blue) 0%,var(--blue-mid) 100%);color:#fff;border-radius:12px;padding:22px;margin-bottom:20px;}
+.hero h1{font-family:'Bebas Neue',sans-serif;font-size:32px;letter-spacing:3px;}
+.hero p{margin-top:8px;font-size:13px;color:rgba(255,255,255,.75);max-width:720px;}
+.compare-inputs{display:grid;grid-template-columns:1fr 1fr auto;gap:12px;align-items:end;margin-top:16px;flex-wrap:wrap;}
+@media(max-width:720px){.compare-inputs{grid-template-columns:1fr;}}
+.compare-inputs label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,.65);margin-bottom:4px;}
+.compare-inputs input{width:100%;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.12);color:#fff;font-size:14px;}
+.compare-inputs input::placeholder{color:rgba(255,255,255,.45);}
+.compare-inputs button{background:var(--gold-light);color:var(--blue);border:none;padding:10px 20px;border-radius:8px;font-weight:600;cursor:pointer;font-size:13px;}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px;box-shadow:var(--shadow);margin-bottom:16px;}
+.card h2{font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:14px;}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+th,td{padding:10px 12px;text-align:right;border-bottom:1px solid var(--border);}
+th:first-child,td:first-child{text-align:left;}
+thead th{font-size:10px;text-transform:uppercase;color:var(--muted);background:var(--surface2);}
+.hi{color:var(--blue);font-weight:600;}
+.chart-wrap{position:relative;height:260px;margin-top:8px;}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+@media(max-width:800px){.grid2{grid-template-columns:1fr;}}
+.loading,.empty-msg{text-align:center;padding:40px;color:var(--muted);}
+footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-size:12px;color:var(--muted);}
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="header-inner">
+    <a href="index.html" class="logo">T20 <span>STATS</span></a>
+    <div class="breadcrumb">
+      <a href="index.html">Home</a><span class="sep">›</span>
+      <span class="current">Compare players</span>
+    </div>
+  </div>
+</div>
+
+<div class="t20-toolbar">
+  <div class="t20-toolbar-inner">
+    <div class="filter-panel" style="flex:1 1 100%;margin:0">
+      <div class="filter-panel-title">Tournaments (multi-select)</div>
+      <div class="filter-actions">
+        <button type="button" onclick="cmpSelectAll()">All</button>
+        <button type="button" onclick="cmpClear()">IPL only</button>
+      </div>
+      <div class="filter-chips" id="cmp-filter-tournaments"></div>
+    </div>
+    <span class="t20-toolbar-label">Season</span>
+    <select class="t20-season-select" id="cmp-season" onchange="cmpOnSeason()">
+      <option value="all">All Seasons</option>
+    </select>
+    <div class="t20-toolbar-sep"></div>
+    <span class="t20-toolbar-label">Year range</span>
+    <div class="t20-year-range">
+      <input class="t20-year-input" type="number" id="cmp-yf" placeholder="From" min="1995" max="2035" onchange="cmpOnYear()">
+      <span class="t20-year-to-label">to</span>
+      <input class="t20-year-input" type="number" id="cmp-yt" placeholder="To" min="1995" max="2035" onchange="cmpOnYear()">
+    </div>
+  </div>
+</div>
+
+<div class="main">
+  <div class="hero">
+    <h1>Player compare</h1>
+    <p>Same tournament, season, and year filters as the rest of the site. Stats are merged across selected leagues (Cricsheet squad-based match counts).</p>
+    <div class="compare-inputs">
+      <div>
+        <label for="inp-p1">Player 1</label>
+        <input id="inp-p1" type="text" placeholder="e.g. V Kohli" autocomplete="off">
+      </div>
+      <div>
+        <label for="inp-p2">Player 2</label>
+        <input id="inp-p2" type="text" placeholder="e.g. RG Sharma" autocomplete="off">
+      </div>
+      <div>
+        <label style="visibility:hidden">Go</label>
+        <button type="button" onclick="cmpRunCompare()">Compare</button>
+      </div>
+    </div>
+  </div>
+  <div id="cmp-out"><div class="loading"><div class="spinner" style="width:24px;height:24px;border:2px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 12px"></div>Loading…</div></div>
+</div>
+<style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+<footer>Data: <a href="https://cricsheet.org" target="_blank">cricsheet.org</a></footer>
+
+<script>
+let COMPS=[],championshipIndex=null,allDataRaw={},selectedTournamentCodes=[],activeSeason='all',yearFrom=null,yearTo=null;
+let cmpChart=null;
+
+function sameName(a,b){return String(a||'').trim().toLowerCase()===String(b||'').trim().toLowerCase();}
+
+function readQsName(key){
+  const raw=new URLSearchParams(location.search).get(key);
+  if(!raw)return'';
+  try{return decodeURIComponent(raw).trim();}catch(e){return String(raw).trim();}
+}
+
+function cmpExtraQs(){
+  const p1=document.getElementById('inp-p1').value.trim();
+  const p2=document.getElementById('inp-p2').value.trim();
+  const o={};
+  if(p1)o.p1=p1;
+  if(p2)o.p2=p2;
+  return o;
+}
+
+function cmpSyncUrl(){
+  if(typeof t20WriteFilterParams==='function'){
+    t20WriteFilterParams({codes:selectedTournamentCodes,activeSeason,yearFrom,yearTo},cmpExtraQs());
+  }
+}
+
+function renderCmpChips(){
+  const wrap=document.getElementById('cmp-filter-tournaments');
+  if(!wrap||!COMPS.length){if(wrap)wrap.innerHTML='';return;}
+  wrap.innerHTML=COMPS.map(c=>{
+    const esc=typeof t20EscapeHtml==='function'?t20EscapeHtml:function(s){return String(s||'');};
+    return`<label class="filter-chip"><input type="checkbox" value="${c.code}" ${selectedTournamentCodes.includes(c.code)?'checked':''} onchange="cmpOnTournament()"><span>${esc(c.name)}</span></label>`;
+  }).join('');
+}
+
+function fillCmpSeason(){
+  const sel=document.getElementById('cmp-season');
+  const cur=activeSeason;
+  const seasons=typeof t20UnionSeasonsForCodes==='function'?t20UnionSeasonsForCodes(championshipIndex,selectedTournamentCodes):[];
+  sel.innerHTML='<option value="all">All Seasons</option>';
+  [...seasons].sort((a,b)=>b.localeCompare(a)).forEach(s=>{
+    const o=document.createElement('option');o.value=s;o.textContent=s;sel.appendChild(o);
+  });
+  sel.value=[...sel.options].some(o=>o.value===cur)?cur:'all';
+  activeSeason=sel.value;
+}
+
+function cmpSelectAll(){
+  selectedTournamentCodes=COMPS.map(c=>c.code);
+  renderCmpChips();fillCmpSeason();
+  activeSeason='all';document.getElementById('cmp-season').value='all';
+  yearFrom=yearTo=null;document.getElementById('cmp-yf').value='';document.getElementById('cmp-yt').value='';
+  cmpReloadData();
+}
+
+function cmpClear(){
+  selectedTournamentCodes=typeof t20DefaultFilterCodes==='function'?t20DefaultFilterCodes(COMPS.map(c=>c.code)):(COMPS.length?[COMPS[0].code]:[]);
+  renderCmpChips();fillCmpSeason();
+  activeSeason='all';document.getElementById('cmp-season').value='all';
+  yearFrom=yearTo=null;document.getElementById('cmp-yf').value='';document.getElementById('cmp-yt').value='';
+  cmpReloadData();
+}
+
+function cmpOnTournament(){
+  const checked=[...document.querySelectorAll('#cmp-filter-tournaments input:checked')].map(i=>i.value);
+  selectedTournamentCodes=checked.length?checked:(typeof t20DefaultFilterCodes==='function'?t20DefaultFilterCodes(COMPS.map(c=>c.code)):['ipl']);
+  if(!checked.length)renderCmpChips();
+  const prev=activeSeason;
+  fillCmpSeason();
+  if(prev!=='all'&&![...document.getElementById('cmp-season').options].some(o=>o.value===prev)){activeSeason='all';document.getElementById('cmp-season').value='all';}
+  else document.getElementById('cmp-season').value=prev;
+  cmpReloadData();
+}
+
+function cmpOnSeason(){
+  activeSeason=document.getElementById('cmp-season').value;
+  yearFrom=yearTo=null;document.getElementById('cmp-yf').value='';document.getElementById('cmp-yt').value='';
+  cmpReloadData();
+}
+
+function cmpOnYear(){
+  yearFrom=parseInt(document.getElementById('cmp-yf').value,10)||null;
+  yearTo=parseInt(document.getElementById('cmp-yt').value,10)||null;
+  activeSeason='all';  document.getElementById('cmp-season').value='all';
+  cmpReloadData();
+}
+
+async function loadCompRaw(code){
+  if(!code)return;
+  if(allDataRaw[code])return;
+  try{
+    const r=await fetch('stats/'+code+'.json');
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    allDataRaw[code]=await r.json();
+  }catch(e){console.warn('stats/'+code+'.json',e.message);}
+}
+
+async function buildMerged(){
+  const codes=selectedTournamentCodes.length?selectedTournamentCodes:COMPS.map(c=>c.code);
+  const parts=[];
+  for(const code of codes){
+    await loadCompRaw(code);
+    const raw=allDataRaw[code];
+    if(!raw)continue;
+    let d=raw;
+    if(activeSeason!=='all'||yearFrom||yearTo){
+      try{d=typeof structuredClone==='function'?structuredClone(raw):JSON.parse(JSON.stringify(raw));}catch(e){d=raw;}
+      d=typeof t20FilterBySeason==='function'?t20FilterBySeason(d,activeSeason,yearFrom,yearTo):raw;
+    }
+    parts.push(d);
+  }
+  return typeof t20MergeDatasets==='function'?t20MergeDatasets(parts):null;
+}
+
+function findBat(merged,name){
+  return(merged.batting||[]).find(p=>sameName(p.name,name))||null;
+}
+function findBowl(merged,name){
+  return(merged.bowling||[]).find(p=>sameName(p.name,name))||null;
+}
+
+function killCmpChart(){if(cmpChart){try{cmpChart.destroy();}catch(e){}cmpChart=null;}}
+
+function cmpRunCompare(){
+  cmpSyncUrl();
+  cmpRender();
+}
+
+function fmt(n){return n==null||n===''?'—':n;}
+/** class for left cell if left wins numeric duel; highBetter = higher number wins (runs); false = lower wins (economy). */
+function cmpWinClass(left,right,highBetter){
+  if(left==null||right==null)return'';
+  var x=+left,y=+right;
+  if(!Number.isFinite(x)||!Number.isFinite(y)||x===y)return'';
+  var leftWins=highBetter?x>y:x<y;
+  return leftWins?'hi':'';
+}
+
+function playerProfileHref(name){
+  var q=typeof t20FilterQS==='function'?t20FilterQS({codes:selectedTournamentCodes,activeSeason,yearFrom,yearTo},championshipIndex):new URLSearchParams();
+  var u=new URLSearchParams(q.toString());
+  u.set('name',name);
+  return'player.html?'+u.toString();
+}
+
+function cmpRender(){
+  const p1=document.getElementById('inp-p1').value.trim();
+  const p2=document.getElementById('inp-p2').value.trim();
+  const host=document.getElementById('cmp-out');
+  if(!p1||!p2){
+    host.innerHTML='<div class="empty-msg">Enter two player names and click <strong>Compare</strong>. Names must match Cricsheet spelling (e.g. <code>V Kohli</code>).</div>';
+    killCmpChart();
+    return;
+  }
+  host.innerHTML='<div class="loading">Merging stats…</div>';
+  buildMerged().then(merged=>{
+    if(!merged||(!merged.batting||!merged.batting.length)){
+      host.innerHTML='<div class="empty-msg">No batting data for this filter. Widen leagues, season, or year range.</div>';
+      killCmpChart();
+      return;
+    }
+    const b1=findBat(merged,p1),b2=findBat(merged,p2);
+    const w1=findBowl(merged,p1),w2=findBowl(merged,p2);
+    if(!b1&&!b2){
+      host.innerHTML='<div class="empty-msg">No merged batting rows for either player. Check spelling or filters.</div>';
+      killCmpChart();
+      return;
+    }
+    const rows=[
+      ['Matches',b1&&b1.matches,b2&&b2.matches,true],
+      ['Runs',b1&&b1.runs,b2&&b2.runs,true],
+      ['Average',b1&&b1.avg,b2&&b2.avg,true],
+      ['Strike rate',b1&&b1.sr,b2&&b2.sr,true],
+      ['50s / 100s',b1?(+(b1.fifties||0)+' / '+(b1.hundreds||0)):'—',b2?(+(b2.fifties||0)+' / '+(b2.hundreds||0)):'—',null],
+      ['4s / 6s',b1?(+(b1.fours||0)+' / '+(b1.sixes||0)):'—',b2?(+(b2.fours||0)+' / '+(b2.sixes||0)):'—',null],
+      ['MVP pts (bat+field in feed)',b1&&b1.mvp_pts,b2&&b2.mvp_pts,true],
+      ['Wickets',w1&&w1.wickets,w2&&w2.wickets,true],
+      ['Economy',w1&&w1.economy,w2&&w2.economy,false],
+      ['Bowling avg',w1&&w1.avg,w2&&w2.avg,false],
+    ];
+    let html='<div class="card"><h2>Head-to-head (merged filter)</h2><table><thead><tr><th>Stat</th><th>'+escHtml(p1)+'</th><th>'+escHtml(p2)+'</th></tr></thead><tbody>';
+    rows.forEach(function(row){
+      var lab=row[0],v1=row[1],v2=row[2],high=row[3];
+      var c1=typeof v1==='number'?v1:fmt(v1);
+      var c2=typeof v2==='number'?v2:fmt(v2);
+      var cls1=high!=null?cmpWinClass(v1,v2,high):'';
+      var cls2=high!=null?cmpWinClass(v2,v1,high):'';
+      html+='<tr><td>'+escHtml(lab)+'</td><td class="'+cls1+'">'+fmt(c1)+'</td><td class="'+cls2+'">'+fmt(c2)+'</td></tr>';
+    });
+    html+='</tbody></table></div>';
+    html+='<div class="grid2"><div class="card"><h2>Runs (merged)</h2><div class="chart-wrap"><canvas id="cmp-chart-runs"></canvas></div></div>';
+    html+='<div class="card"><h2>Links</h2><p style="font-size:13px;color:var(--muted);line-height:1.6">';
+    var u1=playerProfileHref(p1);
+    var u2=playerProfileHref(p2);
+    html+='<a href="'+u1+'" style="color:var(--blue);font-weight:600">Full profile: '+escHtml(p1)+'</a><br><br>';
+    html+='<a href="'+u2+'" style="color:var(--blue);font-weight:600">Full profile: '+escHtml(p2)+'</a></p></div></div>';
+    host.innerHTML=html;
+    const r1=b1?+b1.runs:0,r2=b2?+b2.runs:0;
+    killCmpChart();
+    setTimeout(()=>{
+      const ctx=document.getElementById('cmp-chart-runs');
+      if(!ctx||typeof Chart==='undefined')return;
+      cmpChart=new Chart(ctx.getContext('2d'),{
+        type:'bar',
+        data:{labels:[p1,p2],datasets:[{label:'Runs',data:[r1,r2],backgroundColor:['rgba(30,58,95,.85)','rgba(232,93,4,.85)'],borderRadius:6}]},
+        options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}
+      });
+    },50);
+  });
+}
+
+function escHtml(s){
+  return typeof t20EscapeHtml==='function'?t20EscapeHtml(String(s||'')):String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+async function cmpReloadData(){
+  cmpSyncUrl();
+  allDataRaw={};
+  await cmpRender();
+}
+
+async function boot(){
+  if(typeof t20EnsureSiteConfig==='function')await t20EnsureSiteConfig();
+  try{
+    championshipIndex=await t20FetchIndex();
+    COMPS=t20GetT20Competitions(championshipIndex).map(c=>({code:c.code,name:c.name}));
+  }catch(e){championshipIndex=null;}
+  if(!COMPS.length){
+    const fb=typeof t20GetFallbackCompetitions==='function'?t20GetFallbackCompetitions():[];
+    COMPS=fb.map(c=>({code:c.code,name:c.name}));
+  }
+  const fp=t20ReadFilterParams(location.search,championshipIndex);
+  selectedTournamentCodes=fp.codes;
+  activeSeason=fp.activeSeason;
+  yearFrom=fp.yearFrom;yearTo=fp.yearTo;
+  if(!selectedTournamentCodes.length){
+    selectedTournamentCodes=typeof t20DefaultFilterCodes==='function'?t20DefaultFilterCodes(COMPS.map(c=>c.code)):['ipl'];
+  }
+  renderCmpChips();
+  fillCmpSeason();
+  document.getElementById('cmp-season').value=activeSeason;
+  document.getElementById('cmp-yf').value=yearFrom||'';
+  document.getElementById('cmp-yt').value=yearTo||'';
+  document.getElementById('inp-p1').value=readQsName('p1');
+  document.getElementById('inp-p2').value=readQsName('p2');
+  document.title='Compare — T20 Stats';
+  cmpSyncUrl();
+  cmpRender();
+}
+
+boot();
+</script>
+</body>
+</html>

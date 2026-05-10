@@ -115,4 +115,32 @@ test.describe('post-deploy smoke', () => {
     expect(Array.isArray(j.site.fallbackCompetitions)).toBeTruthy();
     expect(Array.isArray(j.cricsheet.competitions)).toBeTruthy();
   });
+
+  test('index exposes t20MergeDatasets after merge script', async ({ page }) => {
+    await page.goto('/index.html');
+    await page.waitForFunction(() => typeof window.t20MergeDatasets === 'function', { timeout: 60_000 });
+  });
+
+  test('compare page shows head-to-head for two IPL batters', async ({ page, baseURL }) => {
+    const errors = [];
+    attachSoftErrorListeners(page, errors);
+
+    const u = new URL('/compare.html', baseURL);
+    u.searchParams.set('comps', 'ipl');
+    u.searchParams.set('season', 'all');
+    u.searchParams.set('p1', 'V Kohli');
+    u.searchParams.set('p2', 'RG Sharma');
+
+    await page.goto(u.toString(), { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window.t20MergeDatasets === 'function', { timeout: 60_000 });
+
+    await expect(page.locator('.card h2').filter({ hasText: 'Head-to-head' })).toBeVisible({
+      timeout: 120_000,
+    });
+    await expect(page.locator('thead th').filter({ hasText: 'V Kohli' })).toBeVisible();
+    await expect(page.locator('thead th').filter({ hasText: 'RG Sharma' })).toBeVisible();
+    await expect(page.locator('.card h2').filter({ hasText: 'Runs (merged)' })).toBeVisible();
+
+    expect(errors, errors.join('\n')).toEqual([]);
+  });
 });

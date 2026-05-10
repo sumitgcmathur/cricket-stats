@@ -112,7 +112,10 @@ footer a{color:var(--blue);text-decoration:none;}
 
 <div style="background:var(--surface);border-bottom:1px solid var(--border);padding:8px 24px;">
   <div style="max-width:1200px;margin:0 auto">
+    <div style="display:flex;flex-wrap:wrap;align-items:center;gap:14px">
     <button onclick="history.back()" style="background:none;border:none;color:var(--muted);font-family:Inter,sans-serif;font-size:13px;cursor:pointer;padding:4px 0;display:inline-flex;align-items:center;gap:6px">← Back</button>
+    <a id="player-compare-link" href="compare.html" style="font-size:13px;color:var(--blue);font-weight:500;text-decoration:none">Compare vs another player →</a>
+    </div>
   </div>
 </div>
 <div class="t20-toolbar">
@@ -219,6 +222,14 @@ function fillPlayerSeasonOptions(seasons){
   activeSeason=sel.value;
 }
 
+function syncPlayerCompareLink(){
+  const a=document.getElementById('player-compare-link');
+  if(!a||!playerName)return;
+  const q=t20FilterQS({codes:selectedTournamentCodes,activeSeason,yearFrom,yearTo},championshipIndex);
+  q.set('p1',playerName);
+  a.href='compare.html?'+q.toString();
+}
+
 function onPlayerTournamentChange(){
   const checked=[...document.querySelectorAll('#player-filter-tournaments input:checked')].map(i=>i.value);
   selectedTournamentCodes=checked.length?checked:(typeof t20DefaultFilterCodes==='function'?t20DefaultFilterCodes(COMPS.map(c=>c.code)):['ipl']);
@@ -232,6 +243,7 @@ function onPlayerTournamentChange(){
   Promise.all(selectedTournamentCodes.map(loadCompRaw)).then(()=>{
     applyPlayerFilters();
     t20WriteFilterParams({codes:selectedTournamentCodes,activeSeason,yearFrom,yearTo},{name:playerName});
+    syncPlayerCompareLink();
     renderHero();
     renderCurrentPlayerTab();
   });
@@ -249,6 +261,7 @@ function playerSelectAllTournaments(){
   Promise.all(selectedTournamentCodes.map(loadCompRaw)).then(()=>{
     applyPlayerFilters();
     t20WriteFilterParams({codes:selectedTournamentCodes,activeSeason,yearFrom,yearTo},{name:playerName});
+    syncPlayerCompareLink();
     renderHero();
     renderCurrentPlayerTab();
   });
@@ -266,6 +279,7 @@ function playerClearTournaments(){
   Promise.all(selectedTournamentCodes.map(loadCompRaw)).then(()=>{
     applyPlayerFilters();
     t20WriteFilterParams({codes:selectedTournamentCodes,activeSeason,yearFrom,yearTo},{name:playerName});
+    syncPlayerCompareLink();
     renderHero();
     renderCurrentPlayerTab();
   });
@@ -278,6 +292,7 @@ function onPlayerSeasonChange(){
   document.getElementById('player-year-to').value='';
   applyPlayerFilters();
   t20WriteFilterParams({codes:selectedTournamentCodes,activeSeason,yearFrom,yearTo},{name:playerName});
+  syncPlayerCompareLink();
   renderHero();
   renderCurrentPlayerTab();
 }
@@ -289,6 +304,7 @@ function onPlayerYearRange(){
   document.getElementById('player-season-select').value='all';
   applyPlayerFilters();
   t20WriteFilterParams({codes:selectedTournamentCodes,activeSeason,yearFrom,yearTo},{name:playerName});
+  syncPlayerCompareLink();
   renderHero();
   renderCurrentPlayerTab();
 }
@@ -401,6 +417,7 @@ async function boot(){
   const tabC=document.getElementById('tab-career');
   if(tabC) tabC.classList.add('active');
   renderCareer();
+  syncPlayerCompareLink();
 }
 
 function showInitials(){
