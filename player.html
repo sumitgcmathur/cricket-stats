@@ -981,7 +981,7 @@ function renderBatting(containerId){
 
   // Detailed table
   html+=`<div class="card"><div class="card-title">Career Batting Stats</div>
-    <table><thead><tr><th>Competition</th><th title="Matches in official squad list (Cricsheet)">Mat</th><th title="Distinct innings with ≥1 ball faced (striker)">Inns</th><th>Runs</th><th>Avg</th><th>SR</th><th>MVP</th><th title="MVP points per innings">MVP/Inn</th><th>4s</th><th>6s</th><th>50s</th><th>100s</th></tr></thead>
+    <table><thead><tr><th>Competition</th><th title="Matches in official squad list (Cricsheet)">Mat</th><th title="Innings with ≥1 non-wide ball faced as striker (often below Mat for squad-only games)">Inns</th><th>Runs</th><th>Avg</th><th>SR</th><th>MVP</th><th title="MVP points per innings">MVP/Inn</th><th>4s</th><th>6s</th><th>50s</th><th>100s</th></tr></thead>
     <tbody>${rows.map(r=>`<tr>
       <td>${escHtml(r.comp.name)} <span style="font-size:10px;color:var(--muted)">(${escHtml(r.comp.format)})</span></td>
       <td>${r.bat.matches}</td><td>${r.bat.innings!=null?r.bat.innings:'—'}</td><td class="hi">${r.bat.runs.toLocaleString()}</td>
@@ -1086,7 +1086,7 @@ function renderBowling(containerId){
     </div>`;
 
   html+=`<div class="card"><div class="card-title">Career Bowling Stats</div>
-    <table><thead><tr><th>Competition</th><th title="Matches in official squad list (Cricsheet)">Mat</th><th title="Distinct innings with ≥1 ball bowled">Inns</th><th>Wkts</th><th>Avg</th><th>Econ</th><th>MVP</th><th title="MVP points per innings">MVP/Inn</th><th>Overs</th><th>Runs</th></tr></thead>
+    <table><thead><tr><th>Competition</th><th title="Matches in official squad list (Cricsheet)">Mat</th><th title="Innings with ≥1 non-wide delivery bowled (wides do not count as balls bowled)">Inns</th><th>Wkts</th><th>Avg</th><th>Econ</th><th>MVP</th><th title="MVP points per innings">MVP/Inn</th><th>Overs</th><th>Runs</th></tr></thead>
     <tbody>${rows.map(r=>`<tr>
       <td>${escHtml(r.comp.name)} <span style="font-size:10px;color:var(--muted)">(${escHtml(r.comp.format)})</span></td>
       <td>${r.bowl.matches}</td><td>${r.bowl.innings!=null?r.bowl.innings:'—'}</td><td class="hi">${r.bowl.wickets}</td>

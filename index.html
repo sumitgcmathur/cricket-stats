@@ -1761,7 +1761,7 @@ function kpi(label, val, name) {
 function renderBatting(d, target, expanded, filterQ) {
   const cols = [
     {k:'matches', l:'Mat'},
-    {k:'innings', l:'Inns', title: 'Distinct team innings with ≥1 ball faced (striker)'},
+    {k:'innings', l:'Inns', title: 'Distinct innings with ≥1 non-wide ball faced as striker (can be less than Mat if squad-listed but did not bat)'},
     {k:'runs',    l:'Runs', hi:true},
     {k:'avg',     l:'Avg'},
     {k:'sr',      l:'SR'},
@@ -1779,7 +1779,7 @@ function renderBatting(d, target, expanded, filterQ) {
 function renderBowling(d, target, expanded, filterQ) {
   const cols = [
     {k:'matches',  l:'Mat'},
-    {k:'innings',  l:'Inns', title: 'Distinct innings with ≥1 ball bowled'},
+    {k:'innings',  l:'Inns', title: 'Distinct innings with ≥1 non-wide delivery bowled (wides excluded like batting Inns)'},
     {k:'wickets',  l:'Wkts', hi:true},
     {k:'avg',      l:'Avg'},
     {k:'economy',  l:'Econ'},

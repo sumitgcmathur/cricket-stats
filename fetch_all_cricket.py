@@ -359,7 +359,12 @@ def format_dismissal(wicket_type, bowler, fielder):
 
 
 def _inn_key(match_id, innings):
-    return (match_id, str(innings))
+    """Normalize innings label so 1 / 1.0 / '1' share one key per match innings."""
+    try:
+        inorm = str(int(float(innings)))
+    except (TypeError, ValueError):
+        inorm = str(innings).strip() if innings is not None else "1"
+    return (match_id, inorm)
 
 
 def _bat_team_ssn_bucket():
@@ -561,7 +566,10 @@ def parse_zip(zip_bytes, comp):
                         b["runs"]  += runs_bat
                         b["balls"] += 1
                         b["matches"].add(match_id)
-                        b.setdefault("innings_ids", set()).add(_inn_key(match_id, innings))
+                        # Innings batted: count (match, innings) only when striker faces a non-wide
+                        # delivery (wide = no ball to striker; avoids inflating toward matches played).
+                        if not wides:
+                            b.setdefault("innings_ids", set()).add(_inn_key(match_id, innings))
                         if runs_bat == 4: b["fours"] += 1
                         if runs_bat == 6: b["sixes"] += 1
                         inn_runs[innings][batter] += runs_bat
@@ -601,7 +609,8 @@ def parse_zip(zip_bytes, comp):
                             bs["runs"]  += runs_bat
                             bs["balls"] += 1
                             bs["matches"].add(match_id)
-                            bs.setdefault("innings_ids", set()).add(_inn_key(match_id, innings))
+                            if not wides:
+                                bs.setdefault("innings_ids", set()).add(_inn_key(match_id, innings))
                             if runs_bat == 4:
                                 bs["fours"] += 1
                                 bs["mvp_pts"] += 2.5
@@ -614,7 +623,8 @@ def parse_zip(zip_bytes, comp):
                             tss["runs"] += runs_bat
                             tss["balls"] += 1
                             tss["matches"].add(match_id)
-                            tss.setdefault("innings_ids", set()).add(_inn_key(match_id, innings))
+                            if not wides:
+                                tss.setdefault("innings_ids", set()).add(_inn_key(match_id, innings))
                             if runs_bat == 4:
                                 tss["fours"] += 1
                                 tss["mvp_pts"] += 2.5
@@ -682,7 +692,9 @@ def parse_zip(zip_bytes, comp):
                         bl["runs"]  += runs_bat + extras
                         bl["balls"] += 1
                         bl["matches"].add(match_id)
-                        bl.setdefault("innings_ids", set()).add(_inn_key(match_id, innings))
+                        # Innings bowled: count only when a non-wide delivery (wide does not count as a ball bowled).
+                        if not wides:
+                            bl.setdefault("innings_ids", set()).add(_inn_key(match_id, innings))
                         if wicket_t and wicket_t not in ("run out","retired hurt","obstructing the field"):
                             bl["wickets"] += 1
                         # Bowler split vs batter handedness
@@ -728,7 +740,8 @@ def parse_zip(zip_bytes, comp):
                             bs["runs"]  += runs_bat + extras
                             bs["balls"] += 1
                             bs["matches"].add(match_id)
-                            bs.setdefault("innings_ids", set()).add(_inn_key(match_id, innings))
+                            if not wides:
+                                bs.setdefault("innings_ids", set()).add(_inn_key(match_id, innings))
                             # Per-season MVP points (must match overall logic above)
                             if wicket_t and wicket_t not in ("run out","retired hurt","obstructing the field"):
                                 bs["mvp_pts"] += 3.5
@@ -740,7 +753,8 @@ def parse_zip(zip_bytes, comp):
                             bts["runs"] += runs_bat + extras
                             bts["balls"] += 1
                             bts["matches"].add(match_id)
-                            bts.setdefault("innings_ids", set()).add(_inn_key(match_id, innings))
+                            if not wides:
+                                bts.setdefault("innings_ids", set()).add(_inn_key(match_id, innings))
                             if wicket_t and wicket_t not in ("run out","retired hurt","obstructing the field"):
                                 bts["wickets"] += 1
                             if wicket_t and wicket_t not in ("run out","retired hurt","obstructing the field"):
