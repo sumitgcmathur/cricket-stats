@@ -202,11 +202,14 @@
     } else if (yearFrom || yearTo) {
       season = 'all';
     }
+    /* forTeam = batting/bowling slice on index (distinct from team.html ?team=) */
+    var teamRaw = (qs.get('forTeam') || '').trim();
     return {
       codes: codes,
       activeSeason: season,
       yearFrom: yearFrom,
       yearTo: yearTo,
+      team: teamRaw || null,
     };
   }
 
@@ -237,6 +240,8 @@
       if (state.yearTo) u.searchParams.set('yearTo', String(state.yearTo));
       else u.searchParams.delete('yearTo');
     }
+    if (state.team && String(state.team).trim()) u.searchParams.set('forTeam', String(state.team).trim());
+    else u.searchParams.delete('forTeam');
     if (extraPreserve && typeof extraPreserve === 'object') {
       Object.keys(extraPreserve).forEach(function (k) {
         var v = extraPreserve[k];
@@ -267,7 +272,131 @@
       if (state.yearFrom) q.set('yearFrom', String(state.yearFrom));
       if (state.yearTo) q.set('yearTo', String(state.yearTo));
     }
+    if (state.team && String(state.team).trim()) q.set('forTeam', String(state.team).trim());
     return q;
+  }
+
+  function t20FilterByTeamMap(teamMap, seasonMatchesFn) {
+    if (!teamMap || typeof teamMap !== 'object') return null;
+    var out = {};
+    Object.keys(teamMap).forEach(function (team) {
+      var tnode = teamMap[team];
+      var src = (tnode && tnode.by_season) || {};
+      var sub = {};
+      Object.keys(src).forEach(function (ssn) {
+        if (seasonMatchesFn(ssn)) sub[ssn] = src[ssn];
+      });
+      if (Object.keys(sub).length) out[team] = { by_season: sub };
+    });
+    return Object.keys(out).length ? out : null;
+  }
+
+  function t20SumBatTeamBranch(teamNode) {
+    if (!teamNode || !teamNode.by_season) return null;
+    var agg = {
+      matches: 0,
+      runs: 0,
+      balls: 0,
+      fours: 0,
+      sixes: 0,
+      fifties: 0,
+      hundreds: 0,
+      mvp_pts: 0,
+      dismissals: 0,
+    };
+    Object.values(teamNode.by_season).forEach(function (s) {
+      agg.matches += s.matches || 0;
+      agg.runs += s.runs || 0;
+      agg.balls += s.balls || 0;
+      agg.fours += s.fours || 0;
+      agg.sixes += s.sixes || 0;
+      agg.fifties += s.fifties || 0;
+      agg.hundreds += s.hundreds || 0;
+      agg.mvp_pts += s.mvp_pts || 0;
+      agg.dismissals += s.dismissals || 0;
+    });
+    if (!agg.balls && !agg.runs) return null;
+    agg.mvp_pts = +agg.mvp_pts.toFixed(1);
+    var avg = agg.dismissals ? +(agg.runs / agg.dismissals).toFixed(2) : agg.runs;
+    var sr = agg.balls ? +((agg.runs / agg.balls) * 100).toFixed(2) : 0;
+    var perf_index = sr > 0 ? +((avg * (sr / 100)).toFixed(1)) : 0;
+    return {
+      matches: agg.matches,
+      runs: agg.runs,
+      balls: agg.balls,
+      fours: agg.fours,
+      sixes: agg.sixes,
+      fifties: agg.fifties,
+      hundreds: agg.hundreds,
+      mvp_pts: agg.mvp_pts,
+      avg: avg,
+      sr: sr,
+      perf_index: perf_index,
+    };
+  }
+
+  function t20SumBowlTeamBranch(teamNode) {
+    if (!teamNode || !teamNode.by_season) return null;
+    var agg = { matches: 0, wickets: 0, runs: 0, balls: 0, mvp_pts: 0 };
+    Object.values(teamNode.by_season).forEach(function (s) {
+      agg.matches += s.matches || 0;
+      agg.wickets += s.wickets || 0;
+      agg.runs += s.runs || 0;
+      agg.balls += s.balls || 0;
+      agg.mvp_pts += s.mvp_pts || 0;
+    });
+    if (!agg.balls) return null;
+    agg.mvp_pts = +agg.mvp_pts.toFixed(1);
+    var economy = agg.balls ? +((agg.runs / agg.balls) * 6).toFixed(2) : 0;
+    var avg = agg.wickets ? +(agg.runs / agg.wickets).toFixed(2) : null;
+    var overs = Math.floor(agg.balls / 6) + (agg.balls % 6) / 10;
+    var bowl_index =
+      economy > 0 && agg.matches > 0 ? +((agg.wickets / agg.matches) * (6 / economy)).toFixed(2) : 0;
+    return {
+      matches: agg.matches,
+      wickets: agg.wickets,
+      runs: agg.runs,
+      balls: agg.balls,
+      overs: +overs.toFixed(1),
+      economy: economy,
+      avg: avg,
+      bowl_index: bowl_index,
+      mvp_pts: agg.mvp_pts,
+    };
+  }
+
+  /** Slice merged batting/bowling to one franchise (ball rows while batting / bowling for that side). */
+  function t20ApplyTeamFilter(data, teamName) {
+    if (!data || !teamName || teamName === 'all') return data;
+    var nm = String(teamName).trim();
+    if (!nm) return data;
+    var bat = (data.batting || [])
+      .map(function (p) {
+        var t = p.by_team && p.by_team[nm];
+        var agg = t20SumBatTeamBranch(t);
+        if (!agg) return null;
+        var o = Object.assign({}, p, agg);
+        delete o.by_team;
+        return o;
+      })
+      .filter(Boolean)
+      .sort(function (a, b) {
+        return b.runs - a.runs;
+      });
+    var bowl = (data.bowling || [])
+      .map(function (p) {
+        var t = p.by_team && p.by_team[nm];
+        var agg = t20SumBowlTeamBranch(t);
+        if (!agg) return null;
+        var o = Object.assign({}, p, agg);
+        delete o.by_team;
+        return o;
+      })
+      .filter(Boolean)
+      .sort(function (a, b) {
+        return b.wickets - a.wickets;
+      });
+    return Object.assign({}, data, { batting: bat, bowling: bowl });
   }
 
   function t20FilterBySeason(data, activeSeason, yearFrom, yearTo) {
@@ -319,7 +448,7 @@
         );
         /* Keep row if any batting activity in window (e.g. 0 runs but balls faced). */
         if (!agg.matches && !agg.balls && !agg.runs) return null;
-        return Object.assign({}, p, {
+        var row = Object.assign({}, p, {
           matches: agg.matches,
           runs: agg.runs,
           balls: agg.balls,
@@ -331,6 +460,12 @@
           avg: agg.dismissals ? +(agg.runs / agg.dismissals).toFixed(2) : agg.runs,
           sr: agg.balls ? +((agg.runs / agg.balls) * 100).toFixed(2) : 0,
         });
+        var byTeamF = p.by_team ? t20FilterByTeamMap(p.by_team, seasonMatches) : null;
+        if (byTeamF) row.by_team = byTeamF;
+        else delete row.by_team;
+        row.perf_index =
+          row.sr > 0 ? +((row.avg * (row.sr / 100)).toFixed(1)) : +(row.perf_index || 0) || 0;
+        return row;
       })
       .filter(Boolean)
       .sort(function (a, b) {
@@ -416,7 +551,7 @@
           economy > 0 && agg.matches > 0
             ? +((agg.wickets / agg.matches) * (6 / economy)).toFixed(2)
             : 0;
-        return Object.assign({}, p, {
+        var row = Object.assign({}, p, {
           matches: agg.matches,
           wickets: agg.wickets,
           runs: agg.runs,
@@ -427,6 +562,10 @@
           bowl_index: bowl_index,
           mvp_pts: +agg.mvp_pts.toFixed(1),
         });
+        var byTeamF = p.by_team ? t20FilterByTeamMap(p.by_team, seasonMatches) : null;
+        if (byTeamF) row.by_team = byTeamF;
+        else delete row.by_team;
+        return row;
       })
       .filter(Boolean)
       .sort(function (a, b) {
@@ -474,6 +613,7 @@
   g.t20WriteFilterParams = t20WriteFilterParams;
   g.t20FilterQS = t20FilterQS;
   g.t20FilterBySeason = t20FilterBySeason;
+  g.t20ApplyTeamFilter = t20ApplyTeamFilter;
   g.t20MatchPassesFilters = t20MatchPassesFilters;
   g.t20DefaultFilterCodes = t20DefaultFilterCodes;
   g.t20EscapeHtml = t20EscapeHtml;

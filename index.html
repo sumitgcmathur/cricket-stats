@@ -935,6 +935,10 @@ footer a { color: var(--blue); text-decoration: none; }
             <span class="year-range-label">to</span>
             <input class="year-input" type="number" id="year-to" placeholder="To" min="1995" max="2035" onchange="onYearRange()">
           </div>
+          <span class="inline-lab" id="team-slice-wrap" hidden style="margin-left:8px">Team slice</span>
+          <select class="season-select" id="team-slice-select" hidden style="max-width:220px" title="Batting while playing for this side; bowling while this side is fielding. Re-run fetch if missing." onchange="onTeamSliceChange()">
+            <option value="all">All teams (career totals)</option>
+          </select>
         </div>
         <div class="toolbar-sep-v" aria-hidden="true"></div>
         <div class="pill-group" id="stat-pills">
@@ -989,6 +993,8 @@ let currentTableRows = {};
 let currentTableCols = {};
 let activeSeason = 'all';
 let yearFrom = null, yearTo = null;
+/** When set, merged batting/bowling show only contributions for this franchise (see forTeam= URL). */
+let activeTeamFilter = null;
 let selectedTournamentCodes = [];
 let currentMergedData = null;
 let mvpDashboardCharts = [];
@@ -1127,6 +1133,42 @@ function clearTournamentSelection() {
   refreshDashboard();
 }
 
+function fillTeamSliceSelect(merged) {
+  const wrap = document.getElementById('team-slice-wrap');
+  const sel = document.getElementById('team-slice-select');
+  if (!wrap || !sel || !merged) return;
+  const hasTeam = (merged.batting || []).some(p => p.by_team && Object.keys(p.by_team).length);
+  wrap.hidden = !hasTeam;
+  sel.hidden = !hasTeam;
+  if (!hasTeam) {
+    if (activeTeamFilter) {
+      activeTeamFilter = null;
+      syncIndexFiltersToURL();
+    }
+    return;
+  }
+  const names = new Set();
+  (merged.teams || []).forEach(t => { if (t && t.team) names.add(t.team); });
+  (merged.batting || []).forEach(p => {
+    if (p.by_team) Object.keys(p.by_team).forEach(t => names.add(t));
+  });
+  const arr = [...names].sort((a, b) => a.localeCompare(b));
+  sel.innerHTML = '';
+  const o0 = document.createElement('option');
+  o0.value = 'all';
+  o0.textContent = 'All teams (career totals)';
+  sel.appendChild(o0);
+  arr.forEach(t => {
+    const o = document.createElement('option');
+    o.value = t;
+    o.textContent = t;
+    sel.appendChild(o);
+  });
+  const want = activeTeamFilter && activeTeamFilter !== 'all' ? activeTeamFilter : 'all';
+  sel.value = want !== 'all' && names.has(want) ? want : 'all';
+  activeTeamFilter = sel.value === 'all' ? null : sel.value;
+}
+
 async function buildMergedDataset() {
   const codes = selectedTournamentCodes.length ? selectedTournamentCodes : getT20Competitions().map(c => c.code);
   const parts = [];
@@ -1136,7 +1178,23 @@ async function buildMergedDataset() {
     if (activeSeason !== 'all' || yearFrom || yearTo) d = filterBySeason(d);
     parts.push(d);
   }
-  return typeof t20MergeDatasets === 'function' ? t20MergeDatasets(parts) : null;
+  let merged = typeof t20MergeDatasets === 'function' ? t20MergeDatasets(parts) : null;
+  if (!merged) return null;
+  fillTeamSliceSelect(merged);
+  if (activeTeamFilter && activeTeamFilter !== 'all' && typeof t20ApplyTeamFilter === 'function') {
+    const hasSlices = (merged.batting || []).some(p => p.by_team && Object.keys(p.by_team).length);
+    if (hasSlices) merged = t20ApplyTeamFilter(merged, activeTeamFilter);
+  }
+  return merged;
+}
+
+function onTeamSliceChange() {
+  const sel = document.getElementById('team-slice-select');
+  if (!sel) return;
+  activeTeamFilter = sel.value === 'all' ? null : sel.value;
+  updateSeasonBanner();
+  syncIndexFiltersToURL();
+  refreshDashboard();
 }
 
 async function refreshDashboard() {
@@ -1172,6 +1230,7 @@ async function boot() {
     activeSeason = fp.activeSeason;
     yearFrom = fp.yearFrom;
     yearTo = fp.yearTo;
+    activeTeamFilter = fp.team || null;
     if (!selectedTournamentCodes.length) {
       const allC = getT20Competitions().map(c => c.code);
       selectedTournamentCodes = typeof t20DefaultFilterCodes === 'function' ? t20DefaultFilterCodes(allC) : allC;
@@ -1261,12 +1320,16 @@ function onYearRange() {
 function updateSeasonBanner() {
   const banner = document.getElementById('season-banner');
   const bannerText = document.getElementById('banner-season');
+  const teamBit = activeTeamFilter ? ' · Team: ' + activeTeamFilter : '';
   if (activeSeason !== 'all') {
     banner.style.display = 'flex';
-    bannerText.textContent = activeSeason;
+    bannerText.textContent = activeSeason + teamBit;
   } else if (yearFrom || yearTo) {
     banner.style.display = 'flex';
-    bannerText.textContent = (yearFrom || '2008') + ' – ' + (yearTo || '2026');
+    bannerText.textContent = (yearFrom || '2008') + ' – ' + (yearTo || '2026') + teamBit;
+  } else if (activeTeamFilter) {
+    banner.style.display = 'flex';
+    bannerText.textContent = 'Team slice: ' + activeTeamFilter + ' (batting + bowling for this side only)';
   } else {
     banner.style.display = 'none';
   }
@@ -1278,7 +1341,7 @@ function filterBySeason(data) {
 }
 
 function currentT20FilterState() {
-  return { codes: selectedTournamentCodes.slice(), activeSeason, yearFrom, yearTo };
+  return { codes: selectedTournamentCodes.slice(), activeSeason, yearFrom, yearTo, team: activeTeamFilter || null };
 }
 
 function playerHref(name) {

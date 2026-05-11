@@ -358,6 +358,49 @@ def format_dismissal(wicket_type, bowler, fielder):
         return wicket_type
 
 
+def _bat_team_ssn_bucket():
+    return {
+        "runs": 0,
+        "balls": 0,
+        "fours": 0,
+        "sixes": 0,
+        "fifties": 0,
+        "hundreds": 0,
+        "mvp_pts": 0.0,
+        "matches": set(),
+        "dismissals": 0,
+    }
+
+
+def _bowl_team_ssn_bucket():
+    return {"runs": 0, "balls": 0, "wickets": 0, "mvp_pts": 0.0, "matches": set()}
+
+
+def _bat_team_season_bucket(b, team_name, season_key):
+    """season_key may be '' when CSV season is missing."""
+    if not team_name:
+        return None
+    bt_all = b.setdefault("by_team", {})
+    tb = bt_all.setdefault(team_name, {"by_season": {}})
+    sk = season_key if season_key is not None else ""
+    bs_map = tb.setdefault("by_season", {})
+    if sk not in bs_map:
+        bs_map[sk] = _bat_team_ssn_bucket()
+    return bs_map[sk]
+
+
+def _bowl_team_season_bucket(bl, team_name, season_key):
+    if not team_name:
+        return None
+    bt_all = bl.setdefault("by_team", {})
+    tb = bt_all.setdefault(team_name, {"by_season": {}})
+    sk = season_key if season_key is not None else ""
+    bs_map = tb.setdefault("by_season", {})
+    if sk not in bs_map:
+        bs_map[sk] = _bowl_team_ssn_bucket()
+    return bs_map[sk]
+
+
 # ── MAIN PARSER ──────────────────────────────────────────────────────────────
 def parse_zip(zip_bytes, comp):
     format_ = comp["format"]
@@ -477,6 +520,7 @@ def parse_zip(zip_bytes, comp):
                         teams[match_winner_from_info]["by_season"][season]["wins"] += 1
 
                 inn_runs = defaultdict(lambda: defaultdict(int))
+                inn_bat_team = {}
 
                 for row in rows:
                     batter     = row.get("striker","").strip()
@@ -491,6 +535,8 @@ def parse_zip(zip_bytes, comp):
                     wicket_t   = row.get("wicket_type","").strip()
                     innings    = row.get("innings","1")
                     ball_str   = row.get("ball","0")
+                    if bat_team:
+                        inn_bat_team[(match_id, str(innings))] = bat_team
                     try:
                         over_num = int(float(ball_str))  # 0.1->0, 5.6->5, 15.3->15
                     except:
@@ -544,6 +590,18 @@ def parse_zip(zip_bytes, comp):
                             if runs_bat == 6:
                                 bs["sixes"] += 1
                                 bs["mvp_pts"] += 3.5
+                        if bat_team:
+                            sk_bt = season if season else ""
+                            tss = _bat_team_season_bucket(b, bat_team, sk_bt)
+                            tss["runs"] += runs_bat
+                            tss["balls"] += 1
+                            tss["matches"].add(match_id)
+                            if runs_bat == 4:
+                                tss["fours"] += 1
+                                tss["mvp_pts"] += 2.5
+                            if runs_bat == 6:
+                                tss["sixes"] += 1
+                                tss["mvp_pts"] += 3.5
 
                     # Track dismissals for correct batting average
                     player_out = row.get("player_dismissed","").strip()
@@ -551,6 +609,9 @@ def parse_zip(zip_bytes, comp):
                         batters[player_out]["dismissals"] += 1
                         if season and season in batters[player_out]["by_season"]:
                             batters[player_out]["by_season"][season]["dismissals"] += 1
+                        if bat_team:
+                            sk_bt = season if season else ""
+                            _bat_team_season_bucket(batters[player_out], bat_team, sk_bt)["dismissals"] += 1
                         # Fielding MVP (same scale as IPL broadcast table): catch / stumping = 2.5 pts
                         fld_raw = (row.get("fielders") or row.get("fielder") or "").strip()
                         wt_low = (wicket_t or "").strip().lower()
@@ -584,6 +645,11 @@ def parse_zip(zip_bytes, comp):
                                         bs = bf["by_season"][season]
                                         bs["mvp_pts"] = bs.get("mvp_pts", 0) + 2.5
                                         bs["matches"].add(match_id)
+                                    if bowl_team:
+                                        sk_bt = season if season else ""
+                                        fts = _bat_team_season_bucket(bf, bowl_team, sk_bt)
+                                        fts["mvp_pts"] += 2.5
+                                        fts["matches"].add(match_id)
                         # Track wickets per season and phase for bowling filter
                         if bowler and wicket_t not in ("run out","retired hurt","obstructing the field"):
                             if season and season in bowlers[bowler]["by_season"]:
@@ -639,17 +705,35 @@ def parse_zip(zip_bytes, comp):
                                 bs["mvp_pts"] += 3.5
                             elif not wides and not noballs and runs_bat == 0 and not extras:
                                 bs["mvp_pts"] += 1.0
+                        if bowl_team:
+                            sk_bt = season if season else ""
+                            bts = _bowl_team_season_bucket(bl, bowl_team, sk_bt)
+                            bts["runs"] += runs_bat + extras
+                            bts["balls"] += 1
+                            bts["matches"].add(match_id)
+                            if wicket_t and wicket_t not in ("run out","retired hurt","obstructing the field"):
+                                bts["wickets"] += 1
+                            if wicket_t and wicket_t not in ("run out","retired hurt","obstructing the field"):
+                                bts["mvp_pts"] += 3.5
+                            elif not wides and not noballs and runs_bat == 0 and not extras:
+                                bts["mvp_pts"] += 1.0
 
                 for inn, bmap in inn_runs.items():
+                    ibt = inn_bat_team.get((match_id, str(inn)))
+                    sk_bt = season if season else ""
                     for batter, runs in bmap.items():
                         if runs >= 100:
                             batters[batter]["hundreds"] += 1
                             if season and season in batters[batter]["by_season"]:
                                 batters[batter]["by_season"][season]["hundreds"] += 1
+                            if ibt:
+                                _bat_team_season_bucket(batters[batter], ibt, sk_bt)["hundreds"] += 1
                         elif runs >= 50:
                             batters[batter]["fifties"] += 1
                             if season and season in batters[batter]["by_season"]:
                                 batters[batter]["by_season"][season]["fifties"] += 1
+                            if ibt:
+                                _bat_team_season_bucket(batters[batter], ibt, sk_bt)["fifties"] += 1
 
                 # Build and save scorecard
                 try:
@@ -717,6 +801,62 @@ def _official_matches_season(name, season, ball_season_ss, xi_by_season):
     )
 
 
+def _serialize_bat_by_team(s):
+    out = {}
+    for team, tb in (s.get("by_team") or {}).items():
+        subs = {}
+        for ssn, ss in (tb.get("by_season") or {}).items():
+            sm = len(ss.get("matches") or [])
+            if sm < 1 and not ss.get("balls"):
+                continue
+            sd = ss.get("dismissals", 0)
+            subs[ssn] = {
+                "matches": sm,
+                "runs": ss["runs"],
+                "balls": ss["balls"],
+                "dismissals": sd,
+                "avg": round(ss["runs"] / sd, 2) if sd else ss["runs"],
+                "sr": round(ss["runs"] / ss["balls"] * 100, 2) if ss["balls"] else 0,
+                "fours": ss["fours"],
+                "sixes": ss["sixes"],
+                "fifties": ss["fifties"],
+                "hundreds": ss["hundreds"],
+                "mvp_pts": round(ss.get("mvp_pts", 0), 1),
+            }
+        if subs:
+            out[team] = {"by_season": subs}
+    return out or None
+
+
+def _serialize_bowl_by_team(s):
+    out = {}
+    for team, tb in (s.get("by_team") or {}).items():
+        subs = {}
+        for ssn, ss in (tb.get("by_season") or {}).items():
+            sb = ss.get("balls", 0)
+            if not sb:
+                continue
+            sw = ss.get("wickets", 0)
+            sr = ss.get("runs", 0)
+            sm = len(ss.get("matches") or [])
+            secon = round(sr / sb * 6, 2) if sb else 0
+            savg = round(sr / sw, 2) if sw else None
+            sbi = round((sw / sm) * (6 / secon), 2) if secon > 0 and sm > 0 else 0
+            subs[ssn] = {
+                "matches": sm,
+                "wickets": sw,
+                "runs": sr,
+                "balls": sb,
+                "economy": secon,
+                "avg": savg,
+                "bowl_index": sbi,
+                "mvp_pts": round(ss.get("mvp_pts", 0), 1),
+            }
+        if subs:
+            out[team] = {"by_season": subs}
+    return out or None
+
+
 def build_output(
     batters,
     bowlers,
@@ -771,14 +911,18 @@ def build_output(
         for bt, vt in s.get("vs_type",{}).items():
             vsr = round(vt["r"]/vt["b"]*100,1) if vt["b"] else 0
             vs_type[bt] = {"runs":vt["r"],"balls":vt["b"],"sr":vsr}
-        batting_list.append({"name":name,"matches":m,"runs":s["runs"],"balls":s["balls"],
+        bat_row = {"name":name,"matches":m,"runs":s["runs"],"balls":s["balls"],
             "avg":avg,"sr":sr,"fours":s["fours"],"sixes":s["sixes"],
             "fifties":s["fifties"],"hundreds":s["hundreds"],
             "perf_index":perf_index,
             "mvp_pts": round(s.get("mvp_pts",0), 1),
             "phase_stats":phase_stats,
             "vs_type":vs_type,
-            "by_season":by_season})
+            "by_season":by_season}
+        bt_ser = _serialize_bat_by_team(s)
+        if bt_ser:
+            bat_row["by_team"] = bt_ser
+        batting_list.append(bat_row)
     batting_list.sort(key=lambda x: x["runs"], reverse=True)
 
     bowling_list = []
@@ -822,12 +966,16 @@ def build_output(
                 "wickets": hs.get("wickets", 0),
                 "economy": hecon
             }
-        bowling_list.append({"name":name,"matches":m,"wickets":s["wickets"],"runs":s["runs"],
+        bowl_row = {"name":name,"matches":m,"wickets":s["wickets"],"runs":s["runs"],
             "overs":overs,"economy":economy,"avg":avg,"bowl_index":bowl_index,
             "mvp_pts": round(s.get("mvp_pts",0), 1),
             "phase_stats":bowl_phase_stats,
             "vs_hand":vs_hand,
-            "by_season":bowl_by_season})
+            "by_season":bowl_by_season}
+        bteam_ser = _serialize_bowl_by_team(s)
+        if bteam_ser:
+            bowl_row["by_team"] = bteam_ser
+        bowling_list.append(bowl_row)
 
 
     bowling_list.sort(key=lambda x: x["wickets"], reverse=True)

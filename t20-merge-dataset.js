@@ -16,6 +16,103 @@
     return Math.max(1, Math.round(r / av));
   }
 
+  function mergeByTeamBatMaps(maps) {
+    var acc = {};
+    (maps || []).forEach(function (bt) {
+      if (!bt || typeof bt !== 'object') return;
+      Object.keys(bt).forEach(function (team) {
+        if (!acc[team]) acc[team] = { by_season: {} };
+        var dst = acc[team].by_season;
+        var src = (bt[team] && bt[team].by_season) || {};
+        Object.keys(src).forEach(function (ssn) {
+          var b = src[ssn];
+          var a = dst[ssn];
+          if (!a) {
+            dst[ssn] = {
+              matches: +b.matches || 0,
+              runs: +b.runs || 0,
+              balls: +b.balls || 0,
+              dismissals: +b.dismissals || 0,
+              fours: +b.fours || 0,
+              sixes: +b.sixes || 0,
+              fifties: +b.fifties || 0,
+              hundreds: +b.hundreds || 0,
+              mvp_pts: parseFloat(b.mvp_pts) || 0,
+            };
+            return;
+          }
+          a.matches += +b.matches || 0;
+          a.runs += +b.runs || 0;
+          a.balls += +b.balls || 0;
+          a.dismissals += +b.dismissals || 0;
+          a.fours += +b.fours || 0;
+          a.sixes += +b.sixes || 0;
+          a.fifties += +b.fifties || 0;
+          a.hundreds += +b.hundreds || 0;
+          a.mvp_pts = +((parseFloat(a.mvp_pts) || 0) + (parseFloat(b.mvp_pts) || 0)).toFixed(1);
+        });
+      });
+    });
+    Object.keys(acc).forEach(function (team) {
+      var subs = acc[team].by_season;
+      Object.keys(subs).forEach(function (ssn) {
+        var s = subs[ssn];
+        var sd = s.dismissals || 0;
+        s.avg = sd ? +(s.runs / sd).toFixed(2) : s.runs;
+        s.sr = s.balls ? +((s.runs / s.balls) * 100).toFixed(2) : 0;
+        s.mvp_pts = +((parseFloat(s.mvp_pts) || 0).toFixed(1));
+      });
+    });
+    return acc;
+  }
+
+  function mergeByTeamBowlMaps(maps) {
+    var acc = {};
+    (maps || []).forEach(function (bt) {
+      if (!bt || typeof bt !== 'object') return;
+      Object.keys(bt).forEach(function (team) {
+        if (!acc[team]) acc[team] = { by_season: {} };
+        var dst = acc[team].by_season;
+        var src = (bt[team] && bt[team].by_season) || {};
+        Object.keys(src).forEach(function (ssn) {
+          var b = src[ssn];
+          var a = dst[ssn];
+          if (!a) {
+            dst[ssn] = {
+              matches: +b.matches || 0,
+              wickets: +b.wickets || 0,
+              runs: +b.runs || 0,
+              balls: +b.balls || 0,
+              mvp_pts: parseFloat(b.mvp_pts) || 0,
+            };
+            return;
+          }
+          a.matches += +b.matches || 0;
+          a.wickets += +b.wickets || 0;
+          a.runs += +b.runs || 0;
+          a.balls += +b.balls || 0;
+          a.mvp_pts = +((parseFloat(a.mvp_pts) || 0) + (parseFloat(b.mvp_pts) || 0)).toFixed(1);
+        });
+      });
+    });
+    Object.keys(acc).forEach(function (team) {
+      var subs = acc[team].by_season;
+      Object.keys(subs).forEach(function (ssn) {
+        var s = subs[ssn];
+        var sb = s.balls || 0;
+        var sw = s.wickets || 0;
+        var sr = s.runs || 0;
+        var sm = s.matches || 0;
+        s.economy = sb ? +((sr / sb) * 6).toFixed(2) : 0;
+        s.avg = sw ? +(sr / sw).toFixed(2) : null;
+        s.bowl_index =
+          s.economy > 0 && sm > 0 ? +((sw / sm) * (6 / s.economy)).toFixed(2) : 0;
+        s.mvp_pts = +((parseFloat(s.mvp_pts) || 0).toFixed(1));
+      });
+    });
+    return acc;
+  }
+
   function mergeBattingLists(lists) {
     var m = {};
     lists.forEach(function (list) {
@@ -25,6 +122,7 @@
             name: p.name,
             _d: 0,
             _piw: 0,
+            _btMaps: [],
             matches: 0,
             runs: 0,
             balls: 0,
@@ -36,6 +134,7 @@
           };
         }
         var x = m[p.name];
+        if (p.by_team) x._btMaps.push(p.by_team);
         x.matches += +p.matches || 0;
         x.runs += +p.runs || 0;
         x.balls += +p.balls || 0;
@@ -57,7 +156,11 @@
         var perf_index = p.runs > 0 && p._piw ? +((p._piw / p.runs).toFixed(1)) : 0;
         delete p._d;
         delete p._piw;
-        return Object.assign({}, p, { avg: avg, sr: sr, perf_index: perf_index });
+        var mergedBt = mergeByTeamBatMaps(p._btMaps || []);
+        delete p._btMaps;
+        var out = Object.assign({}, p, { avg: avg, sr: sr, perf_index: perf_index });
+        if (mergedBt && Object.keys(mergedBt).length) out.by_team = mergedBt;
+        return out;
       })
       .filter(function (p) {
         return p.runs > 0;
@@ -98,9 +201,10 @@
     lists.forEach(function (list) {
       (list || []).forEach(function (p) {
         if (!m[p.name]) {
-          m[p.name] = { name: p.name, matches: 0, wickets: 0, runs: 0, balls: 0, mvp_pts: 0 };
+          m[p.name] = { name: p.name, _bbMaps: [], matches: 0, wickets: 0, runs: 0, balls: 0, mvp_pts: 0 };
         }
         var x = m[p.name];
+        if (p.by_team) x._bbMaps.push(p.by_team);
         x.matches += +p.matches || 0;
         x.wickets += +p.wickets || 0;
         x.runs += +p.runs || 0;
@@ -116,12 +220,16 @@
         var overs = Math.floor(p.balls / 6) + (p.balls % 6) / 10;
         var bowl_index =
           economy > 0 && p.matches > 0 ? +((p.wickets / p.matches) * (6 / economy)).toFixed(2) : 0;
-        return Object.assign({}, p, {
+        var mergedB = mergeByTeamBowlMaps(p._bbMaps || []);
+        delete p._bbMaps;
+        var out = Object.assign({}, p, {
           overs: +overs.toFixed(1),
           economy: economy,
           avg: avg,
           bowl_index: bowl_index,
         });
+        if (mergedB && Object.keys(mergedB).length) out.by_team = mergedB;
+        return out;
       })
       .filter(function (p) {
         return p.balls > 0;
