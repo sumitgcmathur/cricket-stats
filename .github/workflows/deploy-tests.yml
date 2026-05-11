@@ -22,6 +22,9 @@ jobs:
       - name: Install Playwright browser
         run: npx playwright install chromium --with-deps
 
+      - name: Validate stats/index.json
+        run: node -e "const fs=require('fs'); JSON.parse(fs.readFileSync('stats/index.json','utf8')); console.log('stats/index.json: OK');"
+
       - name: Run E2E smoke tests
         run: npm test
 

@@ -9,7 +9,8 @@ const localBase = 'http://127.0.0.1:4173';
 
 module.exports = defineConfig({
   testDir: path.join(__dirname, 'tests', 'e2e'),
-  timeout: 90_000,
+  /** Must exceed longest waitForFunction in deployment smoke (120s). */
+  timeout: 130_000,
   expect: { timeout: 20_000 },
   fullyParallel: true,
   forbidOnly: !!process.env.CI,

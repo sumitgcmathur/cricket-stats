@@ -18,6 +18,40 @@ function attachSoftErrorListeners(page, bucket) {
   });
 }
 
+/**
+ * Wait until the index dashboard is in a terminal state (stats table, empty filter message, or boot error).
+ * Avoids hanging the full test timeout when boot fails (e.g. invalid stats/index.json: `{\n<` merge markers).
+ */
+async function waitForIndexDashboardReady(page, { timeout = 120_000 } = {}) {
+  await page.waitForFunction(
+    () => {
+      const root = document.getElementById('dash-content');
+      if (!root) return false;
+      const t = root.textContent || '';
+      if (t.includes('Could not load data')) return true;
+      if (t.includes('Error building view')) return true;
+      if (root.querySelector('table')) return true;
+      if (t.includes('No data for this filter')) return true;
+      return false;
+    },
+    { timeout },
+  );
+  const kind = await page.evaluate(() => {
+    const t = document.getElementById('dash-content')?.textContent || '';
+    if (t.includes('Could not load data')) return 'boot';
+    if (t.includes('Error building view')) return 'build';
+    return 'ok';
+  });
+  if (kind === 'boot') {
+    throw new Error(
+      'Index boot failed ("Could not load data"). Ensure stats/index.json is valid JSON (no merge conflict markers) and stats/*.json exist.',
+    );
+  }
+  if (kind === 'build') {
+    throw new Error('Index failed while merging stats ("Error building view").');
+  }
+}
+
 test.describe('post-deploy smoke', () => {
   test('home loads and shared filters script exposes t20EscapeHtml', async ({ page }) => {
     const errors = [];
@@ -35,12 +69,7 @@ test.describe('post-deploy smoke', () => {
     attachSoftErrorListeners(page, errors);
 
     await page.goto('/index.html');
-    await page.waitForFunction(() => {
-      const d = document.getElementById('dash-content');
-      if (!d) return false;
-      const t = d.textContent || '';
-      return !t.includes('Processing') && !t.includes('Could not load data');
-    }, { timeout: 120_000 });
+    await waitForIndexDashboardReady(page);
 
     await page.locator('#year-from').fill('2019');
     await page.locator('#year-to').fill('2024');
