@@ -935,8 +935,8 @@ footer a { color: var(--blue); text-decoration: none; }
             <span class="year-range-label">to</span>
             <input class="year-input" type="number" id="year-to" placeholder="To" min="1995" max="2035" onchange="onYearRange()">
           </div>
-          <span class="inline-lab" id="team-slice-wrap" hidden style="margin-left:8px">Team slice</span>
-          <select class="season-select" id="team-slice-select" hidden style="max-width:220px" title="Batting while playing for this side; bowling while this side is fielding. Re-run fetch if missing." onchange="onTeamSliceChange()">
+          <span class="inline-lab" id="team-slice-wrap" hidden style="margin-left:8px">Team filter</span>
+          <select class="season-select" id="team-slice-select" hidden style="max-width:220px" title="Batting while playing for this side; bowling while this side is fielding. Hard refresh (Ctrl+Shift+R) if options stay empty after re-fetch." onchange="onTeamSliceChange()">
             <option value="all">All teams (career totals)</option>
           </select>
         </div>
@@ -1150,6 +1150,9 @@ function fillTeamSliceSelect(merged) {
   const names = new Set();
   (merged.teams || []).forEach(t => { if (t && t.team) names.add(t.team); });
   (merged.batting || []).forEach(p => {
+    if (p.by_team) Object.keys(p.by_team).forEach(t => names.add(t));
+  });
+  (merged.bowling || []).forEach(p => {
     if (p.by_team) Object.keys(p.by_team).forEach(t => names.add(t));
   });
   const arr = [...names].sort((a, b) => a.localeCompare(b));
@@ -1389,12 +1392,18 @@ function aggregateSeasonData() {} // kept for compatibility
 async function loadComp(code) {
   if (loadedData[code]) return loadedData[code];
   try {
-    const res = await fetch('stats/' + code + '.json');
+    /* Avoid stale JSON after local re-run of fetch_all_cricket.py (browser cache). */
+    const res = await fetch('stats/' + code + '.json', { cache: 'no-store' });
     loadedData[code] = await res.json();
     return loadedData[code];
   } catch (e) {
     return null;
   }
+}
+
+/** Call after regenerating stats/ so the next merge uses fresh JSON. */
+function clearLoadedStatsCache() {
+  loadedData = {};
 }
 
 async function renderStatTab(rawData, skipSeasonFilter) {
