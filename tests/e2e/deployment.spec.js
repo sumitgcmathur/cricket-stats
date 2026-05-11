@@ -143,4 +143,29 @@ test.describe('post-deploy smoke', () => {
 
     expect(errors, errors.join('\n')).toEqual([]);
   });
+
+  test('compare page player fields offer search suggestions', async ({ page, baseURL }) => {
+    const errors = [];
+    attachSoftErrorListeners(page, errors);
+
+    const u = new URL('/compare.html', baseURL);
+    u.searchParams.set('comps', 'ipl');
+    u.searchParams.set('season', 'all');
+
+    await page.goto(u.toString(), { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => typeof window.t20MergeDatasets === 'function', { timeout: 60_000 });
+
+    await page.locator('#inp-p1').fill('kohl');
+    await page.locator('#cmp-sug-p1 .cmp-sug-btn', { hasText: 'V Kohli' }).first().click({ timeout: 120_000 });
+
+    await page.locator('#inp-p2').fill('sharma');
+    await page.locator('#cmp-sug-p2 .cmp-sug-btn', { hasText: 'RG Sharma' }).first().click({ timeout: 120_000 });
+
+    await page.getByRole('button', { name: 'Compare' }).click();
+
+    await expect(page.locator('thead th').filter({ hasText: 'V Kohli' })).toBeVisible({ timeout: 120_000 });
+    await expect(page.locator('thead th').filter({ hasText: 'RG Sharma' })).toBeVisible();
+
+    expect(errors, errors.join('\n')).toEqual([]);
+  });
 });

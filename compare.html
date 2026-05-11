@@ -33,6 +33,11 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-
 .compare-inputs input{width:100%;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.12);color:#fff;font-size:14px;}
 .compare-inputs input::placeholder{color:rgba(255,255,255,.45);}
 .compare-inputs button{background:var(--gold-light);color:var(--blue);border:none;padding:10px 20px;border-radius:8px;font-weight:600;cursor:pointer;font-size:13px;}
+.cmp-field-wrap{position:relative;}
+.cmp-suggestions{position:absolute;left:0;right:0;top:100%;margin-top:4px;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.18);max-height:260px;overflow-y:auto;z-index:400;text-align:left;}
+.cmp-sug-btn{display:block;width:100%;text-align:left;padding:10px 12px;border:none;background:none;cursor:pointer;font-size:13px;color:var(--text);font-family:inherit;}
+.cmp-sug-btn:hover,.cmp-sug-btn:focus{background:var(--blue-light);outline:none;}
+.cmp-sug-hint{padding:8px 12px;font-size:12px;color:var(--muted);}
 .card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px;box-shadow:var(--shadow);margin-bottom:16px;}
 .card h2{font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:14px;}
 table{width:100%;border-collapse:collapse;font-size:13px;}
@@ -87,13 +92,15 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
     <h1>Player compare</h1>
     <p>Same tournament, season, and year filters as the rest of the site. Stats are merged across selected leagues (Cricsheet squad-based match counts).</p>
     <div class="compare-inputs">
-      <div>
+      <div class="cmp-field-wrap">
         <label for="inp-p1">Player 1</label>
-        <input id="inp-p1" type="text" placeholder="e.g. V Kohli" autocomplete="off">
+        <input id="inp-p1" type="text" placeholder="Type a few letters…" autocomplete="off" oninput="cmpScheduleSuggest(1)" onfocus="cmpInputFocus(1)" onblur="cmpInputBlur(1)">
+        <div id="cmp-sug-p1" class="cmp-suggestions" hidden></div>
       </div>
-      <div>
+      <div class="cmp-field-wrap">
         <label for="inp-p2">Player 2</label>
-        <input id="inp-p2" type="text" placeholder="e.g. RG Sharma" autocomplete="off">
+        <input id="inp-p2" type="text" placeholder="Type a few letters…" autocomplete="off" oninput="cmpScheduleSuggest(2)" onfocus="cmpInputFocus(2)" onblur="cmpInputBlur(2)">
+        <div id="cmp-sug-p2" class="cmp-suggestions" hidden></div>
       </div>
       <div>
         <label style="visibility:hidden">Go</label>
@@ -109,6 +116,7 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
 <script>
 let COMPS=[],championshipIndex=null,allDataRaw={},selectedTournamentCodes=[],activeSeason='all',yearFrom=null,yearTo=null;
 let cmpChart=null;
+const cmpSuggestTimers={1:null,2:null},cmpBlurHide={1:null,2:null},cmpSuggestGen={1:0,2:0};
 
 function sameName(a,b){return String(a||'').trim().toLowerCase()===String(b||'').trim().toLowerCase();}
 
@@ -204,6 +212,109 @@ async function loadCompRaw(code){
   }catch(e){console.warn('stats/'+code+'.json',e.message);}
 }
 
+function cmpApplySeasonFilter(raw){
+  if(!raw)return null;
+  let d=raw;
+  if(activeSeason!=='all'||yearFrom||yearTo){
+    try{d=typeof structuredClone==='function'?structuredClone(raw):JSON.parse(JSON.stringify(raw));}catch(e){d=raw;}
+    d=typeof t20FilterBySeason==='function'?t20FilterBySeason(d,activeSeason,yearFrom,yearTo):raw;
+  }
+  return d;
+}
+
+function cmpHideAllSuggest(){
+  [1,2].forEach(function(slot){
+    clearTimeout(cmpSuggestTimers[slot]);
+    clearTimeout(cmpBlurHide[slot]);
+    const id=slot===1?'cmp-sug-p1':'cmp-sug-p2';
+    const el=document.getElementById(id);
+    if(el){el.hidden=true;el.innerHTML='';}
+  });
+}
+
+function cmpScheduleSuggest(slot){
+  clearTimeout(cmpSuggestTimers[slot]);
+  cmpSuggestTimers[slot]=setTimeout(function(){cmpShowSuggestions(slot);},220);
+}
+
+function cmpInputFocus(slot){
+  clearTimeout(cmpBlurHide[slot]);
+  cmpScheduleSuggest(slot);
+}
+
+function cmpInputBlur(slot){
+  cmpBlurHide[slot]=setTimeout(function(){
+    const box=document.getElementById(slot===1?'cmp-sug-p1':'cmp-sug-p2');
+    if(box)box.hidden=true;
+  },200);
+}
+
+function cmpPickSuggest(slot,name){
+  const inp=document.getElementById(slot===1?'inp-p1':'inp-p2');
+  const box=document.getElementById(slot===1?'cmp-sug-p1':'cmp-sug-p2');
+  if(inp)inp.value=name;
+  if(box){box.hidden=true;box.innerHTML='';}
+  clearTimeout(cmpBlurHide[slot]);
+  cmpSyncUrl();
+}
+
+async function cmpSearchPlayerNames(query){
+  const q=String(query||'').trim().toLowerCase();
+  if(q.length<2)return[];
+  const codes=selectedTournamentCodes.length?selectedTournamentCodes:COMPS.map(function(c){return c.code;});
+  const found=new Set();
+  for(let i=0;i<codes.length;i++){
+    const code=codes[i];
+    await loadCompRaw(code);
+    const raw=allDataRaw[code];
+    if(!raw)continue;
+    const d=cmpApplySeasonFilter(raw);
+    if(!d)continue;
+    (d.batting||[]).forEach(function(p){
+      if(p.name&&String(p.name).toLowerCase().includes(q))found.add(p.name);
+    });
+    (d.bowling||[]).forEach(function(p){
+      if(p.name&&String(p.name).toLowerCase().includes(q))found.add(p.name);
+    });
+  }
+  const arr=[...found];
+  arr.sort(function(a,b){
+    const al=String(a).toLowerCase(),bl=String(b).toLowerCase();
+    const ap=al.startsWith(q)?0:1,bp=bl.startsWith(q)?0:1;
+    if(ap!==bp)return ap-bp;
+    return String(a).localeCompare(String(b));
+  });
+  return arr.slice(0,25);
+}
+
+async function cmpShowSuggestions(slot){
+  const gen=++cmpSuggestGen[slot];
+  const inp=document.getElementById(slot===1?'inp-p1':'inp-p2');
+  const box=document.getElementById(slot===1?'cmp-sug-p1':'cmp-sug-p2');
+  if(!inp||!box)return;
+  const q=inp.value.trim().toLowerCase();
+  if(q.length<2){box.hidden=true;box.innerHTML='';return;}
+  box.innerHTML='<div class="cmp-sug-hint">Searching…</div>';
+  box.hidden=false;
+  let names;
+  try{names=await cmpSearchPlayerNames(q);}catch(e){names=[];}
+  if(gen!==cmpSuggestGen[slot])return;
+  if(!names.length){
+    box.innerHTML='<div class="cmp-sug-hint">No matches in the current tournament / season / year filter.</div>';
+    return;
+  }
+  box.innerHTML='';
+  names.forEach(function(n){
+    const btn=document.createElement('button');
+    btn.type='button';
+    btn.className='cmp-sug-btn';
+    btn.textContent=n;
+    btn.addEventListener('mousedown',function(e){e.preventDefault();});
+    btn.addEventListener('click',function(){cmpPickSuggest(slot,n);});
+    box.appendChild(btn);
+  });
+}
+
 async function buildMerged(){
   const codes=selectedTournamentCodes.length?selectedTournamentCodes:COMPS.map(c=>c.code);
   const parts=[];
@@ -257,7 +368,7 @@ function cmpRender(){
   const p2=document.getElementById('inp-p2').value.trim();
   const host=document.getElementById('cmp-out');
   if(!p1||!p2){
-    host.innerHTML='<div class="empty-msg">Enter two player names and click <strong>Compare</strong>. Names must match Cricsheet spelling (e.g. <code>V Kohli</code>).</div>';
+    host.innerHTML='<div class="empty-msg">Enter two players and click <strong>Compare</strong>. Type a few letters in each field and pick a name from the list (same idea as home player search).</div>';
     killCmpChart();
     return;
   }
@@ -323,6 +434,9 @@ function escHtml(s){
 }
 
 async function cmpReloadData(){
+  cmpSuggestGen[1]++;
+  cmpSuggestGen[2]++;
+  cmpHideAllSuggest();
   cmpSyncUrl();
   allDataRaw={};
   await cmpRender();
