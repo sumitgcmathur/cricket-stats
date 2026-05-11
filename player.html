@@ -686,28 +686,36 @@ async function loadPhoto(name){
     }
   }catch(e){ /* ignore */ }
 
-  const parts = key.split(/\s+/).filter(Boolean);
-  const titleAttempts = [];
-  const add = t => { const s = String(t).trim(); if(s && !titleAttempts.includes(s)) titleAttempts.push(s); };
-  add(key);
-  add(key.replace(/ /g, '_'));
-  if(parts.length >= 2){
-    add(parts[parts.length - 1] + '_' + parts[0]);
-    add(parts[parts.length - 1] + ', ' + parts[0]);
-  }
-  add(key + ' (cricketer)');
-  add(key + ' (Indian cricketer)');
-  if(parts.length) add(parts[parts.length - 1]);
+  const parts = photoNameParts(key);
+  const lastKey = photoLastNameKey(parts);
+  const initialFirst = photoLooksLikeInitialFirst(parts);
 
-  for(const title of titleAttempts){
+  if(initialFirst && lastKey.length >= 2){
     try{
-      const src = await wikiThumbnailForTitle(title.replace(/_/g, ' '));
-      if(src){
-        writePlayerPhotoCacheEntry(key, { u: src, exp: now + PLAYER_PHOTO_POS_TTL_MS });
-        applyPlayerPhotoFromUrl(src, title);
+      const wdEarly = await wikidataPhotoForPlayer(key);
+      if(wdEarly){
+        writePlayerPhotoCacheEntry(key, { u: wdEarly, exp: now + PLAYER_PHOTO_POS_TTL_MS });
+        applyPlayerPhotoFromUrl(wdEarly, 'wikidata/commons (initial-name)');
         return;
       }
-    }catch(e){ /* network */ }
+    }catch(e){ /* ignore */ }
+  }
+
+  const titleSeen = new Set();
+  for(const raw of buildPhotoWikiTitleCandidates(key, parts, initialFirst)){
+    for(const title of [raw, raw.replace(/ /g, '_')]){
+      const t = title.trim();
+      if(!t || titleSeen.has(t)) continue;
+      titleSeen.add(t);
+      try{
+        const src = await wikiThumbnailForTitle(t.replace(/_/g, ' '));
+        if(src){
+          writePlayerPhotoCacheEntry(key, { u: src, exp: now + PLAYER_PHOTO_POS_TTL_MS });
+          applyPlayerPhotoFromUrl(src, t);
+          return;
+        }
+      }catch(e){ /* network */ }
+    }
   }
 
   const searchQueries = [
@@ -717,9 +725,10 @@ async function loadPhoto(name){
 
   for(const q of searchQueries){
     try{
-      const titles = await wikiSearchArticleTitles(q, 8);
+      const titles = await wikiSearchArticleTitles(q, 12);
       for(const t of titles){
         if(/disambiguation/i.test(t)) continue;
+        if(!wikiTitleMatchesPlayerLastName(t, lastKey)) continue;
         const src = await wikiThumbnailForTitle(t);
         if(src){
           writePlayerPhotoCacheEntry(key, { u: src, exp: now + PLAYER_PHOTO_POS_TTL_MS });
@@ -730,14 +739,16 @@ async function loadPhoto(name){
     }catch(e){ /* network */ }
   }
 
-  try{
-    const wd = await wikidataPhotoForPlayer(key);
-    if(wd){
-      writePlayerPhotoCacheEntry(key, { u: wd, exp: now + PLAYER_PHOTO_POS_TTL_MS });
-      applyPlayerPhotoFromUrl(wd, 'wikidata/commons');
-      return;
-    }
-  }catch(e){ /* network */ }
+  if(!initialFirst || lastKey.length < 2){
+    try{
+      const wd = await wikidataPhotoForPlayer(key);
+      if(wd){
+        writePlayerPhotoCacheEntry(key, { u: wd, exp: now + PLAYER_PHOTO_POS_TTL_MS });
+        applyPlayerPhotoFromUrl(wd, 'wikidata/commons');
+        return;
+      }
+    }catch(e){ /* network */ }
+  }
 
   writePlayerPhotoCacheEntry(key, { u: false, exp: now + PLAYER_PHOTO_NEG_TTL_MS });
   console.log('No photo found for', name);
@@ -1235,16 +1246,20 @@ function renderMatchups(){
     {key:'middle',label:'Middle',sub:'Overs 7-15',color:'#DAA520'},
     {key:'death',label:'Death',sub:'Overs 16-20',color:'#C0392B'},
   ];
+  const rollBat=typeof t20RollupBatByTeamFranchises==='function'?t20RollupBatByTeamFranchises:function(){return[];};
+  const rollBowl=typeof t20RollupBowlByTeamFranchises==='function'?t20RollupBowlByTeamFranchises:function(){return[];};
   const blocks=[];
   visibleComps().forEach(c=>{
     const d=allData[c.code];
     if(!d) return;
     const batP=d.batting?.find(p=>samePlayerName(p.name,playerName));
     const bowlP=d.bowling?.find(p=>samePlayerName(p.name,playerName));
-    if(batP?.phase_stats||bowlP?.phase_stats) blocks.push({compName:c.name,batP,bowlP});
+    const hasPhase=batP?.phase_stats||bowlP?.phase_stats;
+    const hasTeam=(batP?.by_team&&Object.keys(batP.by_team).length)||(bowlP?.by_team&&Object.keys(bowlP.by_team).length);
+    if(hasPhase||hasTeam) blocks.push({compName:c.name,batP,bowlP});
   });
   if(!blocks.length){
-    document.getElementById('matchups-content').innerHTML='<div class="no-data">No phase breakdown in the current filter<br><small>Phase stats are built per competition (rebuild with <code>python fetch_all_cricket.py</code>).</small></div>';
+    document.getElementById('matchups-content').innerHTML='<div class="no-data">No matchup breakdown in the current filter.<br><small>Phase and franchise charts need data from a recent <code>python fetch_all_cricket.py</code> build.</small></div>';
     return;
   }
   let html='';
@@ -1302,6 +1317,19 @@ function renderMatchups(){
         <div class="chart-wrap"><canvas id="mu-bowl-season-${i}"></canvas></div>
       </div>`;
     }
+    const teamBatRows=blk.batP?.by_team?rollBat(blk.batP.by_team):[];
+    const teamBowlRows=blk.bowlP?.by_team?rollBowl(blk.bowlP.by_team):[];
+    if(teamBatRows.length||teamBowlRows.length){
+      html+=`<div class="section-title" style="font-size:12px;margin-top:12px">🏟️ By franchise (league team)</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-bottom:24px" class="matchup-charts-row">`;
+      if(teamBatRows.length){
+        html+=`<div class="chart-card"><h3>Batting — runs</h3><div class="chart-wrap-sm"><canvas id="mu-bat-teams-${i}"></canvas></div></div>`;
+      }
+      if(teamBowlRows.length){
+        html+=`<div class="chart-card"><h3>Bowling — wickets</h3><div class="chart-wrap-sm"><canvas id="mu-bowl-teams-${i}"></canvas></div></div>`;
+      }
+      html+='</div>';
+    }
     html+='</div>';
   });
   document.getElementById('matchups-content').innerHTML=html;
@@ -1358,6 +1386,30 @@ function drawMatchupCharts(batArg,bowlArg,idx){
         scales:{x:{grid:{display:false},ticks:{font:{size:10}}},
           y:{grid:{color:'#E2E6EA'},ticks:{font:{size:10}},title:{display:true,text:'Wickets',font:{size:9}}},
           y2:{position:'right',grid:{display:false},ticks:{font:{size:10}},title:{display:true,text:'Economy',font:{size:9}}}}}}));
+    }
+  }
+  const rollBat=typeof t20RollupBatByTeamFranchises==='function'?t20RollupBatByTeamFranchises:function(){return[];};
+  const rollBowl=typeof t20RollupBowlByTeamFranchises==='function'?t20RollupBowlByTeamFranchises:function(){return[];};
+  const teamBat=batArg?.by_team?rollBat(batArg.by_team):[];
+  if(teamBat.length){
+    const tctx=document.getElementById('mu-bat-teams-'+suf)?.getContext('2d');
+    if(tctx){
+      charts.push(new Chart(tctx,{type:'bar',indexAxis:'y',data:{
+        labels:teamBat.map(r=>r.team),
+        datasets:[{label:'Runs',data:teamBat.map(r=>r.runs),backgroundColor:'rgba(30,58,95,0.78)',borderRadius:4}],
+      },options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+        scales:{x:{grid:{color:'#E2E6EA'},ticks:{font:{size:10}}},y:{grid:{display:false},ticks:{font:{size:10},autoSkip:false}}}}}));
+    }
+  }
+  const teamBowl=bowlArg?.by_team?rollBowl(bowlArg.by_team):[];
+  if(teamBowl.length){
+    const wctx=document.getElementById('mu-bowl-teams-'+suf)?.getContext('2d');
+    if(wctx){
+      charts.push(new Chart(wctx,{type:'bar',indexAxis:'y',data:{
+        labels:teamBowl.map(r=>r.team),
+        datasets:[{label:'Wickets',data:teamBowl.map(r=>r.wickets),backgroundColor:'rgba(192,57,43,0.78)',borderRadius:4}],
+      },options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+        scales:{x:{beginAtZero:true,grid:{color:'#E2E6EA'},ticks:{font:{size:10}}},y:{grid:{display:false},ticks:{font:{size:10},autoSkip:false}}}}}));
     }
   }
 }

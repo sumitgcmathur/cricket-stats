@@ -115,7 +115,7 @@ footer{text-align:center;padding:24px;border-top:1px solid var(--border);font-si
 
 <script>
 let COMPS=[],championshipIndex=null,allDataRaw={},selectedTournamentCodes=[],activeSeason='all',yearFrom=null,yearTo=null;
-let cmpChart=null;
+let cmpCharts=[];
 const cmpSuggestTimers={1:null,2:null},cmpBlurHide={1:null,2:null},cmpSuggestGen={1:0,2:0};
 
 function sameName(a,b){return String(a||'').trim().toLowerCase()===String(b||'').trim().toLowerCase();}
@@ -339,7 +339,7 @@ function findBowl(merged,name){
   return(merged.bowling||[]).find(p=>sameName(p.name,name))||null;
 }
 
-function killCmpChart(){if(cmpChart){try{cmpChart.destroy();}catch(e){}cmpChart=null;}}
+function killCmpCharts(){cmpCharts.forEach(function(c){try{c.destroy();}catch(e){}});cmpCharts=[];}
 
 function cmpRunCompare(){
   cmpSyncUrl();
@@ -369,21 +369,21 @@ function cmpRender(){
   const host=document.getElementById('cmp-out');
   if(!p1||!p2){
     host.innerHTML='<div class="empty-msg">Enter two players and click <strong>Compare</strong>. Type a few letters in each field and pick a name from the list (same idea as home player search).</div>';
-    killCmpChart();
+    killCmpCharts();
     return;
   }
   host.innerHTML='<div class="loading">Merging stats…</div>';
   buildMerged().then(merged=>{
     if(!merged||(!merged.batting||!merged.batting.length)){
       host.innerHTML='<div class="empty-msg">No batting data for this filter. Widen leagues, season, or year range.</div>';
-      killCmpChart();
+      killCmpCharts();
       return;
     }
     const b1=findBat(merged,p1),b2=findBat(merged,p2);
     const w1=findBowl(merged,p1),w2=findBowl(merged,p2);
     if(!b1&&!b2){
       host.innerHTML='<div class="empty-msg">No merged batting rows for either player. Check spelling or filters.</div>';
-      killCmpChart();
+      killCmpCharts();
       return;
     }
     const rows=[
@@ -418,17 +418,44 @@ function cmpRender(){
     var u2=playerProfileHref(p2);
     html+='<a href="'+u1+'" style="color:var(--blue);font-weight:600">Full profile: '+escHtml(p1)+'</a><br><br>';
     html+='<a href="'+u2+'" style="color:var(--blue);font-weight:600">Full profile: '+escHtml(p2)+'</a></p></div></div>';
+    var rollBat=typeof t20RollupBatByTeamFranchises==='function'?t20RollupBatByTeamFranchises:function(){return[];};
+    var rollBowl=typeof t20RollupBowlByTeamFranchises==='function'?t20RollupBowlByTeamFranchises:function(){return[];};
+    var tb1=rollBat(b1&&b1.by_team),tb2=rollBat(b2&&b2.by_team);
+    var bw1=rollBowl(w1&&w1.by_team),bw2=rollBowl(w2&&w2.by_team);
+    if(tb1.length||tb2.length||bw1.length||bw2.length){
+      html+='<div class="card" style="margin-top:16px"><h2>By franchise (merged)</h2><p style="font-size:12px;color:var(--muted);margin-bottom:12px">Runs and wickets summed across every season row for each IPL / league team in the filter.</p><div class="grid2">';
+      if(tb1.length)html+='<div><h3 style="font-size:11px;text-transform:uppercase;color:var(--muted);margin-bottom:8px">'+escHtml(p1)+' — batting runs</h3><div class="chart-wrap"><canvas id="cmp-fr-bat-1"></canvas></div></div>';
+      else html+='<div></div>';
+      if(tb2.length)html+='<div><h3 style="font-size:11px;text-transform:uppercase;color:var(--muted);margin-bottom:8px">'+escHtml(p2)+' — batting runs</h3><div class="chart-wrap"><canvas id="cmp-fr-bat-2"></canvas></div></div>';
+      else html+='<div></div>';
+      html+='</div><div class="grid2" style="margin-top:16px">';
+      if(bw1.length)html+='<div><h3 style="font-size:11px;text-transform:uppercase;color:var(--muted);margin-bottom:8px">'+escHtml(p1)+' — wickets</h3><div class="chart-wrap"><canvas id="cmp-fr-bwl-1"></canvas></div></div>';
+      else html+='<div></div>';
+      if(bw2.length)html+='<div><h3 style="font-size:11px;text-transform:uppercase;color:var(--muted);margin-bottom:8px">'+escHtml(p2)+' — wickets</h3><div class="chart-wrap"><canvas id="cmp-fr-bwl-2"></canvas></div></div>';
+      else html+='<div></div>';
+      html+='</div></div>';
+    }
     host.innerHTML=html;
     const r1=b1?+b1.runs:0,r2=b2?+b2.runs:0;
-    killCmpChart();
+    killCmpCharts();
     setTimeout(()=>{
-      const ctx=document.getElementById('cmp-chart-runs');
-      if(!ctx||typeof Chart==='undefined')return;
-      cmpChart=new Chart(ctx.getContext('2d'),{
+      if(typeof Chart==='undefined')return;
+      var barOpts={responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:'#E2E6EA'},ticks:{font:{size:10}}},y:{grid:{display:false},ticks:{font:{size:10},autoSkip:false}}}};
+      var ctx=document.getElementById('cmp-chart-runs');
+      if(ctx)cmpCharts.push(new Chart(ctx.getContext('2d'),{
         type:'bar',
         data:{labels:[p1,p2],datasets:[{label:'Runs',data:[r1,r2],backgroundColor:['rgba(30,58,95,.85)','rgba(232,93,4,.85)'],borderRadius:6}]},
         options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}
-      });
+      }));
+      function hBar(id,labels,data,label,color){
+        var el=document.getElementById(id);
+        if(!el||!labels.length)return;
+        cmpCharts.push(new Chart(el.getContext('2d'),{type:'bar',indexAxis:'y',data:{labels:labels,datasets:[{label:label,data:data,backgroundColor:color,borderRadius:4}]},options:barOpts}));
+      }
+      hBar('cmp-fr-bat-1',tb1.map(function(r){return r.team;}),tb1.map(function(r){return r.runs;}),'Runs','rgba(30,58,95,0.78)');
+      hBar('cmp-fr-bat-2',tb2.map(function(r){return r.team;}),tb2.map(function(r){return r.runs;}),'Runs','rgba(232,93,4,0.78)');
+      hBar('cmp-fr-bwl-1',bw1.map(function(r){return r.team;}),bw1.map(function(r){return r.wickets;}),'Wickets','rgba(192,57,43,0.78)');
+      hBar('cmp-fr-bwl-2',bw2.map(function(r){return r.team;}),bw2.map(function(r){return r.wickets;}),'Wickets','rgba(30,58,95,0.55)');
     },50);
   });
 }
