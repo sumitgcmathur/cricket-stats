@@ -1011,11 +1011,18 @@ function renderBatting(containerId){
     if(scCtx){
       const bestComp=rows[0];
       const allBat=allData[bestComp.comp.code]?.batting||[];
-      const others=allBat.filter(p=>!samePlayerName(p.name,playerName)&&p.matches>=5).map(p=>({x:p.avg,y:p.sr}));
-      const me={x:bestComp.bat.avg,y:bestComp.bat.sr};
+      const me={x:+bestComp.bat.avg,y:+bestComp.bat.sr};
+      const others=allBat.filter(p=>{
+        if(p.matches<5) return false;
+        if(samePlayerName(p.name,playerName)) return false;
+        // Same (avg,sr) as this player but different name string — drop gray twin so orange is not covered.
+        if(Number.isFinite(me.x)&&Number.isFinite(me.y)&&Math.abs(+p.avg-me.x)<1e-6&&Math.abs(+p.sr-me.y)<1e-6) return false;
+        return true;
+      }).map(p=>({x:+p.avg,y:+p.sr}));
+      // Chart.js: higher `order` draws first (underneath); lower draws last (on top). Default 0 = first dataset wins z-fight and hid the player.
       charts.push(new Chart(scCtx,{type:'scatter',data:{datasets:[
-        {label:'Other Players',data:others,backgroundColor:'rgba(107,122,141,0.2)',pointRadius:3},
-        {label:playerName,data:[me],backgroundColor:'#E85D04',pointRadius:8,pointStyle:'star'},
+        {label:'Other Players',data:others,order:2,backgroundColor:'rgba(107,122,141,0.22)',pointRadius:3,pointBorderWidth:0},
+        {label:playerName,data:[me],order:1,backgroundColor:'#E85D04',pointBorderColor:'#fff',pointBorderWidth:2,pointRadius:9,pointHoverRadius:11,pointStyle:'circle'},
       ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:'top',labels:{font:{size:10},boxWidth:10}}},scales:{x:{title:{display:true,text:'Average',font:{size:10}},grid:{color:'#E2E6EA'},ticks:{font:{size:10}}},y:{title:{display:true,text:'Strike Rate',font:{size:10}},grid:{color:'#E2E6EA'},ticks:{font:{size:10}}}}}}));
     }
 
