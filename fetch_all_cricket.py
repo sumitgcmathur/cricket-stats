@@ -358,6 +358,10 @@ def format_dismissal(wicket_type, bowler, fielder):
         return wicket_type
 
 
+def _inn_key(match_id, innings):
+    return (match_id, str(innings))
+
+
 def _bat_team_ssn_bucket():
     return {
         "runs": 0,
@@ -369,11 +373,12 @@ def _bat_team_ssn_bucket():
         "mvp_pts": 0.0,
         "matches": set(),
         "dismissals": 0,
+        "innings_ids": set(),
     }
 
 
 def _bowl_team_ssn_bucket():
-    return {"runs": 0, "balls": 0, "wickets": 0, "mvp_pts": 0.0, "matches": set()}
+    return {"runs": 0, "balls": 0, "wickets": 0, "mvp_pts": 0.0, "matches": set(), "innings_ids": set()}
 
 
 def _bat_team_season_bucket(b, team_name, season_key):
@@ -556,6 +561,7 @@ def parse_zip(zip_bytes, comp):
                         b["runs"]  += runs_bat
                         b["balls"] += 1
                         b["matches"].add(match_id)
+                        b.setdefault("innings_ids", set()).add(_inn_key(match_id, innings))
                         if runs_bat == 4: b["fours"] += 1
                         if runs_bat == 6: b["sixes"] += 1
                         inn_runs[innings][batter] += runs_bat
@@ -579,11 +585,23 @@ def parse_zip(zip_bytes, comp):
                         # Per-season tracking
                         if season:
                             if season not in b["by_season"]:
-                                b["by_season"][season] = {"runs":0,"balls":0,"fours":0,"sixes":0,"fifties":0,"hundreds":0,"mvp_pts":0.0,"matches":set(),"dismissals":0}
+                                b["by_season"][season] = {
+                                    "runs": 0,
+                                    "balls": 0,
+                                    "fours": 0,
+                                    "sixes": 0,
+                                    "fifties": 0,
+                                    "hundreds": 0,
+                                    "mvp_pts": 0.0,
+                                    "matches": set(),
+                                    "dismissals": 0,
+                                    "innings_ids": set(),
+                                }
                             bs = b["by_season"][season]
                             bs["runs"]  += runs_bat
                             bs["balls"] += 1
                             bs["matches"].add(match_id)
+                            bs.setdefault("innings_ids", set()).add(_inn_key(match_id, innings))
                             if runs_bat == 4:
                                 bs["fours"] += 1
                                 bs["mvp_pts"] += 2.5
@@ -596,6 +614,7 @@ def parse_zip(zip_bytes, comp):
                             tss["runs"] += runs_bat
                             tss["balls"] += 1
                             tss["matches"].add(match_id)
+                            tss.setdefault("innings_ids", set()).add(_inn_key(match_id, innings))
                             if runs_bat == 4:
                                 tss["fours"] += 1
                                 tss["mvp_pts"] += 2.5
@@ -641,6 +660,7 @@ def parse_zip(zip_bytes, comp):
                                                 "mvp_pts": 0.0,
                                                 "matches": set(),
                                                 "dismissals": 0,
+                                                "innings_ids": set(),
                                             }
                                         bs = bf["by_season"][season]
                                         bs["mvp_pts"] = bs.get("mvp_pts", 0) + 2.5
@@ -662,6 +682,7 @@ def parse_zip(zip_bytes, comp):
                         bl["runs"]  += runs_bat + extras
                         bl["balls"] += 1
                         bl["matches"].add(match_id)
+                        bl.setdefault("innings_ids", set()).add(_inn_key(match_id, innings))
                         if wicket_t and wicket_t not in ("run out","retired hurt","obstructing the field"):
                             bl["wickets"] += 1
                         # Bowler split vs batter handedness
@@ -695,11 +716,19 @@ def parse_zip(zip_bytes, comp):
                         # Per-season tracking
                         if season:
                             if season not in bowlers[bowler]["by_season"]:
-                                bowlers[bowler]["by_season"][season] = {"runs":0,"balls":0,"wickets":0,"mvp_pts":0.0,"matches":set()}
+                                bowlers[bowler]["by_season"][season] = {
+                                    "runs": 0,
+                                    "balls": 0,
+                                    "wickets": 0,
+                                    "mvp_pts": 0.0,
+                                    "matches": set(),
+                                    "innings_ids": set(),
+                                }
                             bs = bowlers[bowler]["by_season"][season]
                             bs["runs"]  += runs_bat + extras
                             bs["balls"] += 1
                             bs["matches"].add(match_id)
+                            bs.setdefault("innings_ids", set()).add(_inn_key(match_id, innings))
                             # Per-season MVP points (must match overall logic above)
                             if wicket_t and wicket_t not in ("run out","retired hurt","obstructing the field"):
                                 bs["mvp_pts"] += 3.5
@@ -711,6 +740,7 @@ def parse_zip(zip_bytes, comp):
                             bts["runs"] += runs_bat + extras
                             bts["balls"] += 1
                             bts["matches"].add(match_id)
+                            bts.setdefault("innings_ids", set()).add(_inn_key(match_id, innings))
                             if wicket_t and wicket_t not in ("run out","retired hurt","obstructing the field"):
                                 bts["wickets"] += 1
                             if wicket_t and wicket_t not in ("run out","retired hurt","obstructing the field"):
@@ -810,6 +840,8 @@ def _serialize_bat_by_team(s):
             if sm < 1 and not ss.get("balls"):
                 continue
             sd = ss.get("dismissals", 0)
+            inn_bt = len(ss.get("innings_ids") or [])
+            mvp_bt = round(ss.get("mvp_pts", 0), 1)
             subs[ssn] = {
                 "matches": sm,
                 "runs": ss["runs"],
@@ -821,7 +853,9 @@ def _serialize_bat_by_team(s):
                 "sixes": ss["sixes"],
                 "fifties": ss["fifties"],
                 "hundreds": ss["hundreds"],
-                "mvp_pts": round(ss.get("mvp_pts", 0), 1),
+                "mvp_pts": mvp_bt,
+                "innings": inn_bt,
+                "mvp_per_innings": round(mvp_bt / inn_bt, 2) if inn_bt else 0.0,
             }
         if subs:
             out[team] = {"by_season": subs}
@@ -842,6 +876,8 @@ def _serialize_bowl_by_team(s):
             secon = round(sr / sb * 6, 2) if sb else 0
             savg = round(sr / sw, 2) if sw else None
             sbi = round((sw / sm) * (6 / secon), 2) if secon > 0 and sm > 0 else 0
+            inn_b = len(ss.get("innings_ids") or [])
+            mvp_b = round(ss.get("mvp_pts", 0), 1)
             subs[ssn] = {
                 "matches": sm,
                 "wickets": sw,
@@ -850,7 +886,9 @@ def _serialize_bowl_by_team(s):
                 "economy": secon,
                 "avg": savg,
                 "bowl_index": sbi,
-                "mvp_pts": round(ss.get("mvp_pts", 0), 1),
+                "mvp_pts": mvp_b,
+                "innings": inn_b,
+                "mvp_per_innings": round(mvp_b / inn_b, 2) if inn_b else 0.0,
             }
         if subs:
             out[team] = {"by_season": subs}
@@ -889,6 +927,8 @@ def build_output(
             if sm < 1:
                 continue
             sd = ss.get("dismissals",0)
+            inn_ct = len(ss.get("innings_ids") or [])
+            mvp_v = round(ss.get("mvp_pts", 0), 1)
             by_season[ssn] = {
                 "matches": sm, "runs": ss["runs"], "balls": ss["balls"],
                 "dismissals": sd,
@@ -896,7 +936,9 @@ def build_output(
                 "sr":  round(ss["runs"]/ss["balls"]*100,2) if ss["balls"] else 0,
                 "fours": ss["fours"], "sixes": ss["sixes"],
                 "fifties": ss["fifties"], "hundreds": ss["hundreds"],
-                "mvp_pts": round(ss.get("mvp_pts", 0), 1),
+                "mvp_pts": mvp_v,
+                "innings": inn_ct,
+                "mvp_per_innings": round(mvp_v / inn_ct, 2) if inn_ct else 0.0,
             }
         # Performance index: avg * (SR/100) - rewards both consistency and aggression
         perf_index = round(avg * (sr/100), 1) if sr > 0 else 0
@@ -911,11 +953,15 @@ def build_output(
         for bt, vt in s.get("vs_type",{}).items():
             vsr = round(vt["r"]/vt["b"]*100,1) if vt["b"] else 0
             vs_type[bt] = {"runs":vt["r"],"balls":vt["b"],"sr":vsr}
+        inn_tot = len(s.get("innings_ids") or [])
+        mvp_tot = round(s.get("mvp_pts", 0), 1)
         bat_row = {"name":name,"matches":m,"runs":s["runs"],"balls":s["balls"],
             "avg":avg,"sr":sr,"fours":s["fours"],"sixes":s["sixes"],
             "fifties":s["fifties"],"hundreds":s["hundreds"],
             "perf_index":perf_index,
-            "mvp_pts": round(s.get("mvp_pts",0), 1),
+            "mvp_pts": mvp_tot,
+            "innings": inn_tot,
+            "mvp_per_innings": round(mvp_tot / inn_tot, 2) if inn_tot else 0.0,
             "phase_stats":phase_stats,
             "vs_type":vs_type,
             "by_season":by_season}
@@ -947,9 +993,20 @@ def build_output(
             secon = round(sr/sb*6, 2) if sb else 0
             savg = round(sr/sw, 2) if sw else None
             sbi = round((sw/sm)*(6/secon), 2) if secon > 0 and sm > 0 else 0
-            bowl_by_season[ssn] = {"matches":sm,"wickets":sw,"runs":sr,"balls":sb,
-                                   "economy":secon,"avg":savg,"bowl_index":sbi,
-                                   "mvp_pts": round(ss.get("mvp_pts", 0), 1)}
+            inn_b = len(ss.get("innings_ids") or [])
+            mvp_b = round(ss.get("mvp_pts", 0), 1)
+            bowl_by_season[ssn] = {
+                "matches": sm,
+                "wickets": sw,
+                "runs": sr,
+                "balls": sb,
+                "economy": secon,
+                "avg": savg,
+                "bowl_index": sbi,
+                "mvp_pts": mvp_b,
+                "innings": inn_b,
+                "mvp_per_innings": round(mvp_b / inn_b, 2) if inn_b else 0.0,
+            }
         # Phase stats for bowler
         raw_bps = s.get("phase_stats",{})
         bowl_phase_stats = {}
@@ -966,9 +1023,13 @@ def build_output(
                 "wickets": hs.get("wickets", 0),
                 "economy": hecon
             }
+        inn_b_tot = len(s.get("innings_ids") or [])
+        mvp_b_tot = round(s.get("mvp_pts", 0), 1)
         bowl_row = {"name":name,"matches":m,"wickets":s["wickets"],"runs":s["runs"],
             "overs":overs,"economy":economy,"avg":avg,"bowl_index":bowl_index,
-            "mvp_pts": round(s.get("mvp_pts",0), 1),
+            "mvp_pts": mvp_b_tot,
+            "innings": inn_b_tot,
+            "mvp_per_innings": round(mvp_b_tot / inn_b_tot, 2) if inn_b_tot else 0.0,
             "phase_stats":bowl_phase_stats,
             "vs_hand":vs_hand,
             "by_season":bowl_by_season}

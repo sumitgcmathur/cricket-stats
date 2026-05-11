@@ -388,13 +388,17 @@ function cmpRender(){
     }
     const rows=[
       ['Matches',b1&&b1.matches,b2&&b2.matches,true],
+      ['Batting innings',b1&&b1.innings,b2&&b2.innings,true],
       ['Runs',b1&&b1.runs,b2&&b2.runs,true],
       ['Average',b1&&b1.avg,b2&&b2.avg,true],
       ['Strike rate',b1&&b1.sr,b2&&b2.sr,true],
       ['50s / 100s',b1?(+(b1.fifties||0)+' / '+(b1.hundreds||0)):'—',b2?(+(b2.fifties||0)+' / '+(b2.hundreds||0)):'—',null],
       ['4s / 6s',b1?(+(b1.fours||0)+' / '+(b1.sixes||0)):'—',b2?(+(b2.fours||0)+' / '+(b2.sixes||0)):'—',null],
       ['MVP pts (bat+field in feed)',b1&&b1.mvp_pts,b2&&b2.mvp_pts,true],
+      ['MVP pts / batting innings',b1&&b1.mvp_per_innings,b2&&b2.mvp_per_innings,true],
       ['Wickets',w1&&w1.wickets,w2&&w2.wickets,true],
+      ['Bowling innings',w1&&w1.innings,w2&&w2.innings,true],
+      ['MVP pts / bowling innings',w1&&w1.mvp_per_innings,w2&&w2.mvp_per_innings,true],
       ['Economy',w1&&w1.economy,w2&&w2.economy,false],
       ['Bowling avg',w1&&w1.avg,w2&&w2.avg,false],
     ];

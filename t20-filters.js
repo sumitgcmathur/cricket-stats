@@ -303,6 +303,7 @@
       hundreds: 0,
       mvp_pts: 0,
       dismissals: 0,
+      innings: 0,
     };
     Object.values(teamNode.by_season).forEach(function (s) {
       agg.matches += s.matches || 0;
@@ -314,12 +315,14 @@
       agg.hundreds += s.hundreds || 0;
       agg.mvp_pts += s.mvp_pts || 0;
       agg.dismissals += s.dismissals || 0;
+      agg.innings += s.innings || 0;
     });
     if (!agg.balls && !agg.runs) return null;
     agg.mvp_pts = +agg.mvp_pts.toFixed(1);
     var avg = agg.dismissals ? +(agg.runs / agg.dismissals).toFixed(2) : agg.runs;
     var sr = agg.balls ? +((agg.runs / agg.balls) * 100).toFixed(2) : 0;
     var perf_index = sr > 0 ? +((avg * (sr / 100)).toFixed(1)) : 0;
+    var innAgg = agg.innings || 0;
     return {
       matches: agg.matches,
       runs: agg.runs,
@@ -329,6 +332,8 @@
       fifties: agg.fifties,
       hundreds: agg.hundreds,
       mvp_pts: agg.mvp_pts,
+      innings: innAgg,
+      mvp_per_innings: innAgg ? +(agg.mvp_pts / innAgg).toFixed(2) : 0,
       avg: avg,
       sr: sr,
       perf_index: perf_index,
@@ -337,13 +342,14 @@
 
   function t20SumBowlTeamBranch(teamNode) {
     if (!teamNode || !teamNode.by_season) return null;
-    var agg = { matches: 0, wickets: 0, runs: 0, balls: 0, mvp_pts: 0 };
+    var agg = { matches: 0, wickets: 0, runs: 0, balls: 0, mvp_pts: 0, innings: 0 };
     Object.values(teamNode.by_season).forEach(function (s) {
       agg.matches += s.matches || 0;
       agg.wickets += s.wickets || 0;
       agg.runs += s.runs || 0;
       agg.balls += s.balls || 0;
       agg.mvp_pts += s.mvp_pts || 0;
+      agg.innings += s.innings || 0;
     });
     if (!agg.balls) return null;
     agg.mvp_pts = +agg.mvp_pts.toFixed(1);
@@ -352,6 +358,7 @@
     var overs = Math.floor(agg.balls / 6) + (agg.balls % 6) / 10;
     var bowl_index =
       economy > 0 && agg.matches > 0 ? +((agg.wickets / agg.matches) * (6 / economy)).toFixed(2) : 0;
+    var innB = agg.innings || 0;
     return {
       matches: agg.matches,
       wickets: agg.wickets,
@@ -362,6 +369,8 @@
       avg: avg,
       bowl_index: bowl_index,
       mvp_pts: agg.mvp_pts,
+      innings: innB,
+      mvp_per_innings: innB ? +(agg.mvp_pts / innB).toFixed(2) : 0,
     };
   }
 
@@ -432,6 +441,7 @@
             acc.hundreds += s.hundreds || 0;
             acc.mvp_pts += s.mvp_pts || 0;
             acc.dismissals += s.dismissals || 0;
+            acc.innings += s.innings || 0;
             return acc;
           },
           {
@@ -444,10 +454,13 @@
             hundreds: 0,
             mvp_pts: 0,
             dismissals: 0,
+            innings: 0,
           }
         );
         /* Keep row if any batting activity in window (e.g. 0 runs but balls faced). */
         if (!agg.matches && !agg.balls && !agg.runs) return null;
+        var mvpBat = +agg.mvp_pts.toFixed(1);
+        var innBat = agg.innings || 0;
         var row = Object.assign({}, p, {
           matches: agg.matches,
           runs: agg.runs,
@@ -456,7 +469,9 @@
           sixes: agg.sixes,
           fifties: agg.fifties,
           hundreds: agg.hundreds,
-          mvp_pts: +agg.mvp_pts.toFixed(1),
+          mvp_pts: mvpBat,
+          innings: innBat,
+          mvp_per_innings: innBat ? +(mvpBat / innBat).toFixed(2) : 0,
           avg: agg.dismissals ? +(agg.runs / agg.dismissals).toFixed(2) : agg.runs,
           sr: agg.balls ? +((agg.runs / agg.balls) * 100).toFixed(2) : 0,
         });
@@ -538,9 +553,10 @@
             acc.runs += s.runs || 0;
             acc.balls += s.balls || 0;
             acc.mvp_pts += s.mvp_pts || 0;
+            acc.innings += s.innings || 0;
             return acc;
           },
-          { matches: 0, wickets: 0, runs: 0, balls: 0, mvp_pts: 0 }
+          { matches: 0, wickets: 0, runs: 0, balls: 0, mvp_pts: 0, innings: 0 }
         );
         if (!agg.balls) return null;
         if (!agg.matches) agg.matches = Math.ceil(agg.balls / 24);
@@ -551,6 +567,8 @@
           economy > 0 && agg.matches > 0
             ? +((agg.wickets / agg.matches) * (6 / economy)).toFixed(2)
             : 0;
+        var mvpBwl = +agg.mvp_pts.toFixed(1);
+        var innBwl = agg.innings || 0;
         var row = Object.assign({}, p, {
           matches: agg.matches,
           wickets: agg.wickets,
@@ -560,7 +578,9 @@
           economy: economy,
           avg: avg,
           bowl_index: bowl_index,
-          mvp_pts: +agg.mvp_pts.toFixed(1),
+          mvp_pts: mvpBwl,
+          innings: innBwl,
+          mvp_per_innings: innBwl ? +(mvpBwl / innBwl).toFixed(2) : 0,
         });
         var byTeamF = p.by_team ? t20FilterByTeamMap(p.by_team, seasonMatches) : null;
         if (byTeamF) row.by_team = byTeamF;

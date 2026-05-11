@@ -38,6 +38,7 @@
               fifties: +b.fifties || 0,
               hundreds: +b.hundreds || 0,
               mvp_pts: parseFloat(b.mvp_pts) || 0,
+              innings: +b.innings || 0,
             };
             return;
           }
@@ -50,6 +51,7 @@
           a.fifties += +b.fifties || 0;
           a.hundreds += +b.hundreds || 0;
           a.mvp_pts = +((parseFloat(a.mvp_pts) || 0) + (parseFloat(b.mvp_pts) || 0)).toFixed(1);
+          a.innings = (a.innings || 0) + (+b.innings || 0);
         });
       });
     });
@@ -61,6 +63,8 @@
         s.avg = sd ? +(s.runs / sd).toFixed(2) : s.runs;
         s.sr = s.balls ? +((s.runs / s.balls) * 100).toFixed(2) : 0;
         s.mvp_pts = +((parseFloat(s.mvp_pts) || 0).toFixed(1));
+        var innB = s.innings || 0;
+        s.mvp_per_innings = innB ? +(s.mvp_pts / innB).toFixed(2) : 0;
       });
     });
     return acc;
@@ -84,6 +88,7 @@
               runs: +b.runs || 0,
               balls: +b.balls || 0,
               mvp_pts: parseFloat(b.mvp_pts) || 0,
+              innings: +b.innings || 0,
             };
             return;
           }
@@ -92,6 +97,7 @@
           a.runs += +b.runs || 0;
           a.balls += +b.balls || 0;
           a.mvp_pts = +((parseFloat(a.mvp_pts) || 0) + (parseFloat(b.mvp_pts) || 0)).toFixed(1);
+          a.innings = (a.innings || 0) + (+b.innings || 0);
         });
       });
     });
@@ -108,6 +114,8 @@
         s.bowl_index =
           s.economy > 0 && sm > 0 ? +((sw / sm) * (6 / s.economy)).toFixed(2) : 0;
         s.mvp_pts = +((parseFloat(s.mvp_pts) || 0).toFixed(1));
+        var innBr = s.innings || 0;
+        s.mvp_per_innings = innBr ? +(s.mvp_pts / innBr).toFixed(2) : 0;
       });
     });
     return acc;
@@ -131,6 +139,7 @@
             fifties: 0,
             hundreds: 0,
             mvp_pts: 0,
+            innings: 0,
           };
         }
         var x = m[p.name];
@@ -143,6 +152,7 @@
         x.fifties += +p.fifties || 0;
         x.hundreds += +p.hundreds || 0;
         x.mvp_pts = +((parseFloat(x.mvp_pts) || 0) + (parseFloat(p.mvp_pts) || 0)).toFixed(1);
+        x.innings += +p.innings || 0;
         x._d += estDismissalsBat(p);
         var pi = parseFloat(p.perf_index);
         if (Number.isFinite(pi)) x._piw += pi * (+p.runs || 0);
@@ -158,7 +168,15 @@
         delete p._piw;
         var mergedBt = mergeByTeamBatMaps(p._btMaps || []);
         delete p._btMaps;
-        var out = Object.assign({}, p, { avg: avg, sr: sr, perf_index: perf_index });
+        var innX = p.innings || 0;
+        var mvpX = parseFloat(p.mvp_pts) || 0;
+        var out = Object.assign({}, p, {
+          avg: avg,
+          sr: sr,
+          perf_index: perf_index,
+          innings: innX,
+          mvp_per_innings: innX ? +(mvpX / innX).toFixed(2) : 0,
+        });
         if (mergedBt && Object.keys(mergedBt).length) out.by_team = mergedBt;
         return out;
       })
@@ -201,7 +219,7 @@
     lists.forEach(function (list) {
       (list || []).forEach(function (p) {
         if (!m[p.name]) {
-          m[p.name] = { name: p.name, _bbMaps: [], matches: 0, wickets: 0, runs: 0, balls: 0, mvp_pts: 0 };
+          m[p.name] = { name: p.name, _bbMaps: [], matches: 0, wickets: 0, runs: 0, balls: 0, mvp_pts: 0, innings: 0 };
         }
         var x = m[p.name];
         if (p.by_team) x._bbMaps.push(p.by_team);
@@ -210,6 +228,7 @@
         x.runs += +p.runs || 0;
         x.balls += bowlingBallsFromRow(p);
         x.mvp_pts = +((parseFloat(x.mvp_pts) || 0) + (parseFloat(p.mvp_pts) || 0)).toFixed(1);
+        x.innings += +p.innings || 0;
       });
     });
     return Object.keys(m)
@@ -222,11 +241,15 @@
           economy > 0 && p.matches > 0 ? +((p.wickets / p.matches) * (6 / economy)).toFixed(2) : 0;
         var mergedB = mergeByTeamBowlMaps(p._bbMaps || []);
         delete p._bbMaps;
+        var innP = p.innings || 0;
+        var mvpP = parseFloat(p.mvp_pts) || 0;
         var out = Object.assign({}, p, {
           overs: +overs.toFixed(1),
           economy: economy,
           avg: avg,
           bowl_index: bowl_index,
+          innings: innP,
+          mvp_per_innings: innP ? +(mvpP / innP).toFixed(2) : 0,
         });
         if (mergedB && Object.keys(mergedB).length) out.by_team = mergedB;
         return out;

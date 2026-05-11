@@ -1174,6 +1174,8 @@ function fillTeamSliceSelect(merged) {
 
 async function buildMergedDataset() {
   const codes = selectedTournamentCodes.length ? selectedTournamentCodes : getT20Competitions().map(c => c.code);
+  /* Drop cached JSON for comps we are merging so re-run fetch shows new fields (e.g. by_team). */
+  codes.forEach(c => { delete loadedData[c]; });
   const parts = [];
   for (const code of codes) {
     let d = await loadComp(code);
@@ -1332,7 +1334,7 @@ function updateSeasonBanner() {
     bannerText.textContent = (yearFrom || '2008') + ' – ' + (yearTo || '2026') + teamBit;
   } else if (activeTeamFilter) {
     banner.style.display = 'flex';
-    bannerText.textContent = 'Team slice: ' + activeTeamFilter + ' (batting + bowling for this side only)';
+    bannerText.textContent = 'Team filter: ' + activeTeamFilter + ' (batting + bowling for this side only)';
   } else {
     banner.style.display = 'none';
   }
@@ -1399,11 +1401,6 @@ async function loadComp(code) {
   } catch (e) {
     return null;
   }
-}
-
-/** Call after regenerating stats/ so the next merge uses fresh JSON. */
-function clearLoadedStatsCache() {
-  loadedData = {};
 }
 
 async function renderStatTab(rawData, skipSeasonFilter) {
@@ -1764,11 +1761,13 @@ function kpi(label, val, name) {
 function renderBatting(d, target, expanded, filterQ) {
   const cols = [
     {k:'matches', l:'Mat'},
+    {k:'innings', l:'Inns', title: 'Distinct team innings with ≥1 ball faced (striker)'},
     {k:'runs',    l:'Runs', hi:true},
     {k:'avg',     l:'Avg'},
     {k:'sr',      l:'SR'},
     {k:'perf_index',l:'PI ⓘ'},
     {k:'mvp_pts', l:'MVP Pts'},
+    {k:'mvp_per_innings', l:'MVP/Inn', title: 'MVP points per innings'},
     {k:'fours',   l:'4s'},
     {k:'sixes',   l:'6s'},
     {k:'fifties', l:'50s'},
@@ -1780,11 +1779,13 @@ function renderBatting(d, target, expanded, filterQ) {
 function renderBowling(d, target, expanded, filterQ) {
   const cols = [
     {k:'matches',  l:'Mat'},
+    {k:'innings',  l:'Inns', title: 'Distinct innings with ≥1 ball bowled'},
     {k:'wickets',  l:'Wkts', hi:true},
     {k:'avg',      l:'Avg'},
     {k:'economy',  l:'Econ'},
     {k:'bowl_index',l:'BI ⓘ'},
     {k:'mvp_pts',  l:'MVP Pts'},
+    {k:'mvp_per_innings', l:'MVP/Inn', title: 'MVP points per innings'},
     {k:'overs',    l:'Overs'},
     {k:'runs',     l:'Runs'},
   ];
@@ -1801,9 +1802,10 @@ function renderTable(target, type, rows, cols, defaultSort, filterQ, showAllRows
   });
   if (filterQ) sorted = sorted.filter(r => r.name.toLowerCase().includes(filterQ.toLowerCase()));
 
-  const thCols = cols.map(col =>
-    `<th class="${key===col.k?'sorted':''}" onclick="sortTbl('${target}','${type}','${col.k}',${key===col.k?dir*-1:-1},'${target}')">${col.l}${key===col.k?(dir===-1?'↓':'↑'):''}</th>`
-  ).join('');
+  const thCols = cols.map(col => {
+    const tt = col.title ? ` title="${t20EscapeHtml(col.title)}"` : '';
+    return `<th class="${key===col.k?'sorted':''}"${tt} onclick="sortTbl('${target}','${type}','${col.k}',${key===col.k?dir*-1:-1},'${target}')">${col.l}${key===col.k?(dir===-1?'↓':'↑'):''}</th>`;
+  }).join('');
 
   const PAGE = 50;
   const showAll = !!showAllRows || !!filterQ || sorted.length <= PAGE;
