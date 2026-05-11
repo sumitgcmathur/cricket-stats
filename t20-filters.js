@@ -600,6 +600,74 @@
     });
   }
 
+  /** Sum per-franchise rows from merged `by_team` (all seasons) for charts. */
+  function t20RollupBatByTeamFranchises(byTeam) {
+    if (!byTeam || typeof byTeam !== 'object') return [];
+    var out = [];
+    Object.keys(byTeam).forEach(function (team) {
+      var tb = byTeam[team];
+      var subs = (tb && tb.by_season) || {};
+      var runs = 0,
+        balls = 0,
+        dismissals = 0,
+        matches = 0;
+      Object.keys(subs).forEach(function (ssn) {
+        var ss = subs[ssn];
+        runs += +ss.runs || 0;
+        balls += +ss.balls || 0;
+        dismissals += +ss.dismissals || 0;
+        matches += +ss.matches || 0;
+      });
+      if (runs < 1 && balls < 1) return;
+      out.push({
+        team: team,
+        runs: runs,
+        balls: balls,
+        dismissals: dismissals,
+        matches: matches,
+        avg: dismissals ? +((runs / dismissals).toFixed(2)) : runs,
+        sr: balls ? +(((runs / balls) * 100).toFixed(1)) : 0,
+      });
+    });
+    out.sort(function (a, b) {
+      return b.runs - a.runs;
+    });
+    return out;
+  }
+
+  function t20RollupBowlByTeamFranchises(byTeam) {
+    if (!byTeam || typeof byTeam !== 'object') return [];
+    var out = [];
+    Object.keys(byTeam).forEach(function (team) {
+      var tb = byTeam[team];
+      var subs = (tb && tb.by_season) || {};
+      var wickets = 0,
+        runs = 0,
+        balls = 0,
+        matches = 0;
+      Object.keys(subs).forEach(function (ssn) {
+        var ss = subs[ssn];
+        wickets += +ss.wickets || 0;
+        runs += +ss.runs || 0;
+        balls += +ss.balls || 0;
+        matches += +ss.matches || 0;
+      });
+      if (!balls) return;
+      out.push({
+        team: team,
+        wickets: wickets,
+        runs: runs,
+        balls: balls,
+        matches: matches,
+        economy: balls ? +(((runs / balls) * 6).toFixed(2)) : 0,
+      });
+    });
+    out.sort(function (a, b) {
+      return b.wickets - a.wickets;
+    });
+    return out;
+  }
+
   function t20MatchPassesFilters(m, activeSeason, yearFrom, yearTo) {
     if (!m) return false;
     if (activeSeason !== 'all') {
@@ -637,5 +705,7 @@
   g.t20MatchPassesFilters = t20MatchPassesFilters;
   g.t20DefaultFilterCodes = t20DefaultFilterCodes;
   g.t20EscapeHtml = t20EscapeHtml;
+  g.t20RollupBatByTeamFranchises = t20RollupBatByTeamFranchises;
+  g.t20RollupBowlByTeamFranchises = t20RollupBowlByTeamFranchises;
   g.FOCUS_MENS_T20_CODES = FOCUS_MENS_T20_CODES;
 })(typeof window !== 'undefined' ? window : globalThis);

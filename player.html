@@ -429,7 +429,7 @@ function showInitials(){
 }
 
 /** Browser cache for resolved photo URLs (local JSON, Wikipedia, Wikidata→Commons). */
-const PLAYER_PHOTO_CACHE_KEY = 't20_player_photo_v2';
+const PLAYER_PHOTO_CACHE_KEY = 't20_player_photo_v3';
 const PLAYER_PHOTO_POS_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const PLAYER_PHOTO_NEG_TTL_MS = 6 * 60 * 60 * 1000;
 
@@ -479,6 +479,39 @@ function photoUrlFromLocalOverrides(map, displayName){
   return null;
 }
 
+function photoNameParts(displayName){
+  return String(displayName||'').trim().split(/\s+/).filter(Boolean);
+}
+function photoLastNameKey(parts){
+  if(!parts.length) return '';
+  return parts[parts.length-1].replace(/[^A-Za-z]/g,'').toLowerCase();
+}
+/** Cricsheet-style "S Dube" / "V Kohli" — Wikipedia search often returns the wrong "S…" article without extra checks. */
+function photoLooksLikeInitialFirst(parts){
+  if(parts.length<2) return false;
+  const f=parts[0];
+  return f.length>0 && f.length<=2 && /^[A-Za-z.]+$/.test(f);
+}
+function wikiTitleMatchesPlayerLastName(title, lastKey){
+  if(!lastKey || lastKey.length<2) return true;
+  const norm=String(title||'').toLowerCase().replace(/[^a-z]/g,'');
+  return norm.includes(lastKey);
+}
+function buildPhotoWikiTitleCandidates(key, parts, initialFirst){
+  const attempts=[];
+  const add=t=>{ const s=String(t).trim(); if(s&&!attempts.includes(s)) attempts.push(s); };
+  add(key+' (cricketer)');
+  add(key+' (Indian cricketer)');
+  add(key);
+  if(parts.length>=2){
+    add(parts[parts.length-1]+', '+parts[0]);
+  }
+  if(!initialFirst && parts.length>=2){
+    add(parts[parts.length-1]);
+  }
+  return attempts;
+}
+
 const WD_CRICKETER_Q = 'Q122998';
 
 function wikidataP18Filename(claims){
@@ -524,7 +557,9 @@ async function commonsThumbFromFilename(commonsFileName){
 /** Wikidata (P18) + Wikimedia Commons thumbnail; prefer items with occupation cricketer. */
 async function wikidataPhotoForPlayer(displayName){
   const key = displayName.trim();
-  const parts = key.split(/\s+/).filter(Boolean);
+  const parts = photoNameParts(key);
+  const lastKey = photoLastNameKey(parts);
+  const strictLast = photoLooksLikeInitialFirst(parts) && lastKey.length >= 2;
   const searches = [
     key + ' cricketer',
     parts.length >= 2 ? parts[parts.length - 1] + ' ' + parts.slice(0, -1).join(' ') + ' cricketer' : null,
@@ -546,6 +581,10 @@ async function wikidataPhotoForPlayer(displayName){
       if(!h?.id || tried.has(h.id)) continue;
       const desc = (h.description || '').toLowerCase();
       if(desc && !/cricket/.test(desc) && /cricketer/i.test(q)) continue;
+      if(strictLast){
+        const lab = ((h.label||'')+' '+(h.description||'')).toLowerCase().replace(/[^a-z]/g,'');
+        if(!lab.includes(lastKey)) continue;
+      }
       tried.add(h.id);
       ids.push(h.id);
       if(ids.length >= 8) break;
@@ -565,6 +604,10 @@ async function wikidataPhotoForPlayer(displayName){
       const ent = entities[id];
       const claims = ent?.claims;
       if(!claims) continue;
+      if(strictLast){
+        const enLab = (ent.labels?.en?.value || '').toString();
+        if(!wikiTitleMatchesPlayerLastName(enLab, lastKey)) continue;
+      }
       const fn = wikidataP18Filename(claims);
       if(!fn) continue;
       withP18.push({ fn, cricket: wikidataIsCricketer(claims) });
