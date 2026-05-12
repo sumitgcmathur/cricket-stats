@@ -168,7 +168,7 @@ async function loadAllMatchIndices(){
   allMatchesRaw=[];
   for(const code of selectedTournamentCodes){
     try{
-      const r=await fetch('stats/matches/'+code+'/index.json');
+      const r=await fetch('stats/matches/'+code+'/index.json', { cache: 'no-store' });
       if(!r.ok)continue;
       const j=await r.json();
       (j.matches||[]).forEach(m=>{allMatchesRaw.push(Object.assign({},m,{_comp:code}));});

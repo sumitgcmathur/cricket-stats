@@ -217,7 +217,7 @@ async function loadMergedMatchIndices(){
   let okCount=0;
   for(const code of selectedTournamentCodes){
     try{
-      const r=await fetch('stats/matches/'+code+'/index.json');
+      const r=await fetch('stats/matches/'+code+'/index.json', { cache: 'no-store' });
       if(!r.ok)continue;
       okCount++;
       const j=await r.json();
@@ -436,7 +436,7 @@ async function openScorecard(id, compCode){
   document.getElementById('bc').textContent='Scorecard';
   killCharts();
   try{
-    const r=await fetch('stats/matches/'+currentScorecardComp+'/'+id+'.json');
+    const r=await fetch('stats/matches/'+currentScorecardComp+'/'+id+'.json', { cache: 'no-store' });
     if(!r.ok)throw new Error('HTTP '+r.status);
     const sc=await r.json();
     buildScorecard(sv,sc);
