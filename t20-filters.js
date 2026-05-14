@@ -51,6 +51,62 @@
   }
 
   var T20_INDEX_CACHE = null;
+  /** Set from stats/index.json last_updated so stats/*.json URLs change after nightly rebuild (CDN + browser cache). */
+  var T20_STATS_CACHE_BUST = null;
+
+  function t20SetStatsCacheBustFromIndex(idx) {
+    T20_STATS_CACHE_BUST = idx && idx.last_updated != null ? String(idx.last_updated) : null;
+  }
+
+  /**
+   * Fetch under stats/ without stale caches: no-store + optional ?v= from index last_updated (set after index load).
+   */
+  function t20FetchStatsJson(relativePath) {
+    var base =
+      typeof document !== 'undefined' && document.baseURI
+        ? document.baseURI
+        : typeof location !== 'undefined' && location.href
+          ? location.href
+          : 'http://localhost/';
+    var u = new URL(relativePath, base).href;
+    if (T20_STATS_CACHE_BUST) {
+      u += (u.indexOf('?') >= 0 ? '&' : '?') + 'v=' + encodeURIComponent(T20_STATS_CACHE_BUST);
+    }
+    return fetch(u, { cache: 'no-store' });
+  }
+
+  /** Re-read stats/index.json (no query string) to pick up new last_updated after nightly jobs — tab back from background. */
+  function t20RefreshStatsCacheBustFromNetwork() {
+    var base =
+      typeof document !== 'undefined' && document.baseURI
+        ? document.baseURI
+        : typeof location !== 'undefined' && location.href
+          ? location.href
+          : 'http://localhost/';
+    return fetch(new URL('stats/index.json', base).href, { cache: 'no-store' })
+      .then(function (res) {
+        if (!res.ok) return null;
+        return res.json();
+      })
+      .then(function (j) {
+        if (j && j.last_updated) t20SetStatsCacheBustFromIndex(j);
+        return j;
+      });
+  }
+
+  var _t20VisBustTimer = null;
+  function t20BindStatsBustOnTabVisible() {
+    if (typeof document === 'undefined' || g._t20VisibilityBustBound) return;
+    g._t20VisibilityBustBound = true;
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState !== 'visible') return;
+      clearTimeout(_t20VisBustTimer);
+      _t20VisBustTimer = setTimeout(function () {
+        t20RefreshStatsCacheBustFromNetwork();
+      }, 400);
+    });
+  }
+  t20BindStatsBustOnTabVisible();
 
   /** Escape text for safe insertion into HTML (stats names, team labels, etc.). */
   function t20EscapeHtml(s) {
@@ -65,13 +121,14 @@
 
   function t20FetchIndex() {
     if (T20_INDEX_CACHE) return Promise.resolve(T20_INDEX_CACHE);
-    return fetch('stats/index.json')
+    return t20FetchStatsJson('stats/index.json')
       .then(function (res) {
         if (!res.ok) throw new Error('stats/index.json HTTP ' + res.status);
         return res.json();
       })
       .then(function (j) {
         T20_INDEX_CACHE = j;
+        t20SetStatsCacheBustFromIndex(j);
         return j;
       });
   }
@@ -83,6 +140,7 @@
   /** Sync cache when the host page already fetched stats/index.json (avoids a duplicate fetch). */
   function t20PrimeIndexCache(idx) {
     T20_INDEX_CACHE = idx || null;
+    t20SetStatsCacheBustFromIndex(idx);
   }
 
   /**
@@ -695,6 +753,8 @@
   g.t20FetchIndex = t20FetchIndex;
   g.t20GetCachedIndex = t20GetCachedIndex;
   g.t20PrimeIndexCache = t20PrimeIndexCache;
+  g.t20FetchStatsJson = t20FetchStatsJson;
+  g.t20RefreshStatsCacheBustFromNetwork = t20RefreshStatsCacheBustFromNetwork;
   g.t20GetT20Competitions = t20GetT20Competitions;
   g.t20UnionSeasonsForCodes = t20UnionSeasonsForCodes;
   g.t20ReadFilterParams = t20ReadFilterParams;

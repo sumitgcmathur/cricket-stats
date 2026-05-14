@@ -206,7 +206,8 @@ async function loadCompRaw(code){
   if(!code)return;
   if(allDataRaw[code])return;
   try{
-    const r=await fetch('stats/'+code+'.json');
+    const fetchFn=typeof t20FetchStatsJson==='function'?t20FetchStatsJson:(path)=>fetch(path,{cache:'no-store'});
+    const r=await fetchFn('stats/'+code+'.json');
     if(!r.ok)throw new Error('HTTP '+r.status);
     allDataRaw[code]=await r.json();
   }catch(e){console.warn('stats/'+code+'.json',e.message);}
@@ -470,6 +471,9 @@ async function cmpReloadData(){
   cmpHideAllSuggest();
   cmpSyncUrl();
   allDataRaw={};
+  if(typeof t20RefreshStatsCacheBustFromNetwork==='function'){
+    try{ await t20RefreshStatsCacheBustFromNetwork(); }catch(e){}
+  }
   await cmpRender();
 }
 

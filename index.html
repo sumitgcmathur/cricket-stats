@@ -936,7 +936,7 @@ footer a { color: var(--blue); text-decoration: none; }
             <input class="year-input" type="number" id="year-to" placeholder="To" min="1995" max="2035" onchange="onYearRange()">
           </div>
           <span class="inline-lab" id="team-slice-wrap" hidden style="margin-left:8px">Team filter</span>
-          <select class="season-select" id="team-slice-select" hidden style="max-width:220px" title="Batting while playing for this side; bowling while this side is fielding. Hard refresh (Ctrl+Shift+R) if options stay empty after re-fetch." onchange="onTeamSliceChange()">
+          <select class="season-select" id="team-slice-select" hidden style="max-width:220px" title="Batting while playing for this side; bowling while this side is fielding. If options look empty after a data update, switch away from this tab and back, or reload the page." onchange="onTeamSliceChange()">
             <option value="all">All teams (career totals)</option>
           </select>
         </div>
@@ -1224,10 +1224,7 @@ async function refreshDashboard() {
 async function boot() {
   try {
     if (typeof t20EnsureSiteConfig === 'function') await t20EnsureSiteConfig();
-    const res = await fetch('stats/index.json');
-    if (!res.ok) throw new Error('stats/index.json not found (HTTP ' + res.status + ')');
-    index = await res.json();
-    if (typeof t20PrimeIndexCache === 'function') t20PrimeIndexCache(index);
+    index = await t20FetchIndex();
     document.getElementById('header-updated').textContent = 'Updated: ' + index.last_updated;
     document.getElementById('footer-updated').textContent = 'Updated: ' + index.last_updated;
     const fp = t20ReadFilterParams(location.search, index);
@@ -1394,8 +1391,8 @@ function aggregateSeasonData() {} // kept for compatibility
 async function loadComp(code) {
   if (loadedData[code]) return loadedData[code];
   try {
-    /* Avoid stale JSON after local re-run of fetch_all_cricket.py (browser cache). */
-    const res = await fetch('stats/' + code + '.json', { cache: 'no-store' });
+    const fetchFn = typeof t20FetchStatsJson === 'function' ? t20FetchStatsJson : (path) => fetch(path, { cache: 'no-store' });
+    const res = await fetchFn('stats/' + code + '.json');
     loadedData[code] = await res.json();
     return loadedData[code];
   } catch (e) {

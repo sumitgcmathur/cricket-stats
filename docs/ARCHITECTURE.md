@@ -127,12 +127,22 @@ flowchart TB
 1. Load **`config.json`** (focus leagues, defaults).
 2. Load **`stats/index.json`** → competition list and metadata.
 3. User picks tournaments / season / year → **`t20ReadFilterParams` / `t20WriteFilterParams`** keep URL and UI aligned.
-4. For each selected code, **`fetch('stats/' + code + '.json')`** (often with cache control so merges pick up new JSON).
+4. For each selected code, **`t20FetchStatsJson('stats/' + code + '.json')`** — see **Cache busting** below.
 5. Optionally **`t20FilterBySeason`** clones and trims rows by season or calendar year.
 6. **`t20MergeDatasets`** combines leagues for tables and KPIs.
 7. **Chart.js** renders charts from merged rows.
 
 **`player.html`** is similar but keyed by **`?name=...`** plus the same filter query string; it loads competition JSON and selects rows by player name. Photos use **`stats/player_photos.json`** overrides first, then Wikipedia / Wikidata, with browser caching keyed by player name.
+
+### Cache busting (nightly `stats/` updates)
+
+Static hosts and browsers may cache JSON by URL. The app uses:
+
+- **`t20FetchStatsJson(relativePath)`** in **`t20-filters.js`**: `fetch` with **`cache: 'no-store'`** and, after **`stats/index.json`** is loaded, a query string **`?v=<index.last_updated>`** so URLs change whenever the fetcher writes a new index timestamp (helps CDNs as well as the browser).
+- **`t20RefreshStatsCacheBustFromNetwork()`**: re-fetches **`stats/index.json`** without `?v=` and updates the bust string — used when the tab becomes visible again (long-lived tabs after a nightly job) and when compare’s **`cmpReloadData`** runs.
+- **`t20FetchIndex()`** / **`t20PrimeIndexCache()`** set the bust from the index payload.
+
+For **origin `Cache-Control`** (e.g. GitHub Pages), you cannot set headers from static files alone; the client-side approach above is the main fix. For full control, put the site behind a CDN or reverse proxy and set short TTL or `no-cache` for `/stats/*`.
 
 ---
 

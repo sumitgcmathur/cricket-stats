@@ -333,7 +333,8 @@ async function loadCompRaw(code){
   if(!code||typeof code!=='string'){console.warn('loadCompRaw: missing competition code');return;}
   if(allDataRaw[code])return;
   try{
-    const r=await fetch(`stats/${code}.json`);
+    const fetchFn=typeof t20FetchStatsJson==='function'?t20FetchStatsJson:(path)=>fetch(path,{cache:'no-store'});
+    const r=await fetchFn('stats/'+code+'.json');
     if(!r.ok)throw new Error('HTTP '+r.status);
     allDataRaw[code]=await r.json();
   }catch(e){
@@ -460,7 +461,9 @@ let localPhotoOverridesPromise = null;
 /** Optional stats/player_photos.json: { "Player Name": "https://..." } — URLs you are allowed to serve. */
 async function getLocalPhotoOverrides(){
   if(localPhotoOverridesPromise) return localPhotoOverridesPromise;
-  localPhotoOverridesPromise = fetch('stats/player_photos.json')
+  localPhotoOverridesPromise = (typeof t20FetchStatsJson === 'function'
+    ? t20FetchStatsJson('stats/player_photos.json')
+    : fetch('stats/player_photos.json', { cache: 'no-store' }))
     .then(r => (r.ok ? r.json() : {}))
     .catch(() => ({}));
   return localPhotoOverridesPromise;
