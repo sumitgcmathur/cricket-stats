@@ -301,6 +301,45 @@ def build_scorecard(match_id, rows, match_winner="", match_win_margin="", match_
 
     innings_list = [serialise_innings(k, v) for k, v in sorted(innings_data.items())]
 
+    def _infer_super_over_winner(inn_list):
+        """Cricsheet often leaves winner blank when outcome is 'tie' but SO decides it (innings 3–4)."""
+        if not inn_list or len(inn_list) < 4:
+            return ""
+        i1, i2, i3, i4 = inn_list[0], inn_list[1], inn_list[2], inn_list[3]
+        r1, r2 = int(i1.get("total_runs") or 0), int(i2.get("total_runs") or 0)
+        if r1 != r2:
+            return ""
+        try:
+            o3 = float(i3.get("overs") or 0)
+            o4 = float(i4.get("overs") or 0)
+        except (TypeError, ValueError):
+            return ""
+        # Super overs are short; avoid misreading multi-day formats with many innings.
+        if o3 > 3 or o4 > 3:
+            return ""
+        ra = int(i3.get("total_runs") or 0)
+        rb = int(i4.get("total_runs") or 0)
+        wka = int(i3.get("total_wickets") or 0)
+        wkb = int(i4.get("total_wickets") or 0)
+        ta = norm_team(i3.get("batting_team") or "")
+        tb = norm_team(i4.get("batting_team") or "")
+        if not ta or not tb:
+            return ""
+        if ra > rb:
+            return ta
+        if rb > ra:
+            return tb
+        if wka < wkb:
+            return ta
+        if wkb < wka:
+            return tb
+        return ""
+
+    if not winner and len(innings_list) >= 4:
+        inferred = _infer_super_over_winner(innings_list)
+        if inferred:
+            winner = inferred
+
     # Match summary for index
     teams_from_innings = [i["batting_team"] for i in innings_list if i.get("batting_team")]
     scores_from_innings = [f"{i['total_runs']}/{i['total_wickets']} ({i['overs']} ov)" for i in innings_list]
@@ -798,6 +837,16 @@ def parse_zip(zip_bytes, comp):
                     sc_path = os.path.join(matches_dir, f"{match_id}.json")
                     with open(sc_path, "w", encoding="utf-8") as sf:
                         json.dump(sc, sf, ensure_ascii=False, separators=(",",":"))
+                    # If scorecard inferred a SO winner but info had no winner (tie), credit team wins once.
+                    w_card = norm_team(sc.get("winner") or "")
+                    if w_card and not match_winner_from_info:
+                        if match_id not in team_won_matches[w_card]:
+                            team_won_matches[w_card].add(match_id)
+                            teams[w_card]["wins"] += 1
+                            if season:
+                                if season not in teams[w_card]["by_season"]:
+                                    teams[w_card]["by_season"][season] = {"wins": 0, "matches": 0}
+                                teams[w_card]["by_season"][season]["wins"] += 1
                     # Add to match index (lightweight)
                     norm_teams = [norm_team(t) for t in (sc.get("teams") or []) if t]
                     # ensure 2 teams when possible
