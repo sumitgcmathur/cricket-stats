@@ -1,12 +1,12 @@
 {
-  "last_updated": "25 May 2026, 21:45",
+  "last_updated": "26 May 2026, 13:15",
   "competitions": [
     {
       "code": "t20s",
       "name": "Men's T20 Internationals",
       "format": "T20",
       "type": "international",
-      "total_matches": 3334,
+      "total_matches": 3350,
       "seasons": [
         "2004/05",
         "2005",
@@ -59,7 +59,7 @@
       "name": "Indian Premier League",
       "format": "T20",
       "type": "league",
-      "total_matches": 1235,
+      "total_matches": 1239,
       "seasons": [
         "2007/08",
         "2009",
