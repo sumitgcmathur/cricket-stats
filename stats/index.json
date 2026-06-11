@@ -1,5 +1,5 @@
 {
-  "last_updated": "10 Jun 2026, 22:27",
+  "last_updated": "11 Jun 2026, 22:22",
   "competitions": [
     {
       "code": "t20s",
@@ -59,7 +59,7 @@
       "name": "Indian Premier League",
       "format": "T20",
       "type": "league",
-      "total_matches": 1243,
+      "total_matches": 1244,
       "seasons": [
         "2007/08",
         "2009",
@@ -87,7 +87,7 @@
       "name": "Big Bash League",
       "format": "T20",
       "type": "league",
-      "total_matches": 662,
+      "total_matches": 663,
       "seasons": [
         "2011/12",
         "2012/13",
@@ -111,7 +111,7 @@
       "name": "Caribbean Premier League",
       "format": "T20",
       "type": "league",
-      "total_matches": 407,
+      "total_matches": 408,
       "seasons": [
         "2013",
         "2014",
@@ -133,7 +133,7 @@
       "name": "SA20",
       "format": "T20",
       "type": "league",
-      "total_matches": 130,
+      "total_matches": 131,
       "seasons": [
         "2022/23",
         "2023/24",
