@@ -1,12 +1,12 @@
 {
-  "last_updated": "20 Aug 2026, 20:56",
+  "last_updated": "21 Aug 2026, 20:50",
   "competitions": [
     {
       "code": "t20s",
       "name": "Men's T20 Internationals",
       "format": "T20",
       "type": "international",
-      "total_matches": 3521,
+      "total_matches": 3526,
       "seasons": [
         "2004/05",
         "2005",
@@ -111,7 +111,7 @@
       "name": "Caribbean Premier League",
       "format": "T20",
       "type": "league",
-      "total_matches": 418,
+      "total_matches": 420,
       "seasons": [
         "2013",
         "2014",
