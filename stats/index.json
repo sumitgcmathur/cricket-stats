@@ -1,5 +1,5 @@
 {
-  "last_updated": "01 Sep 2026, 22:44",
+  "last_updated": "02 Sep 2026, 22:46",
   "competitions": [
     {
       "code": "t20s",
@@ -111,7 +111,7 @@
       "name": "Caribbean Premier League",
       "format": "T20",
       "type": "league",
-      "total_matches": 429,
+      "total_matches": 430,
       "seasons": [
         "2013",
         "2014",
