@@ -1,12 +1,12 @@
 {
-  "last_updated": "24 Oct 2026, 22:38",
+  "last_updated": "25 Oct 2026, 22:44",
   "competitions": [
     {
       "code": "t20s",
       "name": "Men's T20 Internationals",
       "format": "T20",
       "type": "international",
-      "total_matches": 3627,
+      "total_matches": 3646,
       "seasons": [
         "2004/05",
         "2005",
